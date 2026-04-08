@@ -1,0 +1,22 @@
+Module 2 et handoff générés. Voici le récapitulatif :
+
+**Module 2 — Network Access** (`modules/MODULE-2-network-access.md`)
+- **9/9 topics** couverts (2.1 à 2.9)
+- ~14 800 mots / ~59 pages estimées
+- **9 sections** avec théorie détaillée, CLI outputs réalistes, schémas ASCII
+- **9 exercices** avec solutions cachées
+- **3 labs Packet Tracer** (VLANs+Trunks+Inter-VLAN, EtherChannel LACP, RSTP)
+- **15 questions quiz** format examen avec explications
+- **9 encadrés "Point exam"** (pièges courants)
+- **22 tableaux comparatifs**, **11 schémas ASCII**, **14 commandes CLI avec output**
+- Cross-references vers Modules 1, 4 et 5
+
+**Points forts du contenu :**
+- Anatomie du tag 802.1Q (TPID/PCP/DEI/VID) en schéma ASCII
+- Matrice complète de négociation LACP/PAgP
+- Élection root bridge STP pas-à-pas avec exercice de calcul
+- Architecture split-MAC/CAPWAP et FlexConnect bien détaillées
+- Tableau comparatif global des 8 méthodes d'accès management
+- GUI WLC représentée en ASCII avec tous les paramètres clés
+
+**Handoff** (`handoffs/HANDOFF-MODULE-2.md`) créé avec les notes de transition vers le Module 3.

@@ -1,0 +1,223 @@
+/*-- scss:defaults --*/
+
+// === Couleurs principales ===
+$navy:        #1a2332;
+$cisco-blue:  #049fd9;
+$light-gray:  #f4f6f8;
+$medium-gray: #e2e6ea;
+$dark-gray:   #6c757d;
+$accent:      #ff6b35;
+$lab-green:   #28a745;
+$white:       #ffffff;
+
+// === Quarto variables ===
+$body-bg:           $white;
+$body-color:        #2d3748;
+$link-color:        $cisco-blue;
+$link-hover-color:  darken($cisco-blue, 12%);
+
+$font-family-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+$font-family-monospace:  "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+$font-size-base:         1rem;
+
+$headings-font-weight:   600;
+$headings-color:         $navy;
+
+$toc-color:              $navy;
+$toc-active-border:      $cisco-blue;
+
+$code-bg:                #1e1e2e;
+$code-color:             #cdd6f4;
+
+/*-- scss:rules --*/
+
+// === Titres ===
+h1, .h1 { border-bottom: 3px solid $cisco-blue; padding-bottom: 0.4rem; margin-bottom: 1.2rem; }
+h2, .h2 { border-bottom: 1px solid $medium-gray; padding-bottom: 0.3rem; }
+h3, .h3 { color: lighten($navy, 15%); }
+
+// === Callouts ===
+
+// Point exam — bleu Cisco
+.callout-tip {
+  border-left-color: $cisco-blue !important;
+
+  .callout-header {
+    background-color: rgba($cisco-blue, 0.08);
+    color: darken($cisco-blue, 10%);
+  }
+
+  .callout-icon::before {
+    content: "\f19d"; // graduation cap
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+  }
+}
+
+// Attention — orange accent
+.callout-warning {
+  border-left-color: $accent !important;
+
+  .callout-header {
+    background-color: rgba($accent, 0.08);
+    color: darken($accent, 10%);
+  }
+}
+
+// Note technique — gris
+.callout-note {
+  border-left-color: $dark-gray !important;
+
+  .callout-header {
+    background-color: rgba($dark-gray, 0.08);
+    color: $navy;
+  }
+}
+
+// Lab — vert
+.callout-important {
+  border-left-color: $lab-green !important;
+
+  .callout-header {
+    background-color: rgba($lab-green, 0.08);
+    color: darken($lab-green, 10%);
+  }
+}
+
+// === Blocs de code Cisco ===
+div.sourceCode {
+  background-color: $code-bg;
+  border-left: 4px solid $cisco-blue;
+  border-radius: 6px;
+  padding: 0;
+  margin: 1rem 0;
+
+  pre {
+    background-color: $code-bg;
+    color: $code-color;
+    padding: 1rem 1.2rem;
+    border-radius: 6px;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    overflow-x: auto;
+  }
+
+  code {
+    background-color: transparent;
+    color: inherit;
+  }
+}
+
+// Code inline
+code:not(.sourceCode) {
+  background-color: $light-gray;
+  color: $navy;
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+  font-size: 0.88em;
+}
+
+// === Tableaux ===
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2rem 0;
+  font-size: 0.92rem;
+
+  thead {
+    th {
+      background-color: $navy;
+      color: $white;
+      padding: 0.65rem 0.8rem;
+      text-align: left;
+      font-weight: 600;
+      border: none;
+    }
+  }
+
+  tbody {
+    tr {
+      border-bottom: 1px solid $medium-gray;
+
+      &:nth-child(even) {
+        background-color: $light-gray;
+      }
+
+      &:hover {
+        background-color: darken($light-gray, 3%);
+      }
+    }
+
+    td {
+      padding: 0.55rem 0.8rem;
+      vertical-align: top;
+    }
+  }
+}
+
+// === Sidebar navigation ===
+.sidebar-navigation {
+  .sidebar-title {
+    font-weight: 700;
+    color: $navy;
+  }
+
+  .sidebar-item-text {
+    font-size: 0.9rem;
+  }
+
+  .sidebar-item.active > .sidebar-item-text {
+    color: $cisco-blue;
+    font-weight: 600;
+  }
+
+  .sidebar-item-container {
+    border-left: 2px solid transparent;
+
+    &.active {
+      border-left-color: $cisco-blue;
+    }
+  }
+}
+
+// === Cover page (HTML) ===
+.quarto-title-block {
+  .quarto-title {
+    color: $navy;
+  }
+
+  .quarto-title .subtitle {
+    color: $cisco-blue;
+    font-weight: 400;
+  }
+}
+
+// === Miscellaneous ===
+blockquote {
+  border-left: 4px solid $cisco-blue;
+  background-color: $light-gray;
+  padding: 0.8rem 1.2rem;
+  margin: 1rem 0;
+  color: $navy;
+
+  p { margin-bottom: 0; }
+}
+
+hr {
+  border-top: 2px solid $medium-gray;
+  margin: 2rem 0;
+}
+
+// === Responsive ===
+@media (max-width: 768px) {
+  div.sourceCode pre {
+    font-size: 0.82rem;
+    padding: 0.8rem;
+  }
+
+  table {
+    font-size: 0.85rem;
+    display: block;
+    overflow-x: auto;
+  }
+}

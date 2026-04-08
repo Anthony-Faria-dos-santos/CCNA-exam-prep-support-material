@@ -1,0 +1,99 @@
+---
+title: "Guide CCNA 200-301 v1.1"
+subtitle: "Formation complète — Théorie, Labs & Examens blancs"
+author: "Anthony Faria Dos Santos"
+date: today
+date-format: "D MMMM YYYY"
+---
+
+## Préface {.unnumbered}
+
+## Objectif de ce guide
+
+Ce guide couvre l'intégralité du programme **Cisco CCNA 200-301 v1.1**, aligné sur les *exam topics* officiels et le curriculum NetAcad. Il a été conçu pour fournir une ressource unique, complète et structurée, combinant théorie approfondie, pratique CLI et préparation à l'examen.
+
+## Public cible
+
+- Étudiants en formation réseau préparant la certification CCNA
+- Professionnels IT souhaitant valider leurs compétences réseau
+- Techniciens réseau en reconversion ou montée en compétences
+- Toute personne autonome souhaitant un guide structuré et exhaustif
+
+## Structure du guide
+
+Ce guide est organisé en **6 modules théoriques** correspondant aux domaines de l'examen, suivis de sections pratiques :
+
+| Partie | Contenu |
+|--------|---------|
+| **Fondamentaux** | Modules 1-2 : bases réseau, modèle OSI/TCP-IP, switching, VLANs |
+| **Connectivité & Services** | Modules 3-4 : routage, OSPF, NAT, DHCP, DNS, QoS |
+| **Sécurité & Automatisation** | Modules 5-6 : sécurité L2/L3, AAA, REST APIs, Ansible |
+| **Pratique** | Labs Packet Tracer, exercices transversaux, exam blanc |
+| **Annexes** | Glossaire A-Z des termes réseau |
+
+## Comment utiliser ce guide
+
+1. **Lecture séquentielle** : les modules sont ordonnés par progression logique
+2. **Points exam** : les callouts bleus signalent les sujets fréquemment testés
+3. **Labs pratiques** : chaque concept clé est accompagné d'exercices CLI
+4. **Auto-évaluation** : quizzes par module + exam blanc de 100+ questions
+5. **Révision ciblée** : utilisez la table des matières et la recherche pour cibler vos faiblesses
+
+## Légende des callouts
+
+::: {.callout-tip}
+## Point exam
+Concept fréquemment testé à l'examen CCNA. À maîtriser impérativement.
+:::
+
+::: {.callout-important}
+## Lab
+Exercice pratique à réaliser dans Packet Tracer ou sur équipement réel.
+:::
+
+::: {.callout-note}
+## Note technique
+Complément d'information ou détail technique approfondi.
+:::
+
+::: {.callout-warning}
+## Attention
+Piège courant, erreur fréquente ou point de vigilance.
+:::
+
+## Poids des domaines à l'examen
+
+L'examen CCNA 200-301 comporte **100 à 120 questions** en **120 minutes**. Voici la répartition officielle :
+
+| Domaine | Poids | Module |
+|---------|:-----:|--------|
+| 1.0 Network Fundamentals | **20%** | Module 1 |
+| 2.0 Network Access | **20%** | Module 2 |
+| 3.0 IP Connectivity | **25%** | Module 3 |
+| 4.0 IP Services | **10%** | Module 4 |
+| 5.0 Security Fundamentals | **15%** | Module 5 |
+| 6.0 Automation and Programmability | **10%** | Module 6 |
+
+: Répartition des domaines CCNA 200-301 {#tbl-domains}
+
+## Planning de révision — 10 semaines
+
+| Semaine | Focus | Objectif |
+|:-------:|-------|----------|
+| 1 | Module 1 — Network Fundamentals (partie 1) | OSI, TCP/IP, types de réseau, composants |
+| 2 | Module 1 — Network Fundamentals (partie 2) | IPv4/IPv6, câblage, topologies, Wireshark |
+| 3 | Module 2 — Network Access | VLANs, trunking, STP, EtherChannel, WiFi |
+| 4 | Module 3 — IP Connectivity (partie 1) | Routage statique, tables de routage, subnetting |
+| 5 | Module 3 — IP Connectivity (partie 2) | OSPF single-area, FHRPs |
+| 6 | Module 4 — IP Services | NAT/PAT, DHCP, DNS, NTP, SNMP, QoS |
+| 7 | Module 5 — Security Fundamentals | Sécurité L2/L3, ACLs, AAA, VPN, 802.1X |
+| 8 | Module 6 — Automation | REST APIs, JSON, Ansible, Puppet, Chef, SDN |
+| 9 | Labs + Exercices transversaux | Labs Packet Tracer, subnetting drill, révision |
+| 10 | Exam blanc + révisions finales | Simulation d'examen, points faibles, dernières révisions |
+
+: Planning de révision sur 10 semaines {#tbl-planning}
+
+::: {.callout-tip}
+## Conseil de préparation
+Consacrez au minimum **1h30 par jour** de pratique active (labs CLI, exercices). La lecture seule ne suffit pas pour réussir l'examen CCNA.
+:::

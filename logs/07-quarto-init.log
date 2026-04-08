@@ -1,0 +1,30 @@
+Projet Quarto initialisé. Voici le récapitulatif :
+
+### Fichiers créés (18 fichiers)
+
+| Fichier | Rôle |
+|---------|------|
+| `_quarto.yml` | Config book HTML+PDF, chapitres en 4 parties + annexe glossaire |
+| `index.qmd` | Couverture : objectif, public, structure, callouts, planning 10 sem., poids domaines |
+| `styles/custom.scss` | Thème SCSS complet (navy/cisco-blue/orange, callouts stylisés, code sombre, tableaux) |
+| `styles/custom.css` | Fallback CSS si SCSS échoue |
+| `styles/preamble.tex` | LaTeX : fancyhdr, tcolorbox callouts, listings Cisco IOS, couleurs |
+| `includes/before-body.tex` | Page de garde PDF avec cadre, titre, auteur, version |
+| `includes/_callout-styles.qmd` | Documentation conventions callouts (include partagé) |
+| `chapters/01-10*.qmd` | 10 stubs chapitres (prêts à recevoir le contenu) |
+
+### Arborescence conforme
+
+```
+book/
+├── _quarto.yml
+├── index.qmd
+├── chapters/          (10 .qmd stubs)
+├── assets/images/     (vide — pour screenshots/topologies)
+├── assets/diagrams/   (vide — pour .mmd externalisés)
+├── styles/            (custom.scss + custom.css + preamble.tex)
+├── includes/          (before-body.tex + _callout-styles.qmd)
+└── _output/           (rendus)
+```
+
+Prochaine étape : convertir les modules markdown en `.qmd` avec la syntaxe Quarto (callouts, cross-references, mermaid, code annotations).

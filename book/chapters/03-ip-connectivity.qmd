@@ -1,0 +1,2791 @@
+---
+title: 'IP Connectivity'
+description: 'Module 3 — Routage statique et dynamique, OSPF single-area et multi-area, tables de routage, FHRPs'
+---
+
+## Objectif du module {#sec-topic-3-obj}
+
+Le module 3 (**IP Connectivity**) represente **25% de l'examen CCNA 200-301** --- c'est le plus gros domaine du blueprint officiel Cisco. Il est aussi celui qui mobilise le plus de scenarios pratiques et de troubleshooting. Maitriser ce module, c'est maitriser le coeur du metier d'ingenieur reseau : comment les paquets traversent Internet.
+
+A l'issue de ce module, vous serez capable de :
+
+- Interpreter chaque composant d'une table de routage (codes, prefixe, masque, next-hop, AD, metrique)
+- Determiner le chemin qu'un routeur choisit parmi plusieurs routes candidates (longest prefix match, AD, metrique)
+- Configurer et verifier le routage statique IPv4 et IPv6 (default, network, host, floating static)
+- Configurer et verifier OSPF single-area (adjacences, DR/BDR, router-id, passive-interface)
+- Decrire le role et le fonctionnement des protocoles FHRP (HSRP, VRRP, GLBP)
+- Decrire l'interet de la gestion reseau cloud (Meraki, DNA Center, controleurs cloud)
+
+::: {.callout-tip title="🎯 Point exam --- repartition du module"}
+**Statistiques officielles Cisco** : le domain **IP Connectivity** pese **25%** de l'examen. Parmi les topics du module, **OSPF single-area (3.4)** est **le plus teste** --- comptez au minimum 6-8 questions sur OSPF seul. Les topics 3.5 (FHRP) et 3.6 (cloud management) sont en mode *Describe* : pas de configuration, seulement des concepts. Prioriser 3.1, 3.2 et 3.4 dans la revision.
+:::
+
+## 3.1 --- Anatomie de la table de routage {#sec-topic-3-1}
+
+> **Exam topic 3.1** : *Interpret* --- the components of routing table
+> **Niveau** : Interpret
+
+### Contexte
+
+La table de routage est le GPS du routeur. Chaque paquet qui traverse un routeur est confronte a une question simple : « par ou dois-je sortir ? ». La reponse se trouve dans cette table. Un administrateur reseau qui ne sait pas lire une table de routage, c'est comme un pilote qui ne sait pas lire ses instruments de vol --- techniquement aux commandes, mais incapable d'intervenir quand quelque chose deraille.
+
+### Theorie
+
+La table de routage est une structure de donnees maintenue en memoire par le routeur. Elle contient l'ensemble des reseaux de destination connus et, pour chacun, les informations necessaires pour acheminer les paquets. Chaque ligne de la table est une **route** --- une instruction qui dit : « pour atteindre ce reseau, envoie le paquet a cette adresse, via cette interface ».
+
+Les routes peuvent etre apprises de trois facons :
+
+- **Directement connectees (C)** : les reseaux configures sur les interfaces actives du routeur
+- **Statiques (S)** : configurees manuellement par l'administrateur
+- **Dynamiques** : apprises via un protocole de routage (OSPF, EIGRP, BGP...)
+
+#### Output complet d'une table de routage
+
+Voici une table de routage realiste sur un routeur d'entreprise. Prenons le temps de la decortiquer :
+
+```{.default}
+R1# show ip route
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+       N1 - OSPF NSSA external type 1, N2 - OSPF NSSA external type 2
+       E1 - OSPF external type 1, E2 - OSPF external type 2
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, P - periodic downloaded static route, H - NHRP, l - LISP
+       a - application route, + - replicated route, % - next hop override
+
+Gateway of last resort is 203.0.113.1 to network 0.0.0.0
+
+S*    0.0.0.0/0 [1/0] via 203.0.113.1
+      10.0.0.0/8 is variably subnetted, 6 subnets, 3 masks
+C        10.1.1.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.1.1/32 is directly connected, GigabitEthernet0/0
+C        10.1.2.0/24 is directly connected, GigabitEthernet0/1
+L        10.1.2.1/32 is directly connected, GigabitEthernet0/1
+O        10.1.3.0/24 [110/20] via 10.1.2.2, 00:15:32, GigabitEthernet0/1
+O        10.1.4.0/26 [110/30] via 10.1.2.2, 00:15:32, GigabitEthernet0/1
+      192.168.1.0/24 is variably subnetted, 2 subnets, 2 masks
+S        192.168.1.0/24 [1/0] via 10.1.2.3
+S        192.168.1.128/25 [1/0] via 10.1.2.4
+      203.0.113.0/24 is variably subnetted, 2 subnets, 2 masks
+C        203.0.113.0/30 is directly connected, GigabitEthernet0/2
+L        203.0.113.2/32 is directly connected, GigabitEthernet0/2
+```
+
+#### 3.1.a --- Codes des protocoles de routage
+
+La premiere section de l'output est la **legende des codes**. Chaque lettre identifie la source de la route :
+
+| Code | Source | Signification |
+|------|--------|---------------|
+| **C** | Connected | Reseau directement connecte (interface active) |
+| **L** | Local | Adresse IP exacte de l'interface (/32) |
+| **S** | Static | Route configuree manuellement |
+| **S*** | Static default | Route par defaut statique |
+| **O** | OSPF | Route apprise par OSPF intra-area |
+| **O IA** | OSPF inter area | Route OSPF d'une autre area |
+| **O E1/E2** | OSPF external | Route redistribuee dans OSPF |
+| **D** | EIGRP | Route apprise par EIGRP |
+| **R** | RIP | Route apprise par RIP |
+| **B** | BGP | Route apprise par BGP |
+
+Les routes **C** et **L** apparaissent automatiquement des qu'une interface est configuree avec une adresse IP et passe en etat `up/up`. La route **L** (local) est un ajout d'IOS 15+ : elle represente l'adresse exacte de l'interface avec un masque /32 --- le routeur sait que cette adresse lui appartient.
+
+#### 3.1.b --- Prefixe reseau
+
+Le **prefixe** est l'adresse reseau de destination. Dans notre exemple :
+
+- `10.1.1.0` est le prefixe du premier reseau connecte
+- `0.0.0.0` est le prefixe de la route par defaut (« tout le reste »)
+
+Notez la ligne `10.0.0.0/8 is variably subnetted, 6 subnets, 3 masks`. C'est un **en-tete de reseau classful** : IOS regroupe visuellement toutes les routes qui partagent le meme reseau classful (ici 10.0.0.0/8) et indique combien de sous-reseaux et de masques distincts existent. Ce n'est pas une route --- c'est un regroupement d'affichage.
+
+#### 3.1.c --- Masque reseau
+
+Le masque accompagne toujours le prefixe, en notation CIDR :
+
+- `/24` = 255.255.255.0 (256 adresses, 254 hotes)
+- `/26` = 255.255.255.192 (64 adresses, 62 hotes)
+- `/30` = 255.255.255.252 (4 adresses, 2 hotes --- lien point-to-point)
+- `/32` = 255.255.255.255 (une seule adresse --- route locale ou host route)
+
+Le couple prefixe/masque definit precisement l'etendue du reseau de destination. C'est ce couple qui sera utilise pour le **longest prefix match** (@sec-topic-3-2).
+
+#### 3.1.d --- Next hop (prochain saut)
+
+Le **next hop** est l'adresse IP du routeur voisin vers lequel le paquet doit etre envoye. Dans notre exemple :
+
+- `via 10.1.2.2` --- le paquet est envoye au routeur dont l'interface a l'adresse 10.1.2.2
+- `via 203.0.113.1` --- le next hop pour la route par defaut
+
+Pour les routes **connected**, il n'y a pas de next hop : le routeur est directement connecte au reseau. L'output affiche `is directly connected` suivi du nom de l'interface de sortie.
+
+#### 3.1.e --- Distance administrative (AD)
+
+La **distance administrative** est un entier compris entre 0 et 255 qui mesure la confiance que le routeur accorde a la source de la route. Plus la valeur est basse, plus la source est fiable.
+
+| Source | AD par defaut |
+|--------|--------------|
+| Directement connectee | 0 |
+| Route statique | 1 |
+| eBGP | 20 |
+| EIGRP interne | 90 |
+| OSPF | 110 |
+| IS-IS | 115 |
+| RIP | 120 |
+| EIGRP externe | 170 |
+| iBGP | 200 |
+| Inaccessible | 255 |
+
+Dans l'output, l'AD apparait entre crochets, avant la metrique : `[110/20]` signifie AD = 110, metrique = 20. Une route statique affiche `[1/0]` --- AD de 1, metrique de 0.
+
+L'AD sert uniquement a **departager des routes vers la meme destination apprises par des sources differentes**. Si OSPF et EIGRP proposent tous les deux une route vers 10.1.3.0/24, le routeur choisit EIGRP (AD 90 < AD 110).
+
+#### 3.1.f --- Metrique
+
+La **metrique** est la valeur utilisee par un protocole de routage pour comparer ses propres routes entre elles. Chaque protocole utilise sa propre metrique :
+
+| Protocole | Metrique | Composants |
+|-----------|----------|------------|
+| RIP | Hop count | Nombre de routeurs traverses (max 15) |
+| OSPF | Cost | Base sur la bande passante (ref BW / interface BW) |
+| EIGRP | Composite | Bande passante + delai (par defaut) |
+
+La metrique n'est comparable qu'entre routes du **meme protocole**. Comparer une metrique OSPF a une metrique RIP n'a aucun sens --- c'est pour cela que l'AD existe.
+
+Dans `[110/20]`, la metrique OSPF est 20. Si une autre route OSPF vers la meme destination avait une metrique de 30, celle avec 20 gagnerait.
+
+#### 3.1.g --- Gateway of last resort
+
+La ligne `Gateway of last resort is 203.0.113.1 to network 0.0.0.0` indique la **route par defaut** active. C'est le dernier recours : quand aucune route plus specifique ne correspond au paquet, le routeur l'envoie vers cette gateway.
+
+Si aucune route par defaut n'est configuree, l'output affiche : `Gateway of last resort is not set`. Dans ce cas, tout paquet dont la destination ne figure pas dans la table est simplement **jete** (dropped) --- le routeur n'a nulle part ou l'envoyer. Le processus complet de lookup est illustre en @fig-m3-routing-lookup.
+
+#### Schema : anatomie d'une ligne de route
+
+```{.text title="Topologie"}
+O     10.1.3.0/24 [110/20] via 10.1.2.2, 00:15:32, GigabitEthernet0/1
+|     |          |  |   |       |          |          |
+|     |          |  |   |       |          |          +- Interface de sortie
+|     |          |  |   |       |          +- Uptime (depuis quand la route est connue)
+|     |          |  |   |       +- Adresse du next hop
+|     |          |  |   +- Metrique (cout OSPF)
+|     |          |  +- Distance administrative
+|     |          +- Masque en notation CIDR
+|     +- Prefixe reseau (adresse de destination)
++- Code du protocole (O = OSPF)
+```
+
+### Diagramme : processus de lookup dans la table de routage
+
+```{mermaid}
+%%| label: fig-m3-routing-lookup
+%%| fig-cap: "Processus de lookup d'un paquet dans la table de routage d'un routeur"
+flowchart TD
+    A[Paquet IP entrant<br/>dest = 10.1.3.67] --> B{Route matche<br/>dans la table ?}
+    B -->|Aucune| C{Default route<br/>configuree ?}
+    B -->|Une ou plusieurs| D[Longest Prefix Match]
+    D --> E{Plusieurs routes<br/>meme prefixe ?}
+    E -->|Non| F[Forwarder vers next-hop]
+    E -->|Oui, sources differentes| G[AD la plus basse gagne]
+    E -->|Oui, meme protocole| H[Metrique la plus basse]
+    G --> F
+    H --> F
+    C -->|Oui| I[Forwarder via<br/>gateway of last resort]
+    C -->|Non| J[DROP + ICMP<br/>Destination Unreachable]
+```
+
+**Legende** : ce flowchart resume la logique de forwarding de tout routeur IP. Le longest prefix match s'applique en premier, l'AD ensuite, la metrique en dernier --- jamais l'inverse.
+
+### Mise en pratique CLI
+
+```{.cisco filename="R1"}
+! Afficher la table de routage complete
+R1# show ip route
+
+! Filtrer par protocole -- uniquement les routes OSPF
+R1# show ip route ospf
+
+! Filtrer par protocole -- uniquement les routes statiques
+R1# show ip route static
+
+! Chercher une route specifique
+R1# show ip route 10.1.3.0
+```
+
+**Output de `show ip route 10.1.3.0` :**
+
+```{.default}
+Routing entry for 10.1.3.0/24
+  Known via "ospf 1", distance 110, metric 20, type intra area
+  Last update from 10.1.2.2 on GigabitEthernet0/1, 00:15:32 ago
+  Routing Descriptor Blocks:
+  * 10.1.2.2, from 10.1.2.2, 00:15:32 ago, via GigabitEthernet0/1
+      Route metric is 20, traffic share count is 1
+```
+
+**Interpretation** : cette vue detaillee confirme que la route vers 10.1.3.0/24 provient d'OSPF (processus 1), avec une AD de 110 et un cout de 20. Elle est de type *intra area* --- le reseau 10.1.3.0/24 est dans la meme area OSPF que R1. Le next hop 10.1.2.2 est accessible via Gi0/1.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : confondre la distance administrative et la metrique. L'AD compare des **sources differentes** (OSPF vs EIGRP). La metrique compare des **routes du meme protocole** (deux chemins OSPF). L'examen propose regulierement des scenarios ou OSPF a une meilleure metrique qu'EIGRP, mais EIGRP gagne quand meme grace a son AD inferieure.
+
+**A retenir** : les routes **L** (/32) sont normales a partir d'IOS 15. Ne les confondez pas avec des host routes statiques. Elles representent les propres adresses IP du routeur.
+:::
+
+### Exercice 3.1a --- Interpreter une table de routage
+
+**Contexte** : vous etes administrateur reseau chez TechLab, une PME de 80 employes. Le routeur central R1 affiche la table de routage suivante :
+
+```{.default}
+Gateway of last resort is 172.16.0.1 to network 0.0.0.0
+
+S*    0.0.0.0/0 [1/0] via 172.16.0.1
+      10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+C        10.10.10.0/24 is directly connected, GigabitEthernet0/0
+L        10.10.10.1/32 is directly connected, GigabitEthernet0/0
+O        10.10.20.0/24 [110/20] via 10.10.30.2, 01:05:12, GigabitEthernet0/1
+O        10.10.30.0/24 [110/10] via 10.10.30.2, 01:05:12, GigabitEthernet0/1
+      172.16.0.0/16 is variably subnetted, 2 subnets, 2 masks
+C        172.16.0.0/30 is directly connected, GigabitEthernet0/2
+L        172.16.0.2/32 is directly connected, GigabitEthernet0/2
+```
+
+**Consigne** : repondez aux questions suivantes :
+
+1. Combien d'interfaces actives R1 possede-t-il ?
+2. Quelle est l'adresse IP de R1 sur son lien WAN ?
+3. Vers quelle adresse un paquet destine a 8.8.8.8 sera-t-il envoye ?
+4. La route vers 10.10.20.0/24 provient de quel protocole ? Quelle est sa metrique ?
+5. Pourquoi 10.10.30.0/24 a-t-il une metrique differente de 10.10.20.0/24 alors que les deux passent par le meme next hop ?
+
+::: {.callout-note collapse="true" title="Indice"}
+Les routes C et L vont par paires. Comptez les paires pour trouver le nombre d'interfaces. Pour la question 5, pensez au nombre de sauts OSPF.
+:::
+
+::: {.callout-note collapse="true" title="Solution"}
+1. **3 interfaces actives** : Gi0/0 (10.10.10.1), Gi0/1 (implicite --- c'est l'interface de sortie des routes OSPF, mais on ne voit pas sa route C/L dans cette table, ce qui signifie que Gi0/1 a une adresse dans le reseau 10.10.30.0/24), Gi0/2 (172.16.0.2). En fait, Gi0/1 est dans le reseau 10.10.30.0/24 --- on voit que ce reseau est a la fois "connected" via OSPF (metrique 10 = un seul lien) et accessible via Gi0/1. Verification : il y a 3 paires C/L -> 3 interfaces ? Non, seulement 2 paires C/L visibles (Gi0/0 et Gi0/2). Mais Gi0/1 est mentionne comme interface de sortie. La route C/L pour le reseau de Gi0/1 devrait exister --- elle est probablement dans le reseau 10.10.30.0/24 mais l'output la montre comme route O car OSPF l'a aussi apprise. En realite R1 a bien **3 interfaces actives**.
+
+2. **172.16.0.2** --- la route L sur Gi0/2 avec un masque /30 (lien point-to-point typique WAN).
+
+3. **172.16.0.1** --- 8.8.8.8 ne correspond a aucune route specifique, donc la route par defaut `S* 0.0.0.0/0 via 172.16.0.1` s'applique.
+
+4. **OSPF** (code O), metrique **20**. Le `[110/20]` indique AD=110 (OSPF) et metrique=20.
+
+5. Le reseau 10.10.30.0/24 a une metrique de **10** car il est directement connecte au next hop (un seul lien OSPF a traverser). Le reseau 10.10.20.0/24 a une metrique de **20** car il est un saut plus loin (deux liens OSPF). La metrique OSPF est cumulative --- elle additionne le cout de chaque lien traverse.
+:::
+
+### Exercice 3.1b --- Gateway of last resort
+
+**Contexte** : un collegue vous signale que le routeur de la succursale R-BRANCH ne peut pas joindre Internet.
+
+**Consigne** : vous tapez `show ip route` et voyez `Gateway of last resort is not set`. Expliquez le probleme et proposez deux solutions pour le resoudre.
+
+::: {.callout-note collapse="true" title="Indice"}
+Pensez aux deux facons de creer une route par defaut : statiquement, ou via un protocole de routage.
+:::
+
+::: {.callout-note collapse="true" title="Solution"}
+**Probleme** : aucune route par defaut n'est configuree. Tout paquet dont la destination ne figure pas explicitement dans la table de routage est jete.
+
+**Solution 1 --- Route statique par defaut** :
+
+```{.cisco filename="R-BRANCH"}
+R-BRANCH(config)# ip route 0.0.0.0 0.0.0.0 203.0.113.1
+```
+
+**Solution 2 --- Recevoir la route par defaut via OSPF** : si R-BRANCH participe a un domaine OSPF, le routeur de bordure peut redistribuer une route par defaut :
+
+```{.cisco filename="R-EDGE"}
+! Sur le routeur de bordure (celui qui a acces a Internet)
+R-EDGE(config-router)# default-information originate
+```
+
+R-BRANCH recevra alors la route par defaut via OSPF avec le code `O*E2`.
+
+**Explication** : la premiere solution est simple et directe --- adaptee aux topologies avec une seule sortie Internet. La seconde est plus elegante pour les topologies ou plusieurs routeurs peuvent servir de passerelle, car OSPF peut basculer automatiquement vers un routeur de secours.
+:::
+
+### Voir aussi
+
+- @sec-topic-1-6 (relation : adressage IPv4 et notation CIDR)
+- @sec-topic-3-2 (relation : longest prefix match utilise le prefixe/masque pour la decision)
+- @sec-topic-3-3 (relation : les routes statiques peuplent cette table)
+- @sec-topic-3-4 (relation : OSPF peuple cette table dynamiquement)
+- @sec-topic-4-1 (relation : les services comme DHCP reposent sur une table de routage correcte)
+
+## 3.2 --- Decisions de routage (longest prefix, AD, metrique) {#sec-topic-3-2}
+
+> **Exam topic 3.2** : *Determine* --- how a router makes a forwarding decision by default
+> **Niveau** : Determine
+
+### Contexte
+
+Un routeur d'entreprise typique possede des dizaines, voire des centaines de routes dans sa table. Quand un paquet arrive avec une adresse de destination, le routeur doit prendre une decision en quelques microsecondes. Comment choisit-il parmi toutes ces routes ? La reponse suit un processus en trois etapes, toujours dans le meme ordre. Comprendre ce processus est fondamental pour diagnostiquer des problemes de routage.
+
+### Theorie
+
+Le processus de decision d'un routeur suit une hierarchie stricte :
+
+```{.text title="Topologie"}
+Paquet arrive avec IP destination
+          |
+          v
++--------------------------+
+| 1. LONGEST PREFIX MATCH  |  <- Trouve toutes les routes qui matchent
+|    (le plus specifique)  |     et garde la plus specifique
++----------+---------------+
+           | Si plusieurs routes avec le meme prefixe/masque
+           v
++--------------------------+
+| 2. ADMINISTRATIVE        |  <- Compare la fiabilite des sources
+|    DISTANCE (la + basse) |     (EIGRP 90 bat OSPF 110)
++----------+---------------+
+           | Si meme AD (= meme protocole)
+           v
++--------------------------+
+| 3. METRIC                |  <- Compare les chemins au sein
+|    (la + basse)          |     du meme protocole
++--------------------------+
+```
+
+#### 3.2.a --- Longest prefix match
+
+C'est la regle la plus importante du routage IP. Le routeur compare l'adresse de destination du paquet a toutes les routes de sa table et selectionne celle dont le **masque est le plus long** (le plus specifique).
+
+Prenons un exemple concret. Un paquet arrive avec la destination **10.1.3.67**. La table contient :
+
+| Route | Masque | Correspond ? | Bits matches |
+|-------|--------|-------------|--------------|
+| 0.0.0.0/0 | /0 | Oui (match tout) | 0 |
+| 10.0.0.0/8 | /8 | Oui | 8 |
+| 10.1.0.0/16 | /16 | Oui | 16 |
+| 10.1.3.0/24 | /24 | Oui | 24 |
+| 10.1.3.64/26 | /26 | Oui (10.1.3.64--127) | 26 |
+| 10.1.4.0/24 | /24 | Non | --- |
+
+Le routeur choisit **10.1.3.64/26** --- c'est la route la plus specifique qui contient 10.1.3.67. La route par defaut (/0) est le « filet de securite », utilisee uniquement si rien de plus specifique n'existe.
+
+L'analogie postale fonctionne bien ici : imaginez que vous devez livrer un colis a « 15 rue Victor Hugo, Lyon 3e ». Vous avez un carnet avec les destinations « France », « Rhone-Alpes », « Lyon », « Lyon 3e » et « 15 rue Victor Hugo, Lyon 3e ». Vous choisissez naturellement l'entree la plus precise --- c'est exactement ce que fait le routeur.
+
+#### Le longest prefix match en binaire
+
+Pour bien comprendre, convertissons en binaire. L'adresse 10.1.3.67 :
+
+```{.default}
+10.1.3.67  = 00001010.00000001.00000011.01000011
+
+Route 10.1.3.0/24 :
+Reseau     = 00001010.00000001.00000011.00000000
+Masque /24 = 11111111.11111111.11111111.00000000
+                                        ^^^^^^^^ pas compare
+Resultat : 24 bits matchent
+
+Route 10.1.3.64/26 :
+Reseau     = 00001010.00000001.00000011.01000000
+Masque /26 = 11111111.11111111.11111111.11000000
+                                        ^^       compare aussi !
+67 en bin  = 01000011
+64 en bin  = 01000000
+Les 26 premiers bits matchent (plus specifique -> GAGNE)
+```
+
+#### 3.2.b --- Distance administrative
+
+L'AD n'intervient que lorsque **deux routes vers exactement le meme prefixe/masque** sont apprises par des **sources differentes**. C'est un departage inter-protocoles.
+
+Scenario : OSPF et EIGRP proposent tous les deux une route vers 10.1.3.0/24.
+
+```{.default}
+D     10.1.3.0/24 [90/307200] via 10.1.1.2     <- EIGRP, AD 90
+O     10.1.3.0/24 [110/20] via 10.1.2.2         <- OSPF, AD 110
+```
+
+Le routeur installe uniquement la route EIGRP (AD 90 < 110). La route OSPF reste dans la base OSPF mais **ne figure pas dans la table de routage**. Si la route EIGRP disparait (panne du voisin EIGRP), la route OSPF prendra le relais --- ce mecanisme s'appelle le **failover**.
+
+Ce principe est aussi a la base des **floating static routes** (@sec-topic-3-3).
+
+#### 3.2.c --- Metrique du protocole de routage
+
+La metrique departage des routes apprises par le **meme protocole** vers la **meme destination**. Chaque protocole a sa propre metrique :
+
+| Protocole | Metrique | Meilleur = |
+|-----------|----------|-----------|
+| RIP | Nombre de sauts (hop count) | Le moins de sauts |
+| OSPF | Cout (base sur bande passante) | Le cout le plus bas |
+| EIGRP | Composite (BW + delay par defaut) | La valeur la plus basse |
+
+Scenario : deux chemins OSPF vers 10.1.3.0/24.
+
+```{.default}
+O     10.1.3.0/24 [110/20] via 10.1.2.2     <- Cout 20 (chemin rapide)
+O     10.1.3.0/24 [110/30] via 10.1.5.2     <- Cout 30 (chemin plus lent)
+```
+
+Le routeur choisit le chemin via 10.1.2.2 (cout 20 < 30). Si les deux metriques etaient identiques, le routeur ferait du **load balancing** --- il utiliserait les deux chemins simultanement (ECMP : Equal-Cost Multi-Path).
+
+#### Resume du processus de decision
+
+```{.text title="Topologie"}
++----------------------------------------------------+
+|            PROCESSUS DE FORWARDING                  |
++----------------------------------------------------+
+| Etape 1 : Longest prefix match                     |
+|   -> Toujours executee en premier                   |
+|   -> /26 bat /24, qui bat /16, qui bat /0           |
+|   -> Si une seule route match -> FIN                |
+|                                                    |
+| Etape 2 : Administrative distance                  |
+|   -> Seulement si meme prefixe, sources differentes|
+|   -> Connected (0) > Static (1) > EIGRP (90) >     |
+|     OSPF (110) > RIP (120)                         |
+|   -> Si meme AD -> Etape 3                          |
+|                                                    |
+| Etape 3 : Metric                                   |
+|   -> Seulement si meme protocole                    |
+|   -> La plus basse gagne                            |
+|   -> Si meme metrique -> Load balancing (ECMP)      |
+|                                                    |
+| Aucun match -> Gateway of last resort (si definie)  |
+| Aucun match + pas de default -> DROP                |
++----------------------------------------------------+
+```
+
+### Diagramme : comparaison des distances administratives
+
+```{mermaid}
+%%| label: fig-m3-ad-comparison
+%%| fig-cap: "Hierarchie des distances administratives (AD) --- plus la valeur est basse, plus la source est fiable"
+flowchart LR
+    subgraph Fiables["Sources fiables (AD basse)"]
+        direction TB
+        C0["Connected<br/>AD = 0"]
+        S1["Static<br/>AD = 1"]
+        E20["eBGP<br/>AD = 20"]
+    end
+    subgraph IGP["Protocoles internes"]
+        direction TB
+        D90["EIGRP interne<br/>AD = 90"]
+        O110["OSPF<br/>AD = 110"]
+        I115["IS-IS<br/>AD = 115"]
+        R120["RIP<br/>AD = 120"]
+    end
+    subgraph Basses["Sources peu fiables"]
+        direction TB
+        EX170["EIGRP externe<br/>AD = 170"]
+        IB200["iBGP<br/>AD = 200"]
+        U255["Inaccessible<br/>AD = 255"]
+    end
+    Fiables --> IGP --> Basses
+```
+
+**Legende** : lors d'un conflit entre deux sources proposant la meme route, le routeur installe celle dont l'AD est la plus basse. Les routes Connected (0) et Static (1) battent tous les protocoles dynamiques.
+
+### Mise en pratique CLI
+
+```{.cisco filename="R1"}
+! Voir la table complete pour analyser les decisions
+R1# show ip route
+
+! Verifier quel chemin sera utilise pour une destination precise
+R1# show ip route 10.1.3.67
+```
+
+**Output :**
+
+```{.default}
+Routing entry for 10.1.3.64/26
+  Known via "ospf 1", distance 110, metric 20, type intra area
+  Last update from 10.1.2.2 on GigabitEthernet0/1, 00:22:41 ago
+  Routing Descriptor Blocks:
+  * 10.1.2.2, from 10.1.2.2, 00:22:41 ago, via GigabitEthernet0/1
+      Route metric is 20, traffic share count is 1
+```
+
+**Interpretation** : le routeur a trouve la route la plus specifique (10.1.3.64/26) pour atteindre 10.1.3.67. Le `show ip route <IP>` est l'outil de diagnostic cle pour comprendre les decisions de routage.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : l'examen adore presenter un scenario ou une route statique (/24) et une route OSPF (/26) pointent vers des next hops differents. Les candidats pensent que la route statique gagne (AD 1 < AD 110), mais c'est faux : le longest prefix match s'applique TOUJOURS en premier. La route OSPF /26 est plus specifique et gagne, quelle que soit l'AD.
+
+**A retenir** : l'ordre est **toujours** longest prefix -> AD -> metric. L'AD ne peut jamais « battre » un masque plus long.
+:::
+
+### Exercice 3.2 --- Determiner le chemin choisi
+
+**Contexte** : le routeur R-CORE de l'entreprise MegaCorp a la table de routage suivante :
+
+```{.default}
+S     172.16.0.0/16 [1/0] via 10.0.0.1
+O     172.16.0.0/16 [110/40] via 10.0.0.2
+D     172.16.10.0/24 [90/307200] via 10.0.0.3
+O     172.16.10.128/25 [110/20] via 10.0.0.4
+S     172.16.10.128/25 [5/0] via 10.0.0.5
+```
+
+**Consigne** : pour chaque destination ci-dessous, indiquez quelle route sera utilisee et via quel next hop :
+
+1. 172.16.10.200
+2. 172.16.10.50
+3. 172.16.20.1
+4. 172.16.10.130
+
+::: {.callout-note collapse="true" title="Indice"}
+Appliquez systematiquement les 3 etapes : d'abord trouvez toutes les routes qui matchent, puis gardez la plus specifique (longest prefix), puis comparez l'AD si necessaire.
+:::
+
+::: {.callout-note collapse="true" title="Solution"}
+**1. 172.16.10.200** -> via **10.0.0.4** (route OSPF 172.16.10.128/25)
+
+- Matchent : /16 (S et O), /24 (D), /25 (O et S)
+- Longest prefix : /25 (172.16.10.128--255 contient .200) -> deux routes /25
+- AD : OSPF [110] vs Static [5] -> Static gagne (AD 5 < 110)
+- **Correction** : la route statique `S 172.16.10.128/25 [5/0] via 10.0.0.5` gagne. Next hop = **10.0.0.5**.
+
+**2. 172.16.10.50** -> via **10.0.0.3** (route EIGRP 172.16.10.0/24)
+
+- Matchent : /16 (S et O), /24 (D)
+- 10.50 n'est PAS dans 172.16.10.128/25 (128--255), donc les routes /25 ne matchent pas
+- Longest prefix : /24 -> seule route EIGRP
+- Next hop = **10.0.0.3**
+
+**3. 172.16.20.1** -> via **10.0.0.1** (route statique 172.16.0.0/16)
+
+- Matchent : /16 (S et O) uniquement --- .20.1 n'est dans aucun /24 ou /25
+- Longest prefix : /16 -> deux routes (S et O)
+- AD : Static [1] vs OSPF [110] -> Static gagne
+- Next hop = **10.0.0.1**
+
+**4. 172.16.10.130** -> via **10.0.0.5** (route statique 172.16.10.128/25)
+
+- Matchent : /16, /24, /25 (130 est dans 128--255)
+- Longest prefix : /25 -> deux routes (O [110] et S [5])
+- AD : Static [5] bat OSPF [110]
+- Next hop = **10.0.0.5**
+:::
+
+### Voir aussi
+
+- @sec-topic-3-1 (relation : composants de la table de routage)
+- @sec-topic-1-6 (relation : subnetting et calcul de masques)
+- @sec-topic-3-3 (relation : les routes statiques et l'AD modifiable)
+- @sec-topic-5-6 (relation : les ACLs utilisent aussi le wildcard mask pour le matching)
+
+## 3.3 --- Routage statique IPv4 et IPv6 {#sec-topic-3-3}
+
+> **Exam topic 3.3** : *Configure and verify* --- IPv4 and IPv6 static routing
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Avant l'existence des protocoles de routage dynamique, chaque route devait etre configuree a la main sur chaque routeur. Aujourd'hui, le routage statique reste indispensable dans de nombreux scenarios : connexion a un FAI, petites succursales avec une seule sortie, routes de secours, ou reseaux stub sans besoin de protocole dynamique. C'est aussi le fondement pedagogique --- comprendre le routage statique avant le dynamique est comme apprendre a conduire en boite manuelle avant l'automatique.
+
+### Theorie
+
+Une route statique est une instruction permanente dans la configuration du routeur : « pour atteindre ce reseau, passe par la ». Contrairement aux routes dynamiques, elle ne s'adapte pas aux changements de topologie --- si le lien tombe, la route reste dans la configuration (et dans la table de routage tant que l'interface de sortie est up).
+
+#### Syntaxe de base
+
+```{.cisco}
+! Syntaxe IPv4
+ip route <reseau> <masque> <next-hop | interface-sortie> [AD]
+
+! Syntaxe IPv6
+ipv6 route <prefixe/longueur> <next-hop | interface-sortie> [AD]
+```
+
+#### 3.3.a --- Route par defaut (default route)
+
+La route par defaut est le « catch-all » --- elle correspond a toute destination qui n'a pas de route plus specifique. Son prefixe est 0.0.0.0/0 (IPv4) ou ::/0 (IPv6).
+
+```{.cisco filename="R1"}
+! IPv4 -- Route par defaut vers le FAI
+R1(config)# ip route 0.0.0.0 0.0.0.0 203.0.113.1
+
+! IPv6 -- Route par defaut vers le FAI
+R1(config)# ipv6 route ::/0 2001:DB8:ACAD:1::1
+```
+
+**Verification :**
+
+```{.default}
+R1# show ip route static
+S*    0.0.0.0/0 [1/0] via 203.0.113.1
+
+R1# show ipv6 route static
+S   ::/0 [1/0]
+     via 2001:DB8:ACAD:1::1
+```
+
+L'asterisque `*` confirme que cette route est reconnue comme gateway of last resort.
+
+Cas d'usage typique : une succursale avec un seul lien vers le siege. Tout le trafic non local part par ce lien.
+
+#### 3.3.b --- Route reseau (network route)
+
+La route reseau specifie comment atteindre un sous-reseau precis. C'est le type de route statique le plus courant.
+
+```{.cisco filename="R1"}
+! IPv4 -- Atteindre le reseau 192.168.10.0/24 via le routeur voisin
+R1(config)# ip route 192.168.10.0 255.255.255.0 10.1.1.2
+
+! IPv6
+R1(config)# ipv6 route 2001:DB8:ACAD:10::/64 2001:DB8:ACAD:1::2
+```
+
+On peut aussi specifier l'interface de sortie au lieu du next hop :
+
+```{.cisco filename="R1"}
+R1(config)# ip route 192.168.10.0 255.255.255.0 GigabitEthernet0/1
+```
+
+Ou les deux (recommande sur les reseaux multi-acces) :
+
+```{.cisco filename="R1"}
+R1(config)# ip route 192.168.10.0 255.255.255.0 GigabitEthernet0/1 10.1.1.2
+```
+
+#### Schema : topologie pour le routage statique
+
+```{.text title="Topologie"}
+        Reseau A                                      Reseau B
+    192.168.10.0/24                               192.168.20.0/24
+
+ [PC-A]------[SW1]------[R1]===============[R2]------[SW2]------[PC-B]
+              |         Gi0/0  Lien P2P  Gi0/0        |
+              |       .1    10.1.1.0/30    .2          |
+              |         Gi0/1                Gi0/1     |
+              |       .1                       .1      |
+         192.168.10.0/24                  192.168.20.0/24
+```
+
+Pour que PC-A (192.168.10.10) puisse joindre PC-B (192.168.20.10), il faut configurer :
+
+- Sur R1 : une route vers 192.168.20.0/24 via 10.1.1.2
+- Sur R2 : une route vers 192.168.10.0/24 via 10.1.1.1
+
+Sans ces deux routes (aller ET retour), la communication ne fonctionne pas.
+
+#### 3.3.c --- Route hote (host route)
+
+Une route hote pointe vers une **adresse IP unique** --- un masque /32 (IPv4) ou /128 (IPv6). Cas d'usage : diriger le trafic vers un serveur specifique via un chemin particulier, ou creer une route pour une adresse de loopback.
+
+```{.cisco filename="R1"}
+! IPv4 -- Route vers un serveur precis
+R1(config)# ip route 10.1.1.100 255.255.255.255 192.168.1.2
+
+! IPv6
+R1(config)# ipv6 route 2001:DB8:ACAD::100/128 2001:DB8:ACAD:1::2
+```
+
+**Verification :**
+
+```{.default}
+R1# show ip route 10.1.1.100
+Routing entry for 10.1.1.100/32
+  Known via "static", distance 1, metric 0
+  Routing Descriptor Blocks:
+  * 192.168.1.2
+      Route metric is 0, traffic share count is 1
+```
+
+#### 3.3.d --- Floating static route
+
+Une **floating static** est une route statique avec une AD volontairement augmentee pour qu'elle serve de **route de secours**. Par defaut, une route statique a une AD de 1. Si on la monte a 130 (par exemple), elle sera moins preferee qu'une route OSPF (AD 110) --- mais si OSPF tombe, elle prend le relais automatiquement.
+
+```{.text title="Topologie"}
+                 Lien principal (fibre)
+         +---------- OSPF ----------+
+   [R1]--+                          +--[R2]
+         +---- Lien backup (4G) ----+
+              Floating static (AD 130)
+```
+
+```{.cisco filename="R1"}
+! R1 -- Route de secours via le lien 4G (AD 130 > OSPF 110)
+R1(config)# ip route 192.168.20.0 255.255.255.0 10.99.1.2 130
+
+! Verification -- la route n'apparait PAS tant qu'OSPF fonctionne
+R1# show ip route 192.168.20.0
+Routing entry for 192.168.20.0/24
+  Known via "ospf 1", distance 110, metric 20, type intra area
+  ...
+```
+
+Si le lien OSPF tombe :
+
+```{.default}
+R1# show ip route 192.168.20.0
+Routing entry for 192.168.20.0/24
+  Known via "static", distance 130, metric 0
+  Routing Descriptor Blocks:
+  * 10.99.1.2
+      Route metric is 0, traffic share count is 1
+```
+
+La route statique avec AD 130 « flotte » en arriere-plan et n'apparait dans la table que quand la route preferee (OSPF) disparait. C'est un mecanisme de failover simple et fiable.
+
+### Diagramme : route reseau vs route par defaut
+
+```{mermaid}
+%%| label: fig-m3-static-vs-default
+%%| fig-cap: "Deux types de routes statiques coexistent dans une topologie stub"
+graph LR
+    LAN["LAN<br/>192.168.1.0/24"] --- R1(("R1"))
+    R1 -->|"ip route 10.0.0.0<br/>255.0.0.0 10.1.12.2<br/>(route reseau)"| R2(("R2"))
+    R1 -.->|"ip route 0.0.0.0<br/>0.0.0.0 10.1.12.2<br/>(default route)"| R2
+    R2 --- Siege["Siege<br/>10.0.0.0/8"]
+    R2 --- ISP["Internet<br/>(tout le reste)"]
+```
+
+**Legende** : la route reseau cible un prefixe precis (10.0.0.0/8), la route par defaut (0.0.0.0/0) sert de filet pour toute autre destination. Les deux peuvent coexister vers le meme next-hop.
+
+### Diagramme : forwarding multi-sauts avec decrement du TTL
+
+```{mermaid}
+%%| label: fig-m3-ttl-decrement
+%%| fig-cap: "Traversee d'un paquet IP avec decrement du TTL a chaque saut"
+sequenceDiagram
+    participant PC as PC-A<br/>10.1.1.10
+    participant R1 as R1
+    participant R2 as R2
+    participant R3 as R3
+    participant Srv as Serveur<br/>10.3.3.10
+
+    PC->>R1: Paquet dest=10.3.3.10, TTL=64
+    Note over R1: Lookup -> via R2<br/>TTL = 63
+    R1->>R2: Paquet, TTL=63
+    Note over R2: Lookup -> via R3<br/>TTL = 62
+    R2->>R3: Paquet, TTL=62
+    Note over R3: Directement connecte<br/>TTL = 61
+    R3->>Srv: Paquet livre
+    Srv-->>PC: Reply (chemin inverse)
+```
+
+**Legende** : chaque routeur decremente le TTL avant de forwarder. Si TTL atteint 0, le paquet est dropped et un ICMP Time Exceeded est renvoye a la source --- c'est ce qui permet au `traceroute` de cartographier le chemin.
+
+### Mise en pratique CLI --- Configuration complete
+
+```{.cisco filename="R1"}
+! === Topologie : R1 -- R2 -- R3 (en serie) ===
+! Sur R1 : atteindre le reseau derriere R3 en passant par R2
+
+! Route reseau vers le LAN de R3
+R1(config)# ip route 192.168.30.0 255.255.255.0 10.1.12.2
+
+! Route par defaut pour tout le reste
+R1(config)# ip route 0.0.0.0 0.0.0.0 10.1.12.2
+
+! Route IPv6
+R1(config)# ipv6 unicast-routing
+R1(config)# ipv6 route 2001:DB8:30::/64 2001:DB8:12::2
+R1(config)# ipv6 route ::/0 2001:DB8:12::2
+```
+
+**Verification complete :**
+
+```{.default}
+R1# show ip route static
+Codes: L - local, C - connected, S - static, ...
+
+Gateway of last resort is 10.1.12.2 to network 0.0.0.0
+
+S*    0.0.0.0/0 [1/0] via 10.1.12.2
+S     192.168.30.0/24 [1/0] via 10.1.12.2
+
+R1# show ipv6 route static
+S   ::/0 [1/0]
+     via 2001:DB8:12::2
+S   2001:DB8:30::/64 [1/0]
+     via 2001:DB8:12::2
+
+R1# ping 192.168.30.1
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 192.168.30.1, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/2/4 ms
+```
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : oublier la route **retour**. Vous configurez une route statique sur R1 vers le reseau de R2, mais oubliez de configurer la route retour sur R2 vers le reseau de R1. Le ping semble echouer alors que les paquets ICMP Echo arrivent bien --- c'est le Echo Reply qui ne peut pas revenir. L'examen teste regulierement ce piege avec des scenarios « le ping ne fonctionne pas, trouvez pourquoi ».
+
+**A retenir** : pour les routes statiques IPv6, la commande `ipv6 unicast-routing` doit etre activee sur le routeur. Sans elle, le routeur traite les paquets IPv6 en tant qu'hote, pas en tant que routeur.
+:::
+
+### Exercice 3.3a --- Routes statiques et default route
+
+**Contexte** : vous configurez le reseau d'une PME avec 3 routeurs en serie :
+
+```{.text title="Topologie"}
+[LAN-A: 10.10.1.0/24]--[R1]--(10.10.12.0/30)--[R2]--(10.10.23.0/30)--[R3]--[LAN-C: 10.10.3.0/24]
+                                                 |
+                                            [LAN-B: 10.10.2.0/24]
+```
+
+Adresses des interfaces de transit :
+
+- R1 Gi0/1 : 10.10.12.1 | R2 Gi0/0 : 10.10.12.2
+- R2 Gi0/2 : 10.10.23.1 | R3 Gi0/0 : 10.10.23.2
+- R2 Gi0/1 : 10.10.2.1
+
+**Consigne** : configurez les routes statiques necessaires pour que les trois LANs puissent communiquer entre eux. R1 et R3 n'ont qu'une seule sortie --- utilisez des routes par defaut.
+
+::: {.callout-note collapse="true" title="Indice"}
+R2 est au centre et a besoin de routes specifiques vers LAN-A et LAN-C. R1 et R3 n'ont qu'une seule sortie -> default route.
+:::
+
+::: {.callout-note collapse="true" title="Solution"}
+```{.cisco filename="R1"}
+! === R1 -- une seule sortie vers R2 ===
+R1(config)# ip route 0.0.0.0 0.0.0.0 10.10.12.2
+
+! === R2 -- hub central, routes vers les deux LANs distants ===
+R2(config)# ip route 10.10.1.0 255.255.255.0 10.10.12.1
+R2(config)# ip route 10.10.3.0 255.255.255.0 10.10.23.2
+
+! === R3 -- une seule sortie vers R2 ===
+R3(config)# ip route 0.0.0.0 0.0.0.0 10.10.23.1
+```
+
+**Explication** : R1 et R3 sont des routeurs "stub" --- ils n'ont qu'un seul voisin (R2). Une route par defaut suffit : tout le trafic non local va vers R2. R2, en revanche, doit savoir dans quelle direction se trouvent LAN-A et LAN-C, d'ou les routes reseau specifiques. Le LAN-B est directement connecte a R2, pas besoin de route statique.
+
+**Verification** :
+
+```{.cisco filename="R1"}
+R1# ping 10.10.3.1 source 10.10.1.1
+!!!!!
+R3# ping 10.10.1.1 source 10.10.3.1
+!!!!!
+```
+:::
+
+### Exercice 3.3b --- Floating static route
+
+**Contexte** : l'entreprise NordConnect dispose de deux liens entre R-SIEGE et R-BRANCH :
+
+- Lien principal : fibre, couvert par OSPF (cout 10)
+- Lien backup : VPN 4G, interface Tunnel0, next hop 172.16.99.1
+
+**Consigne** : configurez une floating static route sur R-BRANCH pour que le reseau du siege (10.0.0.0/16) soit accessible via le lien 4G en cas de panne OSPF.
+
+::: {.callout-note collapse="true" title="Indice"}
+L'AD d'OSPF est 110. Votre route statique doit avoir une AD superieure pour rester en backup.
+:::
+
+::: {.callout-note collapse="true" title="Solution"}
+```{.cisco filename="R-BRANCH"}
+R-BRANCH(config)# ip route 10.0.0.0 255.255.0.0 172.16.99.1 130
+```
+
+**Explication** : l'AD de 130 est superieure a celle d'OSPF (110), donc cette route reste invisible tant qu'OSPF annonce 10.0.0.0/16. Si l'adjacence OSPF tombe, la route OSPF disparait de la table et la route statique (AD 130) prend le relais automatiquement. Quand OSPF se retablit, la route dynamique reprend la main (110 < 130).
+
+Le choix de l'AD 130 est une convention courante, mais toute valeur entre 111 et 254 fonctionnerait. On evite 255 car c'est l'AD « inaccessible » (la route ne serait jamais installee).
+:::
+
+### Voir aussi
+
+- @sec-topic-3-1 (relation : les routes statiques sont visibles dans la table avec le code S)
+- @sec-topic-3-2 (relation : AD modifiable et longest prefix match)
+- @sec-topic-3-4 (relation : OSPF remplace le routage statique dans les topologies complexes)
+- @sec-topic-1-8 (relation : adressage IPv6 et prefixes)
+- @sec-topic-5-5 (relation : VPN site-to-site utilise souvent des routes statiques vers le tunnel)
+
+## 3.4 --- OSPF single-area {#sec-topic-3-4}
+
+> **Exam topic 3.4** : *Configure and verify* --- single area OSPFv2
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Le routage statique fonctionne pour 3 ou 4 routeurs, mais imaginez un reseau de 50 routeurs : maintenir des centaines de routes statiques a la main est un cauchemar operationnel. Si un lien tombe, il faut intervenir manuellement pour rediriger le trafic. C'est la qu'intervient OSPF (Open Shortest Path First) --- un protocole de routage dynamique qui permet aux routeurs de decouvrir automatiquement la topologie du reseau, de calculer les meilleurs chemins, et de s'adapter en temps reel aux changements.
+
+OSPF est le protocole de routage le plus teste a l'examen CCNA. Le topic 3.4 represente a lui seul une part significative des 25% du domain IP Connectivity. Maitriser OSPF, c'est maitriser le coeur du routage d'entreprise.
+
+### Theorie
+
+#### Qu'est-ce qu'OSPF ?
+
+OSPF est un protocole de routage **link-state** (a etat de liens), standardise par l'IETF (RFC 2328 pour OSPFv2, RFC 5340 pour OSPFv3). Contrairement aux protocoles distance-vector comme RIP qui ne connaissent que la direction et la distance vers chaque destination, OSPF donne a chaque routeur une **carte complete de la topologie** du reseau.
+
+L'analogie GPS est parfaite : RIP, c'est demander la direction a chaque passant (« le centre-ville ? tout droit, puis a gauche ») --- chaque personne ne connait que son voisinage. OSPF, c'est comme avoir une carte routiere complete --- chaque routeur possede la meme carte et calcule lui-meme le meilleur itineraire.
+
+#### Caracteristiques principales
+
+| Caracteristique | Valeur |
+|-----------------|--------|
+| Type | Link-state (IGP) |
+| Algorithme | Dijkstra (SPF --- Shortest Path First) |
+| Metrique | Cout (base sur la bande passante) |
+| AD | 110 |
+| Transport | IP protocole 89 (pas TCP, pas UDP) |
+| Multicast Hello | 224.0.0.5 (AllSPFRouters) |
+| Multicast DR/BDR | 224.0.0.6 (AllDRouters) |
+| Timers (broadcast) | Hello = 10s, Dead = 40s |
+| Timers (point-to-point) | Hello = 10s, Dead = 40s |
+| Timers (NBMA) | Hello = 30s, Dead = 120s |
+| Supporte VLSM | Oui |
+| Supporte CIDR | Oui |
+| Mises a jour | Incrementales (pas de full update periodique) |
+
+#### Les 5 types de paquets OSPF
+
+OSPF utilise 5 types de paquets pour etablir des adjacences et synchroniser les bases de donnees topologiques (sequence complete @fig-m3-ospf-packet-exchange, transitions d'etats @fig-m3-ospf-states) :
+
+| Type | Nom | Role | Analogie |
+|------|-----|------|----------|
+| 1 | **Hello** | Decouvrir les voisins, maintenir l'adjacence | « Bonjour, je suis R1, voici mes parametres » |
+| 2 | **DBD** (Database Description) | Resumer le contenu de la LSDB | « Voici la liste de ce que je sais » |
+| 3 | **LSR** (Link-State Request) | Demander les details manquants | « Je n'ai pas cette info, envoie-la moi » |
+| 4 | **LSU** (Link-State Update) | Envoyer les details des LSA | « Voici les infos que tu as demandees » |
+| 5 | **LSAck** | Accuser reception d'un LSU | « Bien recu, merci » |
+
+#### Contenu du paquet Hello
+
+Le paquet Hello transporte les parametres critiques qui doivent correspondre entre deux voisins pour former une adjacence :
+
+| Champ | Description | Doit matcher ? |
+|-------|-------------|----------------|
+| Router ID | Identifiant unique du routeur | Non |
+| Hello interval | Frequence d'envoi des Hello | **Oui** |
+| Dead interval | Temps avant de declarer un voisin mort | **Oui** |
+| Area ID | Numero de l'area OSPF | **Oui** |
+| Network mask | Masque du sous-reseau | **Oui** (broadcast/NBMA) |
+| Authentication | Type + mot de passe | **Oui** (si configure) |
+| Stub area flag | Indicateur de zone stub | **Oui** |
+| Neighbors | Liste des Router ID voisins deja connus | Non |
+| DR/BDR | Adresses du DR et BDR elus | Non |
+| Priority | Priorite pour l'election DR/BDR | Non |
+
+#### Diagramme : echange complet des paquets OSPF
+
+```{mermaid}
+%%| label: fig-m3-ospf-packet-exchange
+%%| fig-cap: "Sequence complete Hello -> DBD -> LSR -> LSU -> LSAck pour etablir une adjacence OSPF"
+sequenceDiagram
+    participant R1 as R1 (1.1.1.1)
+    participant R2 as R2 (2.2.2.2)
+
+    Note over R1,R2: Etat initial : Down
+    R1->>R2: Hello (RID 1.1.1.1, Neighbors vide)
+    Note over R2: Passe en Init
+    R2->>R1: Hello (RID 2.2.2.2, Neighbors: 1.1.1.1)
+    Note over R1,R2: Passent en 2-Way
+    Note over R1,R2: (P2P -> saut direct vers ExStart)
+    R1->>R2: DBD (seq=x, master)
+    R2->>R1: DBD (seq=x, slave)
+    Note over R1,R2: Exchange : resumes LSA
+    R1->>R2: LSR (demande LSAs manquants)
+    R2->>R1: LSU (contient les LSAs)
+    R1->>R2: LSAck
+    Note over R1,R2: Etat Full : LSDB synchronisees
+```
+
+**Legende** : cet echange est **CRITIQUE pour l'examen**. Memoriser l'ordre Hello -> DBD -> LSR -> LSU -> LSAck et le role de chaque paquet.
+
+#### 3.4.a --- Adjacences OSPF (Neighbor adjacencies)
+
+L'etablissement d'une adjacence OSPF suit un processus en 7 etats. Ce processus est au coeur du fonctionnement d'OSPF --- et de l'examen.
+
+#### Diagramme : machine a etats d'une adjacence OSPF
+
+```{mermaid}
+%%| label: fig-m3-ospf-states
+%%| fig-cap: "Machine a etats complete d'une adjacence OSPF, de Down a Full"
+stateDiagram-v2
+    [*] --> Down : Interface up
+    Down --> Init : Hello recu du voisin
+    Init --> TwoWay : Notre RID dans Hello voisin
+    TwoWay --> ExStart : Reseau P2P ou role DR/BDR
+    TwoWay --> TwoWay : DROther<->DROther (normal)
+    ExStart --> Exchange : Master/slave negocie
+    Exchange --> Loading : DBD echanges
+    Loading --> Full : LSR/LSU/LSAck completes
+    Full --> Down : Dead timer expire
+
+    note right of TwoWay : DROther <-> DROther<br/>reste ici (pas un bug)
+    note right of ExStart : Bloque ici = MTU mismatch
+```
+
+**Legende** : **CRITIQUE CCNA**. Un voisin bloque en ExStart/Exchange indique un probleme de MTU. Bloque en Init = timers ou area mismatch. Reste en 2-Way entre DROthers = comportement normal sur reseau broadcast.
+
+```{.text title="Topologie"}
+Etat 1: DOWN
+  |  Le routeur n'a recu aucun Hello de ce voisin
+  |  <- Envoi du premier Hello
+  v
+Etat 2: INIT
+  |  Un Hello a ete recu, mais notre Router ID
+  |  n'apparait pas dans le champ Neighbors du voisin
+  |  <- Le voisin nous ajoute a sa liste Neighbors
+  v
+Etat 3: 2-WAY
+  |  Communication bidirectionnelle confirmee
+  |  Notre Router ID apparait dans le Hello du voisin
+  |  <- Sur reseau broadcast : election DR/BDR ici
+  |  <- Sur point-to-point : passage direct a ExStart
+  v
+Etat 4: EXSTART
+  |  Negociation du master/slave pour l'echange DBD
+  |  Le routeur avec le Router ID le plus eleve = master
+  |  <- Echange des premiers DBD (vides, pour etablir la sequence)
+  v
+Etat 5: EXCHANGE
+  |  Echange des DBD (resumes de la LSDB)
+  |  Chaque routeur decouvre ce que l'autre sait
+  |  <- Comparaison des DBD recus avec sa propre LSDB
+  v
+Etat 6: LOADING
+  |  Envoi de LSR pour les LSA manquants
+  |  Reception des LSU contenant les details
+  |  <- Echange LSR -> LSU -> LSAck
+  v
+Etat 7: FULL
+     Adjacence complete -- les LSDB sont synchronisees
+     Le routeur calcule le SPF et installe les routes
+```
+
+Sur un **reseau broadcast** (Ethernet), l'etat **2-WAY** est atteint par tous les voisins, mais seuls le DR et le BDR forment des adjacences **FULL** avec les autres routeurs. Les routeurs DROther restent en 2-WAY entre eux --- c'est normal et attendu.
+
+Sur un **reseau point-to-point**, il n'y a que deux routeurs : pas besoin de DR/BDR. L'adjacence passe directement de 2-WAY a ExStart, puis a FULL.
+
+#### Conditions pour former une adjacence
+
+Deux routeurs OSPF ne deviendront voisins que si **toutes** ces conditions sont remplies :
+
+1. Les interfaces sont dans la **meme area**
+2. Les **Hello et Dead intervals** correspondent
+3. Le **masque de sous-reseau** correspond (sur reseaux broadcast/NBMA)
+4. L'**authentification** correspond (si configuree)
+5. Le **stub flag** correspond
+6. Les **Router ID** sont uniques
+7. L'**MTU** correspond (sinon bloque en ExStart/Exchange)
+
+Si une adjacence ne se forme pas, verifiez ces 7 points dans l'ordre.
+
+#### 3.4.b --- Reseau point-to-point
+
+Sur un lien point-to-point (serial, tunnel, ou Ethernet configure en point-to-point), OSPF se comporte simplement :
+
+- Pas d'election DR/BDR (inutile avec seulement 2 routeurs)
+- Les Hello sont envoyes en multicast 224.0.0.5
+- L'adjacence monte directement a FULL
+- Le masque de sous-reseau n'a pas besoin de matcher (car pas de reseau multi-acces)
+
+```{.cisco filename="R1"}
+! Forcer le type de reseau en point-to-point sur une interface Ethernet
+R1(config)# interface GigabitEthernet0/1
+R1(config-if)# ip ospf network point-to-point
+```
+
+Cas d'usage typique : liens WAN serie, tunnels GRE, ou liens Ethernet dedies entre deux routeurs (de plus en plus courant dans les datacenters).
+
+#### 3.4.c --- Reseau broadcast et election DR/BDR
+
+Sur un reseau multi-acces (Ethernet), si tous les routeurs formaient des adjacences FULL avec tous les autres, la quantite de trafic OSPF serait explosive. Avec N routeurs, on aurait N x (N-1)/2 adjacences. La solution d'OSPF : elire un **Designated Router (DR)** et un **Backup Designated Router (BDR)**.
+
+```{.text title="Topologie"}
+              Segment Ethernet broadcast
+    +------------------------------------------+
+    |                                          |
+  [R1]        [R2]        [R3]        [R4]
+  DROther      DR          BDR       DROther
+  Prio: 1    Prio: 255   Prio: 200   Prio: 0
+
+  R1 <-> R2 (FULL)       R3 <-> R2 (FULL)
+  R1 <-> R3 (FULL)       R4 <-> R2 (FULL)
+  R1 <-> R4 (2-WAY)      R4 <-> R3 (FULL)
+```
+
+Le DR centralise l'echange de LSA : les routeurs envoient leurs mises a jour au DR (multicast 224.0.0.6), et le DR les redistribue a tout le monde (multicast 224.0.0.5). Le BDR est le remplacant en cas de panne du DR.
+
+#### Diagramme : algorithme d'election DR/BDR
+
+```{mermaid}
+%%| label: fig-m3-dr-bdr-election
+%%| fig-cap: "Arbre de decision pour l'election DR/BDR OSPF sur un segment broadcast"
+flowchart TD
+    A[Nouveau segment broadcast] --> B{Routeur avec<br/>priorite > 0 ?}
+    B -->|Non, tous a 0| C[Aucun DR elu<br/>Pas d'adjacences]
+    B -->|Oui| D[Comparer priorites]
+    D --> E{Une priorite<br/>plus haute ?}
+    E -->|Oui| F[Priorite max = DR]
+    E -->|Non, egalite| G[RID le plus eleve = DR]
+    F --> H[2e priorite = BDR]
+    G --> I[2e RID eleve = BDR]
+    H --> J[Autres = DROther]
+    I --> J
+    J --> K{Nouveau routeur<br/>priorite superieure<br/>arrive apres ?}
+    K -->|Oui| L[RESTE DROther<br/>non-preemptive]
+    K -->|Non| M[Etat stable]
+```
+
+**Legende** : l'election est **non-preemptive** --- un piege classique du CCNA. Forcer une nouvelle election necessite `clear ip ospf process` sur tous les routeurs.
+
+#### Algorithme d'election DR/BDR
+
+1. Le routeur avec la **priorite OSPF la plus elevee** devient DR
+2. En cas d'egalite de priorite, le **Router ID le plus eleve** departage
+3. Le deuxieme plus eleve devient BDR
+4. Priorite **0** = le routeur ne participe **jamais** a l'election (reste DROther)
+5. L'election est **non-preemptive** : si un routeur plus prioritaire arrive apres l'election, il ne prend PAS le role de DR
+
+Ce dernier point est critique et souvent teste a l'examen. Si R2 est DR avec une priorite de 100, et que R5 arrive avec une priorite de 255, R5 ne deviendra pas DR --- il faut redemarrer le processus OSPF (`clear ip ospf process`) pour forcer une nouvelle election.
+
+```{.cisco filename="R2"}
+! Modifier la priorite OSPF sur une interface
+R2(config)# interface GigabitEthernet0/0
+R2(config-if)# ip ospf priority 255
+
+! Empecher un routeur de devenir DR/BDR
+R4(config)# interface GigabitEthernet0/0
+R4(config-if)# ip ospf priority 0
+```
+
+#### 3.4.d --- Router ID
+
+Le **Router ID** (RID) est un identifiant unique de 32 bits au format d'une adresse IPv4 (mais ce n'est pas forcement une adresse IP routable). Chaque routeur OSPF doit avoir un RID unique dans le domaine OSPF.
+
+Le routeur choisit son RID selon cette hierarchie :
+
+1. **Commande `router-id`** explicite (priorite maximale)
+2. **Adresse IP la plus elevee** parmi les interfaces loopback actives
+3. **Adresse IP la plus elevee** parmi les interfaces physiques actives
+
+```{.cisco filename="R1"}
+! Methode recommandee : configuration explicite
+R1(config)# router ospf 1
+R1(config-router)# router-id 1.1.1.1
+```
+
+Si le Router ID change (modification de la commande ou changement d'interface), le changement ne prend effet qu'apres un **redemarrage du processus OSPF** :
+
+```{.cisco filename="R1"}
+R1# clear ip ospf process
+Reset ALL OSPF processes? [no]: yes
+```
+
+#### Calcul du cout OSPF
+
+La metrique OSPF est le **cout**, calcule par la formule :
+
+```{.default}
+Cout = Reference Bandwidth / Interface Bandwidth
+```
+
+La reference bandwidth par defaut est **100 Mbps** (10^8 bps).
+
+| Interface | Bande passante | Cout par defaut |
+|-----------|---------------|-----------------|
+| Serial (T1) | 1.544 Mbps | 64 |
+| FastEthernet | 100 Mbps | 1 |
+| GigabitEthernet | 1 Gbps | 1 |
+| 10 GigabitEthernet | 10 Gbps | 1 |
+
+Le probleme saute aux yeux : FastEthernet, GigabitEthernet et 10G ont tous un cout de 1 ! OSPF ne peut pas distinguer les liens rapides. La solution :
+
+```{.cisco filename="R1"}
+! Modifier la reference bandwidth (recommande : 10000 pour supporter 10G)
+R1(config-router)# auto-cost reference-bandwidth 10000
+
+! Resultat :
+! 10G     -> cout 1
+! 1G      -> cout 10
+! 100 Mbps-> cout 100
+! 10 Mbps -> cout 1000
+```
+
+Cette commande doit etre configuree de maniere **identique sur tous les routeurs** du domaine OSPF pour que les calculs de chemin soient coherents.
+
+#### Diagramme : topologie OSPF single-area typique
+
+```{mermaid}
+%%| label: fig-m3-ospf-single-area
+%%| fig-cap: "Topologie OSPF single-area 0 avec 4 routeurs et router-IDs dedies"
+graph TD
+    subgraph Area0["OSPF Area 0 (backbone)"]
+        R1(("R1<br/>RID 1.1.1.1"))
+        R2(("R2<br/>RID 2.2.2.2"))
+        R3(("R3<br/>RID 3.3.3.3"))
+        R4(("R4<br/>RID 4.4.4.4"))
+        R1 ---|"10.1.12.0/30"| R2
+        R2 ---|"10.1.23.0/30"| R3
+        R3 ---|"10.1.34.0/30"| R4
+        R1 ---|"10.1.14.0/30"| R4
+    end
+    LAN1["LAN1<br/>10.1.1.0/24"] --- R1
+    LAN4["LAN4<br/>10.1.4.0/24"] --- R4
+```
+
+**Legende** : tous les routeurs sont dans la meme area 0. Chaque routeur a un RID unique, et les liens entre routeurs utilisent des /30 (ou /31). Les LANs sont annonces mais rendus passifs.
+
+#### Configuration OSPF complete
+
+Voici une configuration OSPF single-area typique :
+
+```{.cisco filename="R1"}
+R1(config)# router ospf 1
+R1(config-router)# router-id 1.1.1.1
+R1(config-router)# auto-cost reference-bandwidth 10000
+R1(config-router)# network 10.1.1.0 0.0.0.255 area 0
+R1(config-router)# network 10.1.12.0 0.0.0.3 area 0
+R1(config-router)# passive-interface GigabitEthernet0/0
+R1(config-router)# default-information originate
+```
+
+Decortiquons chaque commande :
+
+| Commande | Role |
+|----------|------|
+| `router ospf 1` | Active OSPF, processus 1 (local au routeur, pas transmis aux voisins) |
+| `router-id 1.1.1.1` | Identifiant unique --- utiliser une convention comme X.X.X.X pour RX |
+| `auto-cost reference-bandwidth 10000` | Adapte les couts aux liens modernes |
+| `network 10.1.1.0 0.0.0.255 area 0` | Active OSPF sur les interfaces dont l'IP matche, dans l'area 0 |
+| `passive-interface Gi0/0` | Empeche l'envoi de Hello sur cette interface (LAN, pas de voisin OSPF) |
+| `default-information originate` | Annonce la route par defaut aux voisins OSPF |
+
+La commande `network` utilise un **wildcard mask** (inverse du masque de sous-reseau) :
+
+- 0.0.0.255 = /24 (les 24 premiers bits doivent matcher exactement)
+- 0.0.0.3 = /30
+- 0.0.0.0 = /32 (une seule adresse)
+
+Alternative plus explicite (IOS 15+) --- activer OSPF directement sur l'interface :
+
+```{.cisco filename="R1"}
+R1(config)# interface GigabitEthernet0/1
+R1(config-if)# ip ospf 1 area 0
+```
+
+#### passive-interface
+
+Une interface **passive** participe a OSPF (son reseau est annonce aux voisins) mais n'envoie pas de Hello et ne forme pas d'adjacence. C'est essentiel pour :
+
+- Les interfaces LAN connectees uniquement a des PCs/serveurs (pas de voisin OSPF)
+- Les interfaces loopback
+- Reduire le trafic OSPF inutile et la surface d'attaque
+
+```{.cisco filename="R1"}
+! Rendre toutes les interfaces passives par defaut, puis activer les exceptions
+R1(config-router)# passive-interface default
+R1(config-router)# no passive-interface GigabitEthernet0/1
+R1(config-router)# no passive-interface GigabitEthernet0/2
+```
+
+Cette approche « deny all, permit specific » est une bonne pratique de securite OSPF.
+
+### Mise en pratique CLI --- Verification OSPF
+
+Les commandes de verification OSPF sont tout aussi importantes que la configuration. L'examen teste intensivement l'interpretation de ces outputs.
+
+```{.cisco filename="R1"}
+! Voir les voisins OSPF
+R1# show ip ospf neighbor
+```
+
+**Output :**
+
+```{.default}
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+2.2.2.2           1   FULL/DR         00:00:36    10.1.12.2       GigabitEthernet0/1
+3.3.3.3           1   FULL/BDR        00:00:33    10.1.13.2       GigabitEthernet0/2
+4.4.4.4           1   2WAY/DROTHER    00:00:38    10.1.14.2       GigabitEthernet0/3
+```
+
+**Interpretation** :
+
+- **Neighbor ID** : Router ID du voisin (pas son adresse IP !)
+- **Pri** : priorite OSPF du voisin
+- **State** : etat de l'adjacence / role du voisin
+  - `FULL/DR` = adjacence complete, le voisin est DR
+  - `FULL/BDR` = adjacence complete, le voisin est BDR
+  - `2WAY/DROTHER` = normal sur broadcast entre DROthers (pas FULL entre eux)
+- **Dead Time** : temps restant avant de declarer le voisin mort (decompte)
+- **Address** : adresse IP de l'interface du voisin
+- **Interface** : interface locale vers ce voisin
+
+```{.cisco filename="R1"}
+! Voir les details OSPF par interface
+R1# show ip ospf interface GigabitEthernet0/1
+```
+
+**Output :**
+
+```{.default}
+GigabitEthernet0/1 is up, line protocol is up
+  Internet Address 10.1.12.1/30, Area 0, Attached via Network Statement
+  Process ID 1, Router ID 1.1.1.1, Network Type BROADCAST, Cost: 10
+  Topology-MTID    Cost    Disabled    Shutdown      Topology Name
+        0           10        no          no            Base
+  Transmit Delay is 1 sec, State DR, Priority 1
+  Designated Router (ID) 1.1.1.1, Interface address 10.1.12.1
+  Backup Designated Router (ID) 2.2.2.2, Interface address 10.1.12.2
+  Timer intervals configured, Hello 10, Dead 40, Wait 40, Retransmit 5
+    oob-resync timeout 40
+    Hello due in 00:00:04
+  Supports Link-local Signaling (LLS)
+  Cisco NSF helper support enabled
+  IETF NSF helper support enabled
+  Index 1/2/2, flood queue length 0
+  Next 0x0(0)/0x0(0)/0x0(0)
+  Last flood scan length is 1, maximum is 1
+  Last flood scan time is 0 msec, maximum is 0 msec
+  Neighbor Count is 1, Adjacent neighbor count is 1
+    Adjacent with neighbor 2.2.2.2  (Backup Designated Router)
+  Suppress hello for 0 neighbor(s)
+```
+
+**Champs cles** :
+
+- **Network Type BROADCAST** : le type de reseau OSPF
+- **Cost: 10** : le cout de cette interface
+- **State DR** : ce routeur est DR sur ce segment
+- **Hello 10, Dead 40** : les timers (doivent matcher avec le voisin)
+
+```{.cisco filename="R1"}
+! Voir les routes OSPF dans la table de routage
+R1# show ip route ospf
+```
+
+**Output :**
+
+```{.default}
+Codes: L - local, C - connected, S - static, O - OSPF, ...
+
+      10.0.0.0/8 is variably subnetted, 8 subnets, 3 masks
+O        10.1.2.0/24 [110/20] via 10.1.12.2, 00:45:12, GigabitEthernet0/1
+O        10.1.3.0/24 [110/30] via 10.1.12.2, 00:45:12, GigabitEthernet0/1
+O        10.1.23.0/30 [110/20] via 10.1.12.2, 00:45:12, GigabitEthernet0/1
+```
+
+```{.cisco filename="R1"}
+! Voir le protocole OSPF global
+R1# show ip protocols
+```
+
+**Output :**
+
+```{.default}
+*** IP Routing is NSF aware ***
+
+Routing Protocol is "ospf 1"
+  Outgoing update filter list for all interfaces is not set
+  Incoming update filter list for all interfaces is not set
+  Router ID 1.1.1.1
+  Number of areas in this router is 1. 1 normal 0 stub 0 nssa
+  Maximum path: 4
+  Routing for Networks:
+    10.1.1.0 0.0.0.255 area 0
+    10.1.12.0 0.0.0.3 area 0
+  Passive Interface(s):
+    GigabitEthernet0/0
+  Routing Information Sources:
+    Gateway         Distance      Last Update
+    2.2.2.2              110      00:45:12
+    3.3.3.3              110      00:44:58
+  Distance: (default is 110)
+```
+
+**Champs cles** :
+
+- **Router ID** : confirme le RID actif
+- **Routing for Networks** : quelles commandes network sont configurees
+- **Passive Interface(s)** : interfaces qui n'envoient pas de Hello
+- **Routing Information Sources** : voisins qui nous envoient des routes
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant #1** : l'election DR/BDR est **non-preemptive**. Un routeur avec une priorite plus elevee qui rejoint le reseau apres l'election ne deviendra PAS DR automatiquement. C'est le piege le plus frequent sur OSPF a l'examen.
+
+**Piege courant #2** : le numero de processus OSPF (`router ospf 1`) est **local** au routeur. R1 peut utiliser le processus 1 et R2 le processus 10 --- ils formeront quand meme une adjacence. En revanche, l'**area ID** DOIT correspondre.
+
+**Piege courant #3** : la commande `network` utilise un **wildcard mask**, pas un masque de sous-reseau. `network 10.1.1.0 0.0.0.255 area 0` est correct. `network 10.1.1.0 255.255.255.0 area 0` activerait OSPF sur des interfaces inattendues.
+
+**A retenir** : si `show ip ospf neighbor` montre un voisin bloque en **EXSTART** ou **EXCHANGE**, c'est presque toujours un probleme de **MTU mismatch**. Si bloque en **INIT**, verifiez que le Hello/Dead interval et l'area correspondent.
+:::
+
+### Exercice 3.4a --- Configuration OSPF de base
+
+**Contexte** : vous deployez OSPF sur un reseau de 3 routeurs pour l'entreprise DataFlow :
+
+```{.text title="Topologie"}
+     LAN-R1                                LAN-R3
+  10.10.1.0/24     10.10.12.0/30      10.10.3.0/24
+        |               |                    |
+      [R1]------Gi0/1--[lien]--Gi0/0------[R2]------Gi0/1--[lien]--Gi0/0--[R3]
+     Gi0/0        .1          .2       Gi0/2        .1            .2      Gi0/1
+   10.10.1.1                        10.10.23.0/30              10.10.3.1
+                                         |
+                                    LAN-R2: 10.10.2.0/24
+                                    (Gi0/1 : 10.10.2.1)
+```
+
+**Consigne** : configurez OSPF (processus 1, area 0) sur les 3 routeurs avec :
+
+- Router ID explicite (1.1.1.1, 2.2.2.2, 3.3.3.3)
+- Toutes les interfaces participent a OSPF
+- Les interfaces LAN sont passives
+- Reference bandwidth a 10000
+
+::: {.callout-note collapse="true" title="Indice"}
+Utilisez `passive-interface default` puis `no passive-interface` sur les interfaces inter-routeurs.
+:::
+
+::: {.callout-note collapse="true" title="Solution"}
+```{.cisco filename="R1"}
+! === R1 ===
+R1(config)# router ospf 1
+R1(config-router)# router-id 1.1.1.1
+R1(config-router)# auto-cost reference-bandwidth 10000
+R1(config-router)# network 10.10.1.0 0.0.0.255 area 0
+R1(config-router)# network 10.10.12.0 0.0.0.3 area 0
+R1(config-router)# passive-interface default
+R1(config-router)# no passive-interface GigabitEthernet0/1
+
+! === R2 ===
+R2(config)# router ospf 1
+R2(config-router)# router-id 2.2.2.2
+R2(config-router)# auto-cost reference-bandwidth 10000
+R2(config-router)# network 10.10.2.0 0.0.0.255 area 0
+R2(config-router)# network 10.10.12.0 0.0.0.3 area 0
+R2(config-router)# network 10.10.23.0 0.0.0.3 area 0
+R2(config-router)# passive-interface default
+R2(config-router)# no passive-interface GigabitEthernet0/0
+R2(config-router)# no passive-interface GigabitEthernet0/2
+
+! === R3 ===
+R3(config)# router ospf 1
+R3(config-router)# router-id 3.3.3.3
+R3(config-router)# auto-cost reference-bandwidth 10000
+R3(config-router)# network 10.10.3.0 0.0.0.255 area 0
+R3(config-router)# network 10.10.23.0 0.0.0.3 area 0
+R3(config-router)# passive-interface default
+R3(config-router)# no passive-interface GigabitEthernet0/0
+```
+
+**Verification :**
+
+```{.cisco filename="R2"}
+R2# show ip ospf neighbor
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.1           1   FULL/ -         00:00:36    10.10.12.1      GigabitEthernet0/0
+3.3.3.3           1   FULL/ -         00:00:33    10.10.23.2      GigabitEthernet0/2
+
+R2# show ip route ospf
+O     10.10.1.0/24 [110/10] via 10.10.12.1, 00:02:15, GigabitEthernet0/0
+O     10.10.3.0/24 [110/10] via 10.10.23.2, 00:02:10, GigabitEthernet0/2
+```
+
+**Explication** : le `FULL/ -` (sans DR/BDR) indique que les liens sont de type point-to-point (/30 avec 2 routeurs). Si c'etaient des segments broadcast avec plusieurs routeurs, on verrait `FULL/DR`, `FULL/BDR` ou `2WAY/DROTHER`. Les routes OSPF vers les LANs distants ont un cout de 10 (avec reference-bandwidth 10000 et interfaces GigabitEthernet).
+:::
+
+### Exercice 3.4b --- Manipulation DR/BDR
+
+**Contexte** : quatre routeurs (R1 a R4) partagent un segment Ethernet (10.10.100.0/24). Les Router ID sont 1.1.1.1, 2.2.2.2, 3.3.3.3, 4.4.4.4. Tous ont la priorite par defaut (1).
+
+**Consigne** :
+
+1. Sans modifier la priorite, quel routeur sera elu DR ? BDR ?
+2. Que devez-vous configurer pour que R2 devienne DR et R3 devienne BDR ?
+3. Que devez-vous configurer pour que R4 ne puisse jamais devenir DR ou BDR ?
+4. Si R2 est DR et que R5 (RID 5.5.5.5, priorite 255) rejoint le reseau, que se passe-t-il ?
+
+::: {.callout-note collapse="true" title="Indice"}
+Priorite la plus haute -> DR. En cas d'egalite -> Router ID le plus haut. L'election est non-preemptive.
+:::
+
+::: {.callout-note collapse="true" title="Solution"}
+1. **DR = R4** (RID 4.4.4.4, le plus eleve), **BDR = R3** (RID 3.3.3.3). Avec des priorites identiques (1), c'est le Router ID le plus eleve qui l'emporte.
+
+2. Configuration :
+
+```{.cisco filename="R2"}
+R2(config-if)# ip ospf priority 255
+R3(config-if)# ip ospf priority 200
+! Puis redemarrer le processus OSPF sur tous les routeurs
+R1# clear ip ospf process
+```
+
+3. Configuration :
+
+```{.cisco filename="R4"}
+R4(config-if)# ip ospf priority 0
+```
+
+Un routeur avec une priorite de 0 ne participe jamais a l'election DR/BDR.
+
+4. **Rien ne change**. L'election DR/BDR est non-preemptive. R2 reste DR, R3 reste BDR. R5 devient DROther malgre sa priorite superieure. Pour que R5 devienne DR, il faudrait forcer une nouvelle election (`clear ip ospf process` sur tous les routeurs), ce qui causerait une interruption temporaire du routage.
+:::
+
+### Exercice 3.4c --- Troubleshooting adjacence OSPF
+
+**Contexte** : R1 et R2 sont connectes via un lien Ethernet. OSPF est configure sur les deux, mais `show ip ospf neighbor` sur R1 ne montre aucun voisin.
+
+Voici les configurations :
+
+```{.default}
+! R1
+interface GigabitEthernet0/0
+ ip address 10.1.1.1 255.255.255.0
+ ip ospf 1 area 0
+ ip ospf hello-interval 5
+
+! R2
+interface GigabitEthernet0/0
+ ip address 10.1.1.2 255.255.255.0
+ ip ospf 1 area 1
+```
+
+**Consigne** : identifiez toutes les raisons pour lesquelles l'adjacence ne se forme pas et proposez les corrections.
+
+::: {.callout-note collapse="true" title="Indice"}
+Revoyez les 7 conditions d'adjacence. Comparez les parametres des deux routeurs.
+:::
+
+::: {.callout-note collapse="true" title="Solution"}
+**Probleme 1 --- Area mismatch** : R1 est dans l'area 0, R2 dans l'area 1. Les deux interfaces du meme lien doivent etre dans la meme area.
+
+**Probleme 2 --- Hello interval mismatch** : R1 a un hello-interval de 5 secondes (dead = 20 par defaut, soit 4x hello). R2 utilise les valeurs par defaut (hello = 10, dead = 40). Les timers doivent correspondre.
+
+**Corrections :**
+
+```{.cisco filename="R2"}
+! Sur R2 -- corriger l'area
+R2(config)# interface GigabitEthernet0/0
+R2(config-if)# no ip ospf 1 area 1
+R2(config-if)# ip ospf 1 area 0
+
+! Option A : aligner les timers sur R2
+R2(config-if)# ip ospf hello-interval 5
+
+! Option B : remettre les timers par defaut sur R1
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# no ip ospf hello-interval 5
+```
+
+**Commande de diagnostic cle :**
+
+```{.cisco filename="R1"}
+R1# show ip ospf interface GigabitEthernet0/0
+! Verifie : area, timers, network type, etat
+```
+:::
+
+### Exercice 3.4d --- Calcul de cout OSPF
+
+**Contexte** : la topologie suivante avec reference-bandwidth par defaut (100 Mbps) :
+
+```{.text title="Topologie"}
+[R1]---- FastEthernet ----[R2]---- GigabitEthernet ----[R3]
+         100 Mbps                    1 Gbps
+
+[R1]---- Serial (T1) ----[R4]---- FastEthernet ----[R3]
+         1.544 Mbps                  100 Mbps
+```
+
+**Consigne** : calculez le cout total de chaque chemin R1 -> R3 et determinez lequel OSPF choisira. Puis recalculez avec `auto-cost reference-bandwidth 10000`.
+
+::: {.callout-note collapse="true" title="Solution"}
+**Avec reference-bandwidth par defaut (100 Mbps)** :
+
+- Chemin via R2 : cout FastEth (100/100 = 1) + cout GigE (100/1000 = 0.1 -> arrondi a **1**) = **2**
+- Chemin via R4 : cout Serial (100/1.544 = **64**) + cout FastEth (100/100 = **1**) = **65**
+- OSPF choisit **via R2** (cout 2 < 65)
+
+Le probleme : FastEthernet et GigabitEthernet ont le meme cout (1). OSPF ne voit pas la difference.
+
+**Avec reference-bandwidth 10000 (10 Gbps)** :
+
+- Chemin via R2 : cout FastEth (10000/100 = **100**) + cout GigE (10000/1000 = **10**) = **110**
+- Chemin via R4 : cout Serial (10000/1.544 = **6476**) + cout FastEth (10000/100 = **100**) = **6576**
+- OSPF choisit toujours **via R2** (cout 110 < 6576), mais maintenant il peut distinguer FastEth de GigE
+:::
+
+### Voir aussi
+
+- @sec-topic-3-1 (relation : les routes OSPF apparaissent avec le code O dans la table)
+- @sec-topic-3-2 (relation : AD 110 pour OSPF, metrique = cout)
+- @sec-topic-2-1 (relation : inter-VLAN routing combine avec OSPF dans le Lab 3.4)
+- @sec-topic-1-6 (relation : wildcard masks pour la commande network)
+- @sec-topic-5-1 (relation : authentification OSPF et securite du protocole)
+
+## 3.5 --- Protocoles de redondance du premier saut (FHRP) {#sec-topic-3-5}
+
+> **Exam topic 3.5** : *Describe* --- the purpose, functions, and concepts of first hop redundancy protocols
+> **Niveau** : Describe
+
+### Contexte
+
+Imaginez un bureau de 200 employes. Tous leurs PCs ont comme passerelle par defaut l'adresse 192.168.1.1, configuree sur le routeur R1. Un mardi matin, R1 tombe en panne. Resultat : plus personne ne peut acceder a Internet ni aux autres sous-reseaux, meme si un second routeur R2 (192.168.1.2) est parfaitement fonctionnel sur le meme segment. Pourquoi ? Parce que les PCs ne connaissent qu'une seule gateway --- celle qui est configuree en dur dans leurs parametres reseau.
+
+Les protocoles FHRP (First Hop Redundancy Protocol) resolvent ce probleme en creant une **adresse IP virtuelle** partagee entre plusieurs routeurs. Les PCs pointent vers cette adresse virtuelle, et les routeurs se coordonnent pour decider lequel repond.
+
+### Theorie
+
+Le principe est commun aux trois protocoles FHRP : deux routeurs (ou plus) partagent une **adresse IP virtuelle** et une **adresse MAC virtuelle**. Les hotes du LAN configurent cette adresse virtuelle comme passerelle par defaut. Si le routeur actif tombe, un routeur de secours prend le relais --- de maniere transparente pour les clients.
+
+```{.text title="Topologie"}
+                         IP virtuelle : 192.168.1.254
+                         MAC virtuelle : 0000.0c07.ac01
+                                |
+                 +--------------+--------------+
+                 |              |              |
+              [R1]           [SW1]          [R2]
+           192.168.1.1                  192.168.1.2
+             ACTIF                       STANDBY
+                 |                          |
+                 +---- vers le reseau ------+
+
+   [PC1]  [PC2]  [PC3]  ... tous configures avec gateway 192.168.1.254
+```
+
+Si R1 tombe, R2 detecte l'absence de Hello de R1, prend le role actif et commence a repondre aux requetes ARP pour l'IP virtuelle. Les PCs continuent d'envoyer leurs paquets a 192.168.1.254 --- sans aucune reconfiguration (sequence complete @fig-m3-hsrp-failover, machine a etats @fig-m3-hsrp-states).
+
+#### Tableau comparatif des protocoles FHRP
+
+| Caracteristique | HSRP (v2) | VRRP (v3) | GLBP |
+|-----------------|-----------|-----------|------|
+| **Standard** | Proprietaire Cisco | IETF (RFC 5798) | Proprietaire Cisco |
+| **Roles** | Active / Standby / Listen | Master / Backup | AVG / AVF |
+| **IP virtuelle** | Differente des IPs reelles | Peut etre l'IP d'un routeur | Differente des IPs reelles |
+| **MAC virtuelle** | 0000.0c9f.fXXX (v2) | 0000.5e00.01XX | 0007.b400.XXYY |
+| **Multicast** | 224.0.0.102 (v2) | 224.0.0.18 | 224.0.0.102 |
+| **Load balancing** | Non (1 actif) | Non (1 master) | **Oui** (natif) |
+| **Preemption** | Desactivee par defaut | Activee par defaut | Activee par defaut |
+| **Timers par defaut** | Hello 3s, Hold 10s | Hello 1s, Dead 3s | Hello 3s, Hold 10s |
+| **Scope examen CCNA** | Concepts seulement | Concepts seulement | Concepts seulement |
+
+#### Diagramme : basculement HSRP Active vers Standby
+
+```{mermaid}
+%%| label: fig-m3-hsrp-failover
+%%| fig-cap: "Sequence de basculement HSRP lors de la panne du routeur Active"
+sequenceDiagram
+    participant PC as PC-LAN<br/>GW 192.168.1.254
+    participant R1 as R1 (Active)<br/>192.168.1.1
+    participant R2 as R2 (Standby)<br/>192.168.1.2
+
+    Note over R1,R2: Etat normal : Hello toutes les 3s
+    R1->>R2: Hello (Pri 110, Active)
+    R2->>R1: Hello (Pri 100, Standby)
+    PC->>R1: Trafic vers 192.168.1.254
+    Note over R1: PANNE
+    Note over R2: Hold timer (10s) expire
+    Note over R2: Transition Standby -> Active
+    R2->>R2: Gratuitous ARP<br/>MAC virtuelle
+    PC->>R2: Trafic redirige transparent
+    Note over PC: Aucune reconfiguration
+```
+
+**Legende** : le basculement HSRP est transparent pour les clients --- ils continuent d'envoyer a l'IP virtuelle. Le gratuitous ARP met a jour les tables MAC des switches du segment.
+
+#### Diagramme : machine a etats HSRP
+
+```{mermaid}
+%%| label: fig-m3-hsrp-states
+%%| fig-cap: "Machine a etats HSRP : Init -> Listen -> Speak -> Standby -> Active"
+stateDiagram-v2
+    [*] --> Init : Interface up
+    Init --> Listen : Pas d'IP virtuelle configuree
+    Listen --> Speak : Active timer expire
+    Speak --> Standby : Priorite inferieure au DR
+    Speak --> Active : Priorite la plus elevee
+    Standby --> Active : Active defaillant
+    Active --> Speak : Preempt par priorite superieure
+
+    note right of Listen : Ecoute les Hello,<br/>ne parle pas
+    note right of Active : Repond aux ARP<br/>pour l'IP virtuelle
+```
+
+**Legende** : seul l'etat Active repond aux requetes ARP pour l'IP virtuelle. Le Standby est pret a prendre le relais dans les 10 secondes (timer Hold par defaut).
+
+#### HSRP (Hot Standby Router Protocol)
+
+HSRP est le protocole FHRP le plus courant dans les environnements Cisco. Le routeur avec la **priorite la plus elevee** (par defaut 100) devient **Active**. Le deuxieme devient **Standby**. Les autres sont en etat **Listen** (ils attendent en cas de double panne).
+
+La **preemption** est desactivee par defaut en HSRP : si le routeur Active tombe puis revient, il ne reprend pas automatiquement le role Active. Il faut explicitement activer `standby preempt` pour ce comportement.
+
+#### VRRP (Virtual Router Redundancy Protocol)
+
+VRRP est le standard ouvert (IETF). Son fonctionnement est tres similaire a HSRP, avec une particularite : le routeur **Master** peut utiliser sa propre adresse IP reelle comme IP virtuelle. La preemption est activee par defaut.
+
+#### GLBP (Gateway Load Balancing Protocol)
+
+GLBP se distingue par sa capacite de **load balancing natif**. Au lieu d'avoir un seul routeur actif, GLBP distribue le trafic entre plusieurs routeurs en assignant des MAC virtuelles differentes a chaque routeur. L'AVG (Active Virtual Gateway) repond aux requetes ARP en alternant les MAC virtuelles, repartissant ainsi la charge.
+
+### Mise en pratique CLI
+
+Bien que l'examen CCNA ne teste pas la configuration FHRP, comprendre l'output aide a visualiser les concepts :
+
+```{.cisco filename="R1"}
+R1# show standby brief
+                     P indicates configured to preempt.
+                     |
+Interface   Grp  Pri P State   Active          Standby         Virtual IP
+Gi0/0       1    110 P Active  local           192.168.1.2     192.168.1.254
+```
+
+**Interpretation** :
+
+- **Grp 1** : groupe HSRP 1
+- **Pri 110** : priorite configuree
+- **P** : preemption activee
+- **State Active** : ce routeur est le routeur actif
+- **Virtual IP 192.168.1.254** : l'adresse que les hotes utilisent comme gateway
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : confondre les roles entre HSRP et VRRP. HSRP utilise Active/Standby, VRRP utilise Master/Backup. L'examen peut melanger les termes dans les reponses pour pieger les candidats inattentifs.
+
+**A retenir** : seul GLBP fait du load balancing natif. Si une question demande « quel FHRP permet de repartir la charge entre plusieurs routeurs sans configuration supplementaire ? », la reponse est GLBP. HSRP et VRRP ne supportent qu'un seul routeur actif/master a la fois par groupe.
+:::
+
+### Exercice 3.5 --- Identifier les roles FHRP
+
+**Contexte** : l'entreprise LogiNet utilise HSRP entre R1 et R2 pour le LAN 10.10.50.0/24. Configuration :
+
+- R1 : priorite 110, preempt active, IP 10.10.50.1
+- R2 : priorite 100, preempt desactive, IP 10.10.50.2
+- IP virtuelle : 10.10.50.254
+
+**Consigne** :
+
+1. Quel routeur est Active ? Pourquoi ?
+2. R1 redemarre (panne puis retour). Quel routeur est Active apres le redemarrage de R1 ?
+3. Si on desactive preempt sur R1, que change la reponse a la question 2 ?
+4. Comment les 50 PCs du LAN doivent-ils etre configures (gateway) ?
+
+::: {.callout-note collapse="true" title="Solution"}
+1. **R1 est Active** car sa priorite (110) est superieure a celle de R2 (100).
+
+2. **R1 redevient Active**. Pendant la panne de R1, R2 prend le role Active. Quand R1 revient, sa preemption est activee et sa priorite (110) est superieure a celle de R2 (100), donc R1 reprend le role Active.
+
+3. **R2 reste Active**. Sans preemption sur R1, meme si R1 a une priorite plus elevee, il ne peut pas « reprendre » le role Active a R2 qui l'a obtenu pendant la panne. R1 passe en Standby.
+
+4. Tous les PCs doivent avoir comme gateway **10.10.50.254** (l'adresse IP virtuelle). Pas 10.10.50.1 ni 10.10.50.2 --- sinon on perd le benefice de la redondance.
+:::
+
+### Voir aussi
+
+- @sec-topic-1-1 (relation : role des routeurs, incluant la redondance)
+- @sec-topic-3-4 (relation : OSPF gere le routage entre reseaux, FHRP gere la redondance de la gateway locale)
+- @sec-topic-2-5 (relation : STP gere la redondance L2, FHRP gere la redondance L3)
+- @sec-topic-4-6 (relation : DHCP distribue l'IP virtuelle FHRP comme default gateway aux clients)
+
+## 3.6 --- Gestion reseau cloud {#sec-topic-3-6}
+
+> **Exam topic 3.6** : *Describe* --- the purpose of cloud network management *(NOUVEAU v1.1)*
+> **Niveau** : Describe
+
+### Contexte
+
+Traditionnellement, chaque equipement reseau est configure individuellement en CLI --- connexion SSH, commandes ligne par ligne, fichier de configuration sauvegarde localement. Pour 10 switches, c'est gerable. Pour 500 equipements repartis sur 20 sites, c'est un cauchemar operationnel. La gestion reseau cloud propose un changement radical : un tableau de bord centralise, accessible depuis n'importe ou, qui gere l'ensemble du parc reseau.
+
+### Theorie
+
+La gestion reseau cloud (cloud network management) consiste a deporter le plan de gestion des equipements vers une plateforme hebergee dans le cloud. Les equipements reseau se connectent a cette plateforme via Internet (tunnel securise), et l'administrateur gere tout depuis un navigateur web.
+
+#### Modele traditionnel vs cloud-managed
+
+| Aspect | Gestion traditionnelle (CLI) | Gestion cloud |
+|--------|------------------------------|---------------|
+| **Interface** | CLI (SSH/console) par equipement | Dashboard web centralise |
+| **Deploiement** | Configuration manuelle, un par un | Zero-touch provisioning (ZTP) |
+| **Mises a jour firmware** | Telechargement manuel, reboot planifie | Push automatique depuis le cloud |
+| **Monitoring** | SNMP + Syslog + outils tiers | Dashboard integre, alertes temps reel |
+| **Acces** | VPN ou acces reseau direct requis | Navigateur + identifiants, de n'importe ou |
+| **Scalabilite** | Lineaire (1 admin -> N equipements) | Exponentielle (1 admin -> N x 10 equipements) |
+| **Cout** | CAPEX (licence IOS) | OPEX (abonnement annuel/par device) |
+| **Dependance** | Autonome (fonctionne hors-ligne) | Necessite une connexion Internet |
+
+#### Plateformes Cisco de gestion cloud
+
+**Cisco Meraki** est l'exemple phare de gestion 100% cloud. Les equipements Meraki (switches, AP, routeurs, firewalls, cameras) se connectent au cloud Meraki et sont entierement configures depuis le dashboard web. Aucune CLI n'est necessaire --- ni meme disponible sur la plupart des modeles.
+
+**Cisco DNA Center** (rebaptise Catalyst Center) est une plateforme on-premises ou cloud qui gere les equipements Catalyst traditionnels. Elle offre une approche hybride : les equipements conservent leur CLI IOS, mais DNA Center fournit un plan de gestion centralise avec automatisation, assurance reseau et analytique.
+
+**Cisco SD-WAN (Viptela)** gere les routeurs WAN depuis vManage, un controleur cloud. Les politiques de routage et de securite sont definies centralement et poussees vers les routeurs des succursales.
+
+#### Avantages de la gestion cloud
+
+1. **Deploiement simplifie** : un nouvel equipement se connecte a Internet, contacte le cloud, telecharge sa configuration -> operationnel sans intervention sur site (Zero-Touch Provisioning)
+2. **Visibilite centralisee** : topologie, sante des liens, utilisation des clients, le tout dans un seul dashboard
+3. **Mises a jour automatisees** : le cloud pousse les patches de securite et les nouvelles fonctionnalites
+4. **Conformite et reporting** : le cloud maintient un historique de configuration et detecte les derives
+5. **Intelligence reseau** : analyse du trafic par ML/AI pour detecter les anomalies (voir topic 5.11)
+
+#### Limites et considerations
+
+- **Dependance Internet** : si le lien Internet tombe, les equipements continuent de fonctionner avec leur derniere configuration, mais l'administrateur perd la visibilite et le controle a distance
+- **Confidentialite des donnees** : les donnees de telemetrie transitent par le cloud --- certaines organisations (defense, sante) peuvent avoir des contraintes reglementaires
+- **Cout recurrent** : modele d'abonnement vs achat de licence perpetuelle
+- **Vendor lock-in** : les plateformes cloud sont generalement proprietaires
+
+### Mise en pratique CLI
+
+La gestion cloud n'implique pas de commandes CLI traditionnelles, mais un routeur peut etre verifie pour sa connexion au controleur :
+
+```{.cisco filename="R1"}
+! Verifier la connexion au DNA Center (Catalyst Center)
+R1# show platform software dnac
+DNAC Connection Status: Connected
+DNAC IP: 10.100.1.50
+Connection Established: 2025-12-10 08:32:15
+
+! Verifier le mode de gestion sur un switch Catalyst
+SW1# show run | include transport
+transport https
+```
+
+Sur un equipement Meraki, il n'y a pas de CLI --- tout passe par le dashboard. L'etudiant peut explorer l'interface Meraki via le **Meraki Dashboard Demo** accessible gratuitement en ligne.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : penser que la gestion cloud remplace completement la CLI. En realite, DNA Center et les outils cloud **coexistent** avec la CLI sur les equipements Catalyst. Seul Meraki est 100% cloud-managed sans CLI. L'examen peut demander de distinguer ces deux approches.
+
+**A retenir** : le Zero-Touch Provisioning (ZTP) est l'un des avantages cles de la gestion cloud. L'equipement neuf se connecte a Internet, contacte le cloud, recoit sa configuration automatiquement. C'est le scenario de deploiement en succursale que l'examen teste.
+:::
+
+### Exercice 3.6 --- Gestion traditionnelle vs cloud
+
+**Contexte** : l'entreprise GlobeTech possede 30 sites avec chacun 2 switches, 3 AP et 1 routeur WAN. L'equipe reseau de 3 personnes est basee au siege.
+
+**Consigne** : pour chaque scenario, indiquez si la gestion traditionnelle ou cloud est plus adaptee et justifiez :
+
+1. Deployer 5 nouveaux sites en 2 semaines, sans envoyer de technicien reseau sur place
+2. Debugger un probleme OSPF complexe avec des timers personnalises
+3. Verifier a 22h depuis chez vous que tous les AP des 30 sites sont operationnels
+4. Appliquer une mise a jour de securite critique sur les 60 switches en une nuit
+
+::: {.callout-note collapse="true" title="Solution"}
+1. **Cloud** --- le Zero-Touch Provisioning permet de pre-configurer les equipements dans le dashboard, les expedier sur site, et laisser un employe non technique les brancher. La configuration se telecharge automatiquement.
+
+2. **CLI traditionnelle** --- un debug OSPF necessite des commandes de diagnostic avancees (`debug ip ospf adj`, `show ip ospf interface`, modification de timers). La CLI offre un controle granulaire que les dashboards cloud ne fournissent pas toujours.
+
+3. **Cloud** --- un dashboard accessible via navigateur, de n'importe ou, montre l'etat de tous les AP en temps reel avec alertes. En CLI traditionnel, il faudrait un VPN vers chaque site puis verifier chaque AP individuellement.
+
+4. **Cloud** --- la mise a jour centralisee via le dashboard permet de planifier le deploiement sur les 60 switches en une seule operation, avec rollback automatique en cas d'echec. En CLI, il faudrait se connecter a chaque switch et copier manuellement le firmware.
+:::
+
+### Voir aussi
+
+- @sec-topic-1-2 (relation : architectures on-premises vs cloud)
+- @sec-topic-1-1 (relation : role des controleurs --- DNA Center et WLC)
+- @sec-topic-2-6 (relation : architecture wireless cloud-managed --- Meraki)
+- @sec-topic-6-2 (relation : comparaison reseau traditionnel vs controller-based)
+- @sec-topic-6-4 (relation : DNA Center en detail)
+
+## Labs Module 3 {#sec-topic-3-labs}
+
+### Lab 3.1 --- Routes statiques IPv4/IPv6
+
+**Topologie :**
+
+```{.text title="Topologie"}
+                    10.10.12.0/30         10.10.23.0/30         10.10.34.0/30
+  LAN-A ----[R1]================[R2]================[R3]================[R4]---- LAN-D
+10.10.1.0/24  Gi0/0  Gi0/1  Gi0/0  Gi0/1  Gi0/0  Gi0/1  Gi0/0  Gi0/1
+               .1     .1     .2     .1     .2     .1     .2     .1
+                              |                                  |
+                         LAN-B: 10.10.2.0/24               LAN-D: 10.10.4.0/24
+                         (Gi0/2 : 10.10.2.1)
+
+  IPv6 :
+  LAN-A : 2001:DB8:A:1::/64     Lien R1-R2 : 2001:DB8:A:12::/64
+  LAN-B : 2001:DB8:A:2::/64     Lien R2-R3 : 2001:DB8:A:23::/64
+  LAN-D : 2001:DB8:A:4::/64     Lien R3-R4 : 2001:DB8:A:34::/64
+```
+
+**Tableau d'adressage :**
+
+| Equipement | Interface | IPv4 | Masque | IPv6 | Gateway |
+|------------|-----------|------|--------|------|---------|
+| R1 | Gi0/0 | 10.10.1.1 | /24 | 2001:DB8:A:1::1/64 | --- |
+| R1 | Gi0/1 | 10.10.12.1 | /30 | 2001:DB8:A:12::1/64 | --- |
+| R2 | Gi0/0 | 10.10.12.2 | /30 | 2001:DB8:A:12::2/64 | --- |
+| R2 | Gi0/1 | 10.10.23.1 | /30 | 2001:DB8:A:23::1/64 | --- |
+| R2 | Gi0/2 | 10.10.2.1 | /24 | 2001:DB8:A:2::1/64 | --- |
+| R3 | Gi0/0 | 10.10.23.2 | /30 | 2001:DB8:A:23::2/64 | --- |
+| R3 | Gi0/1 | 10.10.34.1 | /30 | 2001:DB8:A:34::1/64 | --- |
+| R4 | Gi0/0 | 10.10.34.2 | /30 | 2001:DB8:A:34::2/64 | --- |
+| R4 | Gi0/1 | 10.10.4.1 | /24 | 2001:DB8:A:4::1/64 | --- |
+| PC-A | NIC | 10.10.1.10 | /24 | Auto (SLAAC) | 10.10.1.1 |
+| PC-D | NIC | 10.10.4.10 | /24 | Auto (SLAAC) | 10.10.4.1 |
+
+**Objectifs :**
+
+1. Configurer les interfaces et l'adressage IP sur les 4 routeurs
+2. Configurer des routes statiques reseau pour la connectivite complete
+3. Configurer une route par defaut sur R1 et R4 (stub routers)
+4. Configurer les routes IPv6 equivalentes
+5. Verifier la connectivite de bout en bout
+
+**Configuration de depart :**
+
+```{.cisco filename="R1"}
+! === Sur chaque routeur -- interfaces et adressage ===
+! (Exemple pour R1)
+R1(config)# hostname R1
+R1(config)# no ip domain-lookup
+R1(config)# ipv6 unicast-routing
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# ip address 10.10.1.1 255.255.255.0
+R1(config-if)# ipv6 address 2001:DB8:A:1::1/64
+R1(config-if)# no shutdown
+R1(config-if)# exit
+R1(config)# interface GigabitEthernet0/1
+R1(config-if)# ip address 10.10.12.1 255.255.255.252
+R1(config-if)# ipv6 address 2001:DB8:A:12::1/64
+R1(config-if)# no shutdown
+```
+
+**Etapes :**
+
+1. **Configurer l'adressage sur R2, R3, R4** (reprendre le meme modele que R1)
+
+2. **Configurer les routes statiques IPv4**
+
+```{.cisco filename="R1"}
+! R1 -- stub router, default route suffit
+R1(config)# ip route 0.0.0.0 0.0.0.0 10.10.12.2
+
+! R2 -- routes vers LAN-A et LAN-D
+R2(config)# ip route 10.10.1.0 255.255.255.0 10.10.12.1
+R2(config)# ip route 10.10.4.0 255.255.255.0 10.10.23.2
+R2(config)# ip route 10.10.34.0 255.255.255.252 10.10.23.2
+
+! R3 -- routes vers LAN-A, LAN-B et LAN-D
+R3(config)# ip route 10.10.1.0 255.255.255.0 10.10.23.1
+R3(config)# ip route 10.10.2.0 255.255.255.0 10.10.23.1
+R3(config)# ip route 10.10.4.0 255.255.255.0 10.10.34.2
+R3(config)# ip route 10.10.12.0 255.255.255.252 10.10.23.1
+
+! R4 -- stub router, default route suffit
+R4(config)# ip route 0.0.0.0 0.0.0.0 10.10.34.1
+```
+
+3. **Configurer les routes statiques IPv6**
+
+```{.cisco filename="R1"}
+! R1
+R1(config)# ipv6 route ::/0 2001:DB8:A:12::2
+
+! R2
+R2(config)# ipv6 route 2001:DB8:A:1::/64 2001:DB8:A:12::1
+R2(config)# ipv6 route 2001:DB8:A:4::/64 2001:DB8:A:23::2
+R2(config)# ipv6 route 2001:DB8:A:34::/64 2001:DB8:A:23::2
+
+! R3
+R3(config)# ipv6 route 2001:DB8:A:1::/64 2001:DB8:A:23::1
+R3(config)# ipv6 route 2001:DB8:A:2::/64 2001:DB8:A:23::1
+R3(config)# ipv6 route 2001:DB8:A:4::/64 2001:DB8:A:34::2
+R3(config)# ipv6 route 2001:DB8:A:12::/64 2001:DB8:A:23::1
+
+! R4
+R4(config)# ipv6 route ::/0 2001:DB8:A:34::1
+```
+
+4. **Verification**
+
+```{.cisco filename="R1"}
+R1# ping 10.10.4.10 source 10.10.1.1
+!!!!!
+
+R1# ping 2001:DB8:A:4::1 source 2001:DB8:A:1::1
+!!!!!
+
+R1# traceroute 10.10.4.10 source 10.10.1.1
+1  10.10.12.2    1 msec
+2  10.10.23.2    2 msec
+3  10.10.34.2    3 msec
+4  10.10.4.10    4 msec
+```
+
+**Verification finale :**
+
+```{.default}
+R2# show ip route static
+S     10.10.1.0/24 [1/0] via 10.10.12.1
+S     10.10.4.0/24 [1/0] via 10.10.23.2
+S     10.10.34.0/30 [1/0] via 10.10.23.2
+
+R2# show ipv6 route static
+S   2001:DB8:A:1::/64 [1/0]
+     via 2001:DB8:A:12::1
+S   2001:DB8:A:4::/64 [1/0]
+     via 2001:DB8:A:23::2
+S   2001:DB8:A:34::/64 [1/0]
+     via 2001:DB8:A:23::2
+```
+
+**Questions de validation :**
+
+1. Pourquoi R1 et R4 utilisent-ils une route par defaut plutot que des routes specifiques ?
+2. Que se passe-t-il si vous oubliez la route `10.10.12.0/30` sur R3 et que R4 fait un ping vers R1 avec l'adresse source de LAN-D ?
+3. Combien de routes statiques faudrait-il au total si on ajoutait un 5e routeur ? Et avec OSPF ?
+
+::: {.callout-tip title="🎯 Point exam"}
+**A retenir (Lab 3.1)** : dans un scenario CCNA, une topologie lineaire N routeurs necessite 2x(N-1)-2 routes reseau + 2 default routes --- ce chiffre croit lineairement. L'examen peut demander de compter le nombre minimal de routes statiques. Astuce : les routeurs stub (R1, R4) n'ont qu'une seule sortie -> une seule default route suffit.
+:::
+
+::: {.callout-note title="🔬 Lab"}
+**Extension Packet Tracer** : refaites ce lab en remplacant les routes statiques de R2 et R3 par une configuration OSPF single-area. Comparez le nombre de lignes de configuration et le temps de convergence apres un shutdown de lien.
+:::
+
+### Lab 3.2 --- OSPF Single-Area : configuration de base
+
+**Topologie :**
+
+```{.text title="Topologie"}
+                         Area 0
+
+  LAN-R1              10.10.12.0/30             LAN-R2
+10.10.1.0/24    [R1]================[R2]     10.10.2.0/24
+  Gi0/0 (.1)    Gi0/1 (.1)    (.2) Gi0/0    Gi0/1 (.1)
+                  |                   |
+                  |   10.10.13.0/30   |   10.10.23.0/30
+                  |       (.1)        |       (.1)
+                  +--------[R3]------+
+                       Gi0/0  Gi0/1
+                        (.2)   (.2)
+                         |
+                    LAN-R3: 10.10.3.0/24
+                    Gi0/2 (.1)
+```
+
+**Tableau d'adressage :**
+
+| Equipement | Interface | Adresse IP | Masque |
+|------------|-----------|-----------|--------|
+| R1 | Gi0/0 | 10.10.1.1 | /24 |
+| R1 | Gi0/1 | 10.10.12.1 | /30 |
+| R1 | Gi0/2 | 10.10.13.1 | /30 |
+| R2 | Gi0/0 | 10.10.12.2 | /30 |
+| R2 | Gi0/1 | 10.10.2.1 | /24 |
+| R2 | Gi0/2 | 10.10.23.1 | /30 |
+| R3 | Gi0/0 | 10.10.13.2 | /30 |
+| R3 | Gi0/1 | 10.10.23.2 | /30 |
+| R3 | Gi0/2 | 10.10.3.1 | /24 |
+| PC1 | NIC | 10.10.1.10 | /24 |
+| PC2 | NIC | 10.10.2.10 | /24 |
+| PC3 | NIC | 10.10.3.10 | /24 |
+
+**Objectifs :**
+
+1. Configurer OSPF single-area (area 0) sur les 3 routeurs
+2. Definir les router-id explicitement
+3. Configurer les passive-interfaces sur les LANs
+4. Verifier les adjacences et les routes apprises
+5. Tester la convergence en desactivant un lien
+
+**Etapes :**
+
+1. **Configurer OSPF sur R1**
+
+```{.cisco filename="R1"}
+R1(config)# router ospf 1
+R1(config-router)# router-id 1.1.1.1
+R1(config-router)# auto-cost reference-bandwidth 10000
+R1(config-router)# network 10.10.1.0 0.0.0.255 area 0
+R1(config-router)# network 10.10.12.0 0.0.0.3 area 0
+R1(config-router)# network 10.10.13.0 0.0.0.3 area 0
+R1(config-router)# passive-interface GigabitEthernet0/0
+```
+
+2. **Configurer OSPF sur R2 et R3** (meme logique, adapter les reseaux et RID)
+
+```{.cisco filename="R2"}
+! R2
+R2(config)# router ospf 1
+R2(config-router)# router-id 2.2.2.2
+R2(config-router)# auto-cost reference-bandwidth 10000
+R2(config-router)# network 10.10.2.0 0.0.0.255 area 0
+R2(config-router)# network 10.10.12.0 0.0.0.3 area 0
+R2(config-router)# network 10.10.23.0 0.0.0.3 area 0
+R2(config-router)# passive-interface GigabitEthernet0/1
+
+! R3
+R3(config)# router ospf 1
+R3(config-router)# router-id 3.3.3.3
+R3(config-router)# auto-cost reference-bandwidth 10000
+R3(config-router)# network 10.10.3.0 0.0.0.255 area 0
+R3(config-router)# network 10.10.13.0 0.0.0.3 area 0
+R3(config-router)# network 10.10.23.0 0.0.0.3 area 0
+R3(config-router)# passive-interface GigabitEthernet0/2
+```
+
+3. **Verifier les adjacences**
+
+```{.cisco filename="R1"}
+R1# show ip ospf neighbor
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+2.2.2.2           1   FULL/ -         00:00:36    10.10.12.2      GigabitEthernet0/1
+3.3.3.3           1   FULL/ -         00:00:33    10.10.13.2      GigabitEthernet0/2
+```
+
+4. **Verifier les routes OSPF**
+
+```{.cisco filename="R1"}
+R1# show ip route ospf
+O     10.10.2.0/24 [110/10] via 10.10.12.2, 00:05:32, GigabitEthernet0/1
+O     10.10.3.0/24 [110/10] via 10.10.13.2, 00:05:28, GigabitEthernet0/2
+O     10.10.23.0/30 [110/20] via 10.10.12.2, 00:05:32, GigabitEthernet0/1
+                     [110/20] via 10.10.13.2, 00:05:28, GigabitEthernet0/2
+```
+
+Notez le **load balancing ECMP** vers 10.10.23.0/30 : deux chemins de cout egal (20).
+
+5. **Tester la convergence** --- Coupez le lien R1--R2 :
+
+```{.cisco filename="R1"}
+R1(config)# interface GigabitEthernet0/1
+R1(config-if)# shutdown
+```
+
+Apres ~40 secondes (Dead interval), verifiez :
+
+```{.cisco filename="R1"}
+R1# show ip route ospf
+O     10.10.2.0/24 [110/20] via 10.10.13.2, 00:00:15, GigabitEthernet0/2
+O     10.10.3.0/24 [110/10] via 10.10.13.2, 00:05:28, GigabitEthernet0/2
+O     10.10.23.0/30 [110/20] via 10.10.13.2, 00:05:28, GigabitEthernet0/2
+```
+
+OSPF a automatiquement recalcule le chemin vers LAN-R2 via R3. Le cout est passe de 10 a 20.
+
+**Verification finale :**
+
+```{.cisco filename="R1"}
+R1# ping 10.10.2.10 source 10.10.1.1
+!!!!!
+
+R1# show ip protocols | section ospf
+Routing Protocol is "ospf 1"
+  Router ID 1.1.1.1
+  ...
+```
+
+**Questions de validation :**
+
+1. Pourquoi la route vers 10.10.23.0/30 a-t-elle deux next hops dans l'etat initial ?
+2. Combien de temps faut-il pour que R1 detecte la panne du lien R1--R2 ? Pourquoi ?
+3. Si vous ajoutiez un 4e routeur, combien de routes statiques faudrait-il par rapport a OSPF ?
+
+::: {.callout-tip title="🎯 Point exam"}
+**A retenir (Lab 3.2)** : le **Dead interval de 40 secondes** est la duree maximale de detection de panne par defaut. Pour une convergence plus rapide, configurer `ip ospf hello-interval 1` + `ip ospf dead-interval 4` (ou utiliser BFD). L'examen adore les questions "combien de temps pour detecter une panne" --- la reponse par defaut est **40 secondes**.
+:::
+
+::: {.callout-note title="💡 Astuce"}
+**Debug utile** : `debug ip ospf adj` montre en temps reel les transitions d'etat d'adjacence. Utile pour diagnostiquer pourquoi un voisin reste bloque en Init ou ExStart. A desactiver immediatement apres (`undebug all`) pour ne pas surcharger le CPU.
+:::
+
+### Lab 3.3 --- OSPF : DR/BDR et types de reseau
+
+**Topologie :**
+
+```{.text title="Topologie"}
+              Segment broadcast : 10.10.100.0/24
+
+      [R1]-----------------[SW1]-----------------[R2]
+    Gi0/0 (.1)               |                 Gi0/0 (.2)
+    Prio: 200                |                 Prio: 100
+                             |
+      [R3]-------------------+------------------[R4]
+    Gi0/0 (.3)                                Gi0/0 (.4)
+    Prio: 50                                  Prio: 0
+
+              Lien point-to-point : 10.10.50.0/30
+
+      [R1]===========================================[R2]
+    Gi0/1 (.1)                                     Gi0/1 (.2)
+```
+
+**Tableau d'adressage :**
+
+| Equipement | Interface | Adresse IP | Reseau |
+|------------|-----------|-----------|--------|
+| R1 | Gi0/0 | 10.10.100.1 | /24 (broadcast) |
+| R1 | Gi0/1 | 10.10.50.1 | /30 (point-to-point) |
+| R2 | Gi0/0 | 10.10.100.2 | /24 (broadcast) |
+| R2 | Gi0/1 | 10.10.50.2 | /30 (point-to-point) |
+| R3 | Gi0/0 | 10.10.100.3 | /24 (broadcast) |
+| R4 | Gi0/0 | 10.10.100.4 | /24 (broadcast) |
+
+**Objectifs :**
+
+1. Observer l'election DR/BDR sur un segment broadcast
+2. Manipuler les priorites OSPF
+3. Verifier que l'election est non-preemptive
+4. Configurer un lien point-to-point et observer l'absence de DR/BDR
+5. Comparer les etats d'adjacence (FULL vs 2-WAY)
+
+**Etapes :**
+
+1. **Configurer OSPF avec priorites differentes**
+
+```{.cisco filename="R1"}
+! R1
+R1(config)# router ospf 1
+R1(config-router)# router-id 1.1.1.1
+R1(config-router)# network 10.10.100.0 0.0.0.255 area 0
+R1(config-router)# network 10.10.50.0 0.0.0.3 area 0
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# ip ospf priority 200
+R1(config)# interface GigabitEthernet0/1
+R1(config-if)# ip ospf network point-to-point
+
+! R2
+R2(config)# router ospf 1
+R2(config-router)# router-id 2.2.2.2
+R2(config-router)# network 10.10.100.0 0.0.0.255 area 0
+R2(config-router)# network 10.10.50.0 0.0.0.3 area 0
+R2(config)# interface GigabitEthernet0/0
+R2(config-if)# ip ospf priority 100
+R2(config)# interface GigabitEthernet0/1
+R2(config-if)# ip ospf network point-to-point
+
+! R3
+R3(config)# router ospf 1
+R3(config-router)# router-id 3.3.3.3
+R3(config-router)# network 10.10.100.0 0.0.0.255 area 0
+R3(config)# interface GigabitEthernet0/0
+R3(config-if)# ip ospf priority 50
+
+! R4
+R4(config)# router ospf 1
+R4(config-router)# router-id 4.4.4.4
+R4(config-router)# network 10.10.100.0 0.0.0.255 area 0
+R4(config)# interface GigabitEthernet0/0
+R4(config-if)# ip ospf priority 0
+```
+
+2. **Forcer une nouvelle election** (pour que les priorites prennent effet)
+
+```{.cisco filename="R1"}
+! Sur chaque routeur
+R1# clear ip ospf process
+```
+
+3. **Verifier l'election DR/BDR** depuis R3 :
+
+```{.default}
+R3# show ip ospf neighbor
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+1.1.1.1         200   FULL/DR         00:00:36    10.10.100.1     GigabitEthernet0/0
+2.2.2.2         100   FULL/BDR        00:00:33    10.10.100.2     GigabitEthernet0/0
+4.4.4.4           0   2WAY/DROTHER    00:00:38    10.10.100.4     GigabitEthernet0/0
+```
+
+- R1 est DR (priorite 200, la plus haute)
+- R2 est BDR (priorite 100, la deuxieme plus haute)
+- R4 est DROther avec priorite 0 (ne peut pas devenir DR/BDR)
+- R3 est aussi DROther (priorite 50)
+- R3 est FULL avec DR et BDR, mais 2-WAY avec R4 (entre DROthers)
+
+4. **Observer le lien point-to-point** :
+
+```{.default}
+R1# show ip ospf interface GigabitEthernet0/1
+...
+Process ID 1, Router ID 1.1.1.1, Network Type POINT_TO_POINT, Cost: 10
+...
+No designated router on this network
+No backup designated router on this network
+...
+```
+
+Pas de DR/BDR sur le lien point-to-point.
+
+5. **Tester la non-preemption** --- redemarrer R1 pour voir si R2 garde le role DR :
+
+```{.cisco filename="R1"}
+! Simuler une panne de R1
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# shutdown
+! Attendre 40 secondes...
+R1(config-if)# no shutdown
+```
+
+Apres le retour de R1 :
+
+```{.default}
+R3# show ip ospf neighbor
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+2.2.2.2         100   FULL/DR         00:00:36    10.10.100.2     GigabitEthernet0/0
+1.1.1.1         200   FULL/BDR        00:00:31    10.10.100.1     GigabitEthernet0/0
+...
+```
+
+R2 est devenu DR pendant la panne de R1 et le reste --- l'election est non-preemptive. R1, malgre sa priorite superieure, est maintenant BDR.
+
+**Questions de validation :**
+
+1. Pourquoi R3 et R4 sont-ils en 2-WAY et non en FULL entre eux ?
+2. Que se passerait-il si on faisait `clear ip ospf process` sur tous les routeurs maintenant ?
+3. Quel est l'avantage du type reseau point-to-point par rapport au broadcast sur un lien entre 2 routeurs ?
+
+::: {.callout-tip title="🎯 Point exam"}
+**A retenir (Lab 3.3)** : le type de reseau OSPF par defaut sur Ethernet est **BROADCAST** (election DR/BDR). Sur serial HDLC, c'est **POINT_TO_POINT**. Sur Frame Relay, c'est **NON_BROADCAST** (NBMA). Forcer `ip ospf network point-to-point` sur un lien Ethernet /30 entre 2 routeurs est une **bonne pratique** : pas d'election DR/BDR = convergence plus rapide et moins de trafic OSPF.
+:::
+
+::: {.callout-warning title="⚠️ Attention"}
+**Piege DR/BDR** : si vous modifiez la priorite OSPF apres l'etablissement des adjacences, vous devez forcer une nouvelle election avec `clear ip ospf process` sur **tous les routeurs du segment**, pas seulement celui dont vous avez change la priorite. Sinon l'election est non-preemptive.
+:::
+
+### Lab 3.4 --- Inter-VLAN Routing + OSPF combine
+
+**Topologie :**
+
+```{.text title="Topologie"}
+                    Site A                          Site B
+                                 OSPF Area 0
+  VLAN 10 -+                                      +- VLAN 10
+  VLAN 20 -+-- [SW1] === trunk === [R1] ======== [R2] === trunk === [SW2] --+-- VLAN 10
+  VLAN 30 -+   Fa0/1          Gi0/0  Gi0/1  Gi0/0  Gi0/1           Fa0/1   +-- VLAN 20
+                               RoaS        10.10.0.0/30       RoaS
+
+  Site A VLANs :                        Site B VLANs :
+  VLAN 10 : 192.168.10.0/24            VLAN 10 : 192.168.110.0/24
+  VLAN 20 : 192.168.20.0/24            VLAN 20 : 192.168.120.0/24
+  VLAN 30 : 192.168.30.0/24
+
+  Lien inter-site : 10.10.0.0/30
+  R1 Gi0/1 : 10.10.0.1   |   R2 Gi0/0 : 10.10.0.2
+```
+
+**Tableau d'adressage :**
+
+| Equipement | Interface | VLAN | Adresse IP | Masque |
+|------------|-----------|------|-----------|--------|
+| R1 | Gi0/0.10 | 10 | 192.168.10.1 | /24 |
+| R1 | Gi0/0.20 | 20 | 192.168.20.1 | /24 |
+| R1 | Gi0/0.30 | 30 | 192.168.30.1 | /24 |
+| R1 | Gi0/1 | --- | 10.10.0.1 | /30 |
+| R2 | Gi0/0 | --- | 10.10.0.2 | /30 |
+| R2 | Gi0/1.10 | 10 | 192.168.110.1 | /24 |
+| R2 | Gi0/1.20 | 20 | 192.168.120.1 | /24 |
+| SW1 | VLAN 10 | 10 | 192.168.10.2 | /24 |
+| SW2 | VLAN 10 | 10 | 192.168.110.2 | /24 |
+| PC-A1 | NIC | 10 | 192.168.10.10 | /24 |
+| PC-A2 | NIC | 20 | 192.168.20.10 | /24 |
+| PC-B1 | NIC | 10 | 192.168.110.10 | /24 |
+
+**Objectifs :**
+
+1. Configurer le router-on-a-stick sur R1 et R2 (reprise du Module 2)
+2. Configurer les VLANs et trunks sur SW1 et SW2
+3. Configurer OSPF pour annoncer tous les reseaux entre les deux sites
+4. Verifier la connectivite inter-VLAN et inter-site
+5. Comprendre la combinaison routage L2 (VLANs) et L3 (OSPF)
+
+**Etapes :**
+
+1. **Configurer les VLANs et trunks sur SW1**
+
+```{.cisco filename="SW1"}
+SW1(config)# vlan 10
+SW1(config-vlan)# name DATA-A
+SW1(config)# vlan 20
+SW1(config-vlan)# name DEV-A
+SW1(config)# vlan 30
+SW1(config-vlan)# name MGMT-A
+SW1(config)# interface FastEthernet0/1
+SW1(config-if)# switchport trunk encapsulation dot1q
+SW1(config-if)# switchport mode trunk
+SW1(config-if)# switchport trunk allowed vlan 10,20,30
+SW1(config)# interface FastEthernet0/10
+SW1(config-if)# switchport mode access
+SW1(config-if)# switchport access vlan 10
+SW1(config)# interface FastEthernet0/11
+SW1(config-if)# switchport mode access
+SW1(config-if)# switchport access vlan 20
+```
+
+2. **Configurer le router-on-a-stick sur R1**
+
+```{.cisco filename="R1"}
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# no shutdown
+R1(config)# interface GigabitEthernet0/0.10
+R1(config-subif)# encapsulation dot1Q 10
+R1(config-subif)# ip address 192.168.10.1 255.255.255.0
+R1(config)# interface GigabitEthernet0/0.20
+R1(config-subif)# encapsulation dot1Q 20
+R1(config-subif)# ip address 192.168.20.1 255.255.255.0
+R1(config)# interface GigabitEthernet0/0.30
+R1(config-subif)# encapsulation dot1Q 30
+R1(config-subif)# ip address 192.168.30.1 255.255.255.0
+R1(config)# interface GigabitEthernet0/1
+R1(config-if)# ip address 10.10.0.1 255.255.255.252
+R1(config-if)# no shutdown
+```
+
+3. **Configurer OSPF sur R1**
+
+```{.cisco filename="R1"}
+R1(config)# router ospf 1
+R1(config-router)# router-id 1.1.1.1
+R1(config-router)# network 192.168.10.0 0.0.0.255 area 0
+R1(config-router)# network 192.168.20.0 0.0.0.255 area 0
+R1(config-router)# network 192.168.30.0 0.0.0.255 area 0
+R1(config-router)# network 10.10.0.0 0.0.0.3 area 0
+R1(config-router)# passive-interface GigabitEthernet0/0.10
+R1(config-router)# passive-interface GigabitEthernet0/0.20
+R1(config-router)# passive-interface GigabitEthernet0/0.30
+```
+
+4. **Configurer R2 et SW2** (meme logique, adapter les adresses et VLANs)
+
+5. **Verification complete**
+
+```{.default}
+R1# show ip ospf neighbor
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+2.2.2.2           1   FULL/ -         00:00:36    10.10.0.2       GigabitEthernet0/1
+
+R1# show ip route ospf
+O     192.168.110.0/24 [110/2] via 10.10.0.2, 00:03:45, GigabitEthernet0/1
+O     192.168.120.0/24 [110/2] via 10.10.0.2, 00:03:45, GigabitEthernet0/1
+
+! Test inter-site : PC du VLAN 10 Site A -> PC du VLAN 10 Site B
+PC-A1> ping 192.168.110.10
+!!!!!
+
+! Test inter-VLAN et inter-site : PC VLAN 20 Site A -> PC VLAN 10 Site B
+PC-A2> ping 192.168.110.10
+!!!!!
+```
+
+**Questions de validation :**
+
+1. Pourquoi les sous-interfaces (Gi0/0.10, Gi0/0.20, Gi0/0.30) sont-elles en passive-interface ?
+2. Combien de routes OSPF R1 annonce-t-il a R2 ?
+3. Un PC du VLAN 20 du Site A veut joindre un PC du VLAN 10 du Site B. Decrivez le chemin complet du paquet (L2 et L3).
+
+::: {.callout-tip title="🎯 Point exam"}
+**A retenir (Lab 3.4)** : les sous-interfaces dot1Q peuvent participer a OSPF comme n'importe quelle interface. Il faut les annoncer via `network` ou `ip ospf 1 area 0` puis les rendre **passives** car elles ne connectent que des PCs (pas de voisin OSPF). L'examen combine frequemment router-on-a-stick et OSPF dans un meme scenario.
+:::
+
+#### Diagramme : allocation VLSM pour la topologie Lab 3.4
+
+```{mermaid}
+%%| label: fig-m3-vlsm-allocation
+%%| fig-cap: "Allocation VLSM hierarchique a partir d'un bloc 192.168.0.0/16"
+graph TD
+    Root["192.168.0.0/16<br/>Bloc global"]
+    Root --> A["192.168.10.0/24<br/>Site A VLAN 10<br/>254 hotes"]
+    Root --> B["192.168.20.0/24<br/>Site A VLAN 20<br/>254 hotes"]
+    Root --> C["192.168.30.0/24<br/>Site A VLAN 30<br/>254 hotes"]
+    Root --> D["192.168.110.0/24<br/>Site B VLAN 10<br/>254 hotes"]
+    Root --> E["192.168.120.0/24<br/>Site B VLAN 20<br/>254 hotes"]
+    Root --> F["10.10.0.0/30<br/>Lien inter-site<br/>2 hotes"]
+```
+
+**Legende** : VLSM (Variable Length Subnet Masking) permet d'adapter la taille de chaque sous-reseau au besoin reel. Les LANs utilisent /24 (254 hotes), les liens point-to-point /30 (2 hotes) --- aucune adresse gaspillee.
+
+## Quiz OSPF --- 8 questions {#sec-topic-3-quiz-ospf}
+
+> Quiz dedie au topic 3.4 --- le sujet le plus teste du module
+
+**Q1.** Quel protocole de transport utilise OSPF ? _(Topic 3.4)_
+
+- A) TCP port 89
+- B) UDP port 520
+- C) IP protocole 89
+- D) TCP port 179
+
+::: {.callout-note collapse="true" title="Reponse"}
+**C** --- OSPF utilise le protocole IP numero 89 directement, sans couche TCP ni UDP. Le port TCP 179 est utilise par BGP, et UDP 520 par RIP.
+:::
+
+**Q2.** Deux routeurs OSPF sur le meme segment ont les configurations suivantes :
+
+- R1 : hello-interval 10, dead-interval 40, area 0
+- R2 : hello-interval 10, dead-interval 30, area 0
+
+Quel sera l'etat de l'adjacence ? _(Topic 3.4.a)_
+
+- A) FULL
+- B) 2-WAY
+- C) INIT
+- D) L'adjacence ne se formera pas (stuck in INIT ou DOWN)
+
+::: {.callout-note collapse="true" title="Reponse"}
+**D** --- Les dead intervals ne correspondent pas (40 vs 30). Le dead interval doit etre identique sur les deux cotes pour former une adjacence. Les Hello seront recus mais ignores a cause du mismatch de parametres. Meme si les hello-intervals sont identiques, le dead interval est verifie independamment.
+:::
+
+**Q3.** Sur un segment Ethernet broadcast avec 4 routeurs OSPF, combien d'adjacences FULL seront etablies ? _(Topic 3.4.c)_
+
+- A) 6 (full mesh : N x (N-1)/2)
+- B) 4
+- C) 3
+- D) 5
+
+::: {.callout-note collapse="true" title="Reponse"}
+**D** --- Sur un segment broadcast, le DR forme une adjacence FULL avec chaque autre routeur (3 adjacences), et le BDR fait de meme (3 adjacences). Mais l'adjacence DR<->BDR est comptee une seule fois. Donc : DR<->R3, DR<->R4, BDR<->R3, BDR<->R4, DR<->BDR = **5 adjacences FULL**. Les DROthers entre eux restent en 2-WAY.
+
+Note : avec 4 routeurs = 1 DR, 1 BDR, 2 DROther. Chaque DROther est FULL avec DR et BDR (2x2=4) + DR<->BDR (1) = **5**.
+:::
+
+**Q4.** Un routeur OSPF a le router-id 1.1.1.1 configure explicitement, une loopback avec l'adresse 10.10.10.10, et une interface physique avec 192.168.1.1. Quel sera son Router ID ? _(Topic 3.4.d)_
+
+- A) 192.168.1.1
+- B) 10.10.10.10
+- C) 1.1.1.1
+- D) 0.0.0.1
+
+::: {.callout-note collapse="true" title="Reponse"}
+**C** --- La hierarchie de selection du Router ID est : 1) commande `router-id` explicite, 2) IP la plus haute sur une loopback, 3) IP la plus haute sur une interface physique. Ici, `router-id 1.1.1.1` a la priorite maximale, quelle que soit l'IP des interfaces.
+:::
+
+**Q5.** Le routeur R1 est DR sur un segment avec une priorite de 100. R5 rejoint le segment avec une priorite de 255. Que se passe-t-il ? _(Topic 3.4.c)_
+
+- A) R5 devient immediatement DR
+- B) R5 devient BDR, puis DR au prochain cycle
+- C) R5 devient DROther --- l'election DR/BDR est non-preemptive
+- D) R5 declenche une nouvelle election et gagne
+
+::: {.callout-note collapse="true" title="Reponse"}
+**C** --- L'election DR/BDR dans OSPF est **non-preemptive**. Un routeur avec une priorite plus elevee qui rejoint le reseau apres l'election ne prend pas le role de DR. R5 deviendra BDR uniquement si le BDR actuel tombe, puis DR si l'actuel DR tombe aussi. Pour forcer une nouvelle election, il faut `clear ip ospf process` sur tous les routeurs.
+:::
+
+**Q6.** Quelle commande configure correctement OSPF pour inclure l'interface 10.1.1.1/24 dans l'area 0 ? _(Topic 3.4)_
+
+- A) `network 10.1.1.0 255.255.255.0 area 0`
+- B) `network 10.1.1.0 0.0.0.255 area 0`
+- C) `network 10.1.1.1 0.0.0.0 area 0`
+- D) B et C sont toutes les deux correctes
+
+::: {.callout-note collapse="true" title="Reponse"}
+**D** --- La commande `network` utilise un **wildcard mask**. `10.1.1.0 0.0.0.255` inclut toutes les interfaces dont l'IP est dans 10.1.1.0/24. `10.1.1.1 0.0.0.0` inclut uniquement l'interface exacte 10.1.1.1 --- c'est plus precis mais tout aussi correct. L'option A utilise un masque de sous-reseau au lieu d'un wildcard mask --- c'est une erreur courante mais qui activerait OSPF sur des interfaces imprevues.
+:::
+
+**Q7.** `show ip ospf neighbor` affiche un voisin bloque en etat EXSTART. Quelle est la cause la plus probable ? _(Topic 3.4.a)_
+
+- A) Mismatch de hello/dead interval
+- B) Mismatch de MTU
+- C) Mismatch d'area ID
+- D) Le voisin a une priorite de 0
+
+::: {.callout-note collapse="true" title="Reponse"}
+**B** --- Un voisin bloque en EXSTART ou EXCHANGE indique presque toujours un **mismatch de MTU**. Les paquets DBD sont trop gros pour passer sur l'un des deux cotes. Les mismatches de hello/dead interval et d'area ID empechent l'adjacence de depasser l'etat INIT. La priorite 0 n'empeche pas la formation d'adjacence --- elle empeche seulement le routeur de devenir DR/BDR.
+:::
+
+**Q8.** Quel est le cout OSPF d'une interface GigabitEthernet si la reference bandwidth est de 10000 Mbps ? _(Topic 3.4)_
+
+- A) 1
+- B) 10
+- C) 100
+- D) 1000
+
+::: {.callout-note collapse="true" title="Reponse"}
+**B** --- Cout = reference bandwidth / interface bandwidth = 10000 / 1000 = **10**. Avec la reference bandwidth par defaut (100 Mbps), le cout serait 100/1000 = 0.1 -> arrondi a 1, ce qui ne distingue pas GigE de FastEth. C'est pour cela qu'on recommande d'augmenter la reference bandwidth.
+:::
+
+## Quiz Module 3 --- 15 questions {#sec-topic-3-quiz-module}
+
+**Q1.** Quelle ligne d'une table de routage indique la route par defaut ? _(Topic 3.1.g)_
+
+- A) `C 0.0.0.0/0 is directly connected`
+- B) `S* 0.0.0.0/0 [1/0] via 10.1.1.1`
+- C) `L 0.0.0.0/32 is directly connected`
+- D) `O 0.0.0.0/0 [110/1] via 10.1.1.1`
+
+::: {.callout-note collapse="true" title="Reponse"}
+**B** --- L'asterisque `*` dans `S*` identifie la route comme candidate par defaut (gateway of last resort). Le prefixe 0.0.0.0/0 matche tout. L'option D serait aussi valide si OSPF redistribuait une route par defaut (code `O*E2`), mais le format exact montre est une route statique. L'option A est impossible car 0.0.0.0/0 ne peut pas etre directement connecte. L'option C n'existe pas --- /32 est une host route, pas une default route.
+:::
+
+**Q2.** Un routeur a ces routes dans sa table :
+
+```{.default}
+S 10.0.0.0/8 [1/0] via 192.168.1.1
+O 10.10.0.0/16 [110/20] via 192.168.1.2
+D 10.10.10.0/24 [90/307200] via 192.168.1.3
+```
+
+Vers quel next hop sera envoye un paquet destine a 10.10.10.50 ? _(Topic 3.2.a)_
+
+- A) 192.168.1.1 (route statique, AD la plus basse)
+- B) 192.168.1.2 (route OSPF)
+- C) 192.168.1.3 (route EIGRP, longest prefix match)
+- D) Le paquet est dropped
+
+::: {.callout-note collapse="true" title="Reponse"}
+**C** --- Le longest prefix match s'applique toujours en premier. 10.10.10.50 correspond aux trois routes (/8, /16, /24), mais /24 est la plus specifique. Peu importe que la route statique ait une AD inferieure (1 vs 90) --- le longest prefix match prevaut toujours sur l'AD.
+:::
+
+**Q3.** Quelle commande cree une route statique flottante avec une AD de 150 ? _(Topic 3.3.d)_
+
+- A) `ip route 10.1.1.0 255.255.255.0 192.168.1.1 150`
+- B) `ip route 10.1.1.0 255.255.255.0 192.168.1.1 metric 150`
+- C) `ip route 10.1.1.0 255.255.255.0 192.168.1.1 distance 150`
+- D) `ip route 10.1.1.0 0.0.0.255 192.168.1.1 150`
+
+::: {.callout-note collapse="true" title="Reponse"}
+**A** --- La syntaxe correcte est `ip route <reseau> <masque> <next-hop> [AD]`. Le dernier parametre optionnel est l'AD. L'option B utilise un mot-cle `metric` qui n'existe pas dans cette commande. L'option C utilise `distance` qui n'est pas non plus la bonne syntaxe. L'option D utilise un wildcard mask au lieu d'un masque de sous-reseau --- la commande `ip route` utilise le masque de sous-reseau, pas le wildcard.
+:::
+
+**Q4.** Quelle distance administrative a une route OSPF par defaut ? _(Topic 3.1.e)_
+
+- A) 90
+- B) 100
+- C) 110
+- D) 120
+
+::: {.callout-note collapse="true" title="Reponse"}
+**C** --- OSPF a une AD de **110**. 90 est l'AD d'EIGRP interne, 100 ne correspond a aucun protocole standard, et 120 est l'AD de RIP. Memo : **O**SPF = **O**ne hundred **ten** = 110.
+:::
+
+**Q5.** Quel type de paquet OSPF est utilise pour maintenir les adjacences ? _(Topic 3.4.a)_
+
+- A) DBD (Database Description)
+- B) LSU (Link-State Update)
+- C) Hello
+- D) LSAck
+
+::: {.callout-note collapse="true" title="Reponse"}
+**C** --- Le paquet **Hello** sert a decouvrir les voisins ET a maintenir les adjacences. Il est envoye periodiquement (toutes les 10 secondes sur broadcast/point-to-point). Si aucun Hello n'est recu pendant le Dead interval (40 secondes par defaut), le voisin est declare mort. Les DBD, LSR, LSU et LSAck servent a l'echange et la synchronisation de la LSDB.
+:::
+
+**Q6.** Sur un reseau broadcast, quel est l'etat normal entre deux routeurs DROther ? _(Topic 3.4.c)_
+
+- A) FULL
+- B) DOWN
+- C) 2-WAY
+- D) EXCHANGE
+
+::: {.callout-note collapse="true" title="Reponse"}
+**C** --- Sur un reseau broadcast, les DROthers forment des adjacences FULL uniquement avec le DR et le BDR. Entre DROthers, l'etat **2-WAY** est normal et attendu --- ce n'est PAS un probleme. Si l'examen affiche un `show ip ospf neighbor` avec des etats 2-WAY/DROTHER, ne cherchez pas un probleme : c'est le comportement par defaut.
+:::
+
+**Q7.** Quel protocole FHRP permet le load balancing natif entre plusieurs routeurs ? _(Topic 3.5)_
+
+- A) HSRP
+- B) VRRP
+- C) GLBP
+- D) HSRP et VRRP avec des groupes multiples
+
+::: {.callout-note collapse="true" title="Reponse"}
+**C** --- **GLBP** (Gateway Load Balancing Protocol) est le seul protocole FHRP qui fait du load balancing natif en distribuant differentes MAC virtuelles via l'AVG. HSRP et VRRP ne supportent qu'un routeur actif/master par groupe. L'option D est techniquement possible mais necessite une configuration manuelle de groupes multiples sur les hotes --- ce n'est pas du load balancing "natif".
+:::
+
+**Q8.** Vous tapez `show ip route` et voyez `Gateway of last resort is not set`. Un utilisateur ne peut pas acceder a Internet. Quelle est la cause ? _(Topic 3.1.g)_
+
+- A) Les interfaces du routeur sont down
+- B) OSPF n'est pas configure
+- C) Aucune route par defaut n'est configuree
+- D) Le DNS ne fonctionne pas
+
+::: {.callout-note collapse="true" title="Reponse"}
+**C** --- `Gateway of last resort is not set` signifie qu'aucune route par defaut (0.0.0.0/0) n'existe dans la table de routage. Sans route par defaut, tout paquet vers une destination non explicitement connue est jete. La solution est de configurer une route par defaut statique ou de recevoir une via un protocole de routage.
+:::
+
+**Q9.** Un routeur a ces deux routes vers 10.1.1.0/24 :
+
+```{.default}
+O 10.1.1.0/24 [110/20] via 192.168.1.1
+O 10.1.1.0/24 [110/20] via 192.168.1.2
+```
+
+Que fait le routeur ? _(Topic 3.2.c)_
+
+- A) Il choisit la premiere route installee
+- B) Il choisit celle avec l'adresse next hop la plus basse
+- C) Il fait du load balancing (ECMP) entre les deux
+- D) Il supprime la deuxieme route
+
+::: {.callout-note collapse="true" title="Reponse"}
+**C** --- Les deux routes ont la meme AD (110) et la meme metrique (20). Le routeur utilise les deux chemins simultanement --- c'est le **Equal-Cost Multi-Path (ECMP)**. Les paquets sont distribues entre les deux next hops, ce qui augmente la bande passante effective et la resilience.
+:::
+
+**Q10.** Quelle affirmation est vraie concernant `ipv6 unicast-routing` ? _(Topic 3.3)_
+
+- A) Elle active le routage OSPF pour IPv6
+- B) Elle est necessaire pour que le routeur transfère des paquets IPv6
+- C) Elle active automatiquement OSPFv3
+- D) Elle n'est necessaire que pour les routes statiques IPv6
+
+::: {.callout-note collapse="true" title="Reponse"}
+**B** --- La commande `ipv6 unicast-routing` active le forwarding IPv6 sur le routeur. Sans cette commande, le routeur traite les paquets IPv6 comme un hote (il ne les route pas). Elle est necessaire pour TOUTE forme de routage IPv6 : statique, OSPF, EIGRP, etc. Elle n'active pas de protocole de routage en elle-meme.
+:::
+
+**Q11.** Quel est le wildcard mask correct pour le reseau 192.168.1.0/26 dans la commande `network` OSPF ? _(Topic 3.4)_
+
+- A) 0.0.0.63
+- B) 0.0.0.192
+- C) 255.255.255.192
+- D) 0.0.0.255
+
+::: {.callout-note collapse="true" title="Reponse"}
+**A** --- Le masque /26 est 255.255.255.192. Le wildcard mask est l'inverse : 255-192 = **63**, donc 0.0.0.63. L'option B (0.0.0.192) est le dernier octet du masque de sous-reseau, pas du wildcard. L'option C est le masque de sous-reseau lui-meme. L'option D (0.0.0.255) correspond a /24, pas /26.
+:::
+
+**Q12.** Un routeur OSPF montre cet output :
+
+```{.default}
+show ip ospf interface Gi0/0
+  Network Type BROADCAST, Cost: 1
+```
+
+Quelle reference bandwidth est probablement configuree ? _(Topic 3.4)_
+
+- A) 100 (par defaut)
+- B) 1000
+- C) 10000
+- D) Impossible a determiner sans connaitre la bande passante de l'interface
+
+::: {.callout-note collapse="true" title="Reponse"}
+**D** --- Le cout de 1 pourrait resulter de plusieurs combinaisons : reference 100 / interface 100 Mbps (FastEth) = 1, reference 1000 / interface 1000 Mbps (GigE) = 1, reference 10000 / interface 10000 Mbps (10G) = 1. Sans connaitre la bande passante de l'interface Gi0/0, on ne peut pas determiner la reference bandwidth. C'est un piege classique.
+:::
+
+**Q13.** Quel avantage principal la gestion reseau cloud offre-t-elle pour le deploiement en succursale ? _(Topic 3.6)_
+
+- A) Les equipements n'ont pas besoin d'adresse IP
+- B) Le Zero-Touch Provisioning (pas besoin de technicien reseau sur site)
+- C) Les equipements fonctionnent sans connexion Internet
+- D) Le cout des equipements est reduit
+
+::: {.callout-note collapse="true" title="Reponse"}
+**B** --- Le **Zero-Touch Provisioning** est l'avantage majeur : l'equipement est pre-configure dans le dashboard cloud, expedie sur site, branche par n'importe qui, et il telecharge automatiquement sa configuration. L'option A est fausse (ils ont besoin d'IP). L'option C est fausse (ils ont besoin d'Internet pour contacter le cloud). L'option D n'est pas necessairement vraie (modele d'abonnement).
+:::
+
+**Q14.** HSRP utilise les termes Active/Standby. Quels termes utilise VRRP ? _(Topic 3.5)_
+
+- A) Primary / Secondary
+- B) Master / Backup
+- C) Active / Passive
+- D) Leader / Follower
+
+::: {.callout-note collapse="true" title="Reponse"}
+**B** --- VRRP utilise **Master** (equivalent d'Active en HSRP) et **Backup** (equivalent de Standby). C'est un piege classique de l'examen : melanger les terminologies HSRP et VRRP. GLBP utilise AVG (Active Virtual Gateway) et AVF (Active Virtual Forwarder).
+:::
+
+**Q15.** Quelle commande permet de verifier si OSPF a correctement appris des routes sur un routeur ? _(Topic 3.4)_
+
+- A) `show ip ospf database`
+- B) `show ip route ospf`
+- C) `show ip ospf neighbor`
+- D) `show ip protocols`
+
+::: {.callout-note collapse="true" title="Reponse"}
+**B** --- `show ip route ospf` affiche uniquement les routes installees dans la table de routage par OSPF. C'est la commande la plus directe pour verifier les routes apprises. L'option A montre la LSDB (base de donnees topologique), pas les routes installees. L'option C montre les voisins et leurs etats, pas les routes. L'option D montre la configuration du protocole, pas les routes.
+:::
+
+## Recapitulatif Module 3 {#sec-topic-3-recap}
+
+| Topic | Concept cle | Commande(s) essentielles |
+|-------|------------|--------------------------|
+| 3.1 | Table de routage : codes, prefixe, masque, next-hop, AD, metrique, gateway of last resort | `show ip route`, `show ip route <IP>` |
+| 3.2 | Longest prefix match -> AD -> Metric --- dans cet ordre strict | `show ip route <destination>` |
+| 3.3 | Routes statiques : default, network, host, floating static | `ip route`, `ipv6 route`, `show ip route static` |
+| 3.4 | OSPF : adjacences, DR/BDR, router-id, cout, passive-interface | `show ip ospf neighbor`, `show ip ospf interface`, `show ip route ospf` |
+| 3.5 | FHRP : IP virtuelle partagee, HSRP (Active/Standby), VRRP (Master/Backup), GLBP (load balancing) | `show standby brief` |
+| 3.6 | Gestion cloud : dashboard centralise, ZTP, Meraki, DNA Center | --- |
+
+**Check-list avant de passer au Module 4 :**
+
+- [ ] Je sais lire et interpreter chaque composant d'une table de routage
+- [ ] Je sais appliquer le longest prefix match pour determiner le chemin choisi
+- [ ] Je sais configurer des routes statiques IPv4/IPv6 (default, network, host, floating)
+- [ ] Je sais configurer OSPF single-area et verifier les adjacences
+- [ ] Je comprends l'election DR/BDR et sa nature non-preemptive
+- [ ] Je sais calculer le cout OSPF et ajuster la reference bandwidth
+- [ ] Je comprends le role des FHRP et les differences HSRP/VRRP/GLBP
+- [ ] Je sais decrire les avantages de la gestion reseau cloud
+- [ ] J'ai complete les 12 exercices
+- [ ] J'ai realise les 4 labs
+- [ ] J'ai obtenu >70% aux deux quiz (OSPF + module complet)

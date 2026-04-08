@@ -1,0 +1,7 @@
+Glossaire généré avec succès dans `/c/Users/madko/Sandbox-lite/AI_Workshop/Rédactions/ccna-guide/references/glossaire.md`.
+
+Résumé :
+- **220 termes** dédupliqués et classés alphabétiquement (A-Z)
+- Chaque entrée contient : **terme en gras**, définition concise (1-2 lignes), et _(Module N, Topic N.X)_
+- Couverture complète des 6 modules : protocoles (OSPF, BGP, STP, LACP...), commandes CLI (`show ip route`, `show ip ospf neighbor`...), acronymes (VLAN, NAT, QoS, SDN...), concepts (subnetting, longest prefix match, overlay/underlay...), et technologies de sécurité (IPsec, WPA3, DAI, DHCP snooping...)
+- Les termes apparaissant dans plusieurs modules référencent tous les modules pertinents

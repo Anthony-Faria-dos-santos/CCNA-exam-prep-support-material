@@ -1,0 +1,46 @@
+project:
+  type: book
+  output-dir: _output
+
+book:
+  title: 'Guide CCNA 200-301 v1.1'
+  subtitle: 'Formation complète — Théorie, Labs & Examens blancs'
+  author: 'Anthony Faria Dos Santos'
+  date: today
+  language: fr
+  chapters:
+    - index.qmd
+    - part: 'Fondamentaux'
+      chapters:
+        - chapters/01-network-fundamentals.qmd
+        - chapters/02-network-access.qmd
+    - part: 'Connectivité & Services'
+      chapters:
+        - chapters/03-ip-connectivity.qmd
+        - chapters/04-ip-services.qmd
+    - part: 'Sécurité & Automatisation'
+      chapters:
+        - chapters/05-security-fundamentals.qmd
+        - chapters/06-automation.qmd
+    - part: 'Pratique'
+      chapters:
+        - chapters/07-labs.qmd
+        - chapters/08-exercices.qmd
+        - chapters/09-exam-blanc.qmd
+  appendices:
+    - chapters/10-glossaire.qmd
+
+format:
+  pdf:
+    documentclass: report
+    papersize: a4
+    fontsize: 11pt
+    geometry: margin=2.2cm
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    colorlinks: true
+    linkcolor: NavyBlue
+    urlcolor: RoyalBlue
+    highlight-style: tango
+    keep-tex: false

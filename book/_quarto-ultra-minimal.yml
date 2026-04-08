@@ -1,0 +1,10 @@
+project:
+  type: book
+
+book:
+  title: 'Guide CCNA Test'
+  chapters:
+    - test.qmd
+
+format:
+  html: default

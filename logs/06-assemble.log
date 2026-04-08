@@ -1,0 +1,19 @@
+Tout est terminé. Voici le récapitulatif :
+
+### Résultats
+
+| Étape | Statut |
+|-------|--------|
+| Merge guide | **206 016 mots** — ~588 pages — `exports/CCNA-GUIDE-COMPLET.md` |
+| Coverage check | **53/53 topics (100%)** — aucun manquant |
+| Sections manquantes | Aucune — pas besoin de relance |
+| Statistiques finales | Générées dans `exports/RESUME-GUIDE.md` |
+
+### Chiffres clés
+
+- **6 modules** couvrant les 6 domains CCNA (incluant les 3 nouveaux topics v1.1)
+- **16 labs** Packet Tracer (4 pour le Module 3 OSPF comme prévu)
+- **64 exercices** intégrés aux modules + **56 points exam**
+- **152 questions** de quiz/exam blanc + **50 exercices subnetting**
+- **220 termes** au glossaire
+- **1 219 blocs CLI** avec outputs

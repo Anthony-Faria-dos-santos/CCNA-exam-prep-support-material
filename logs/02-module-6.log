@@ -1,0 +1,17 @@
+Les deux fichiers ont été générés.
+
+**Module 6 — Automation and Programmability** (`MODULE-6-automation-and-programmability.md`) :
+
+- **7 sections** couvrant les topics 6.1 à 6.7 (y compris 6.3.a et 6.3.b)
+- **~10 500 mots** (~42 pages estimées)
+- **7 exercices** avec indices et solutions détaillées
+- **2 labs** (REST API avec curl/Postman + DNA Center GUI via DevNet Sandbox)
+- **15 questions quiz** format examen avec explications pour chaque option
+- **18 tableaux comparatifs** (dont les tableaux "Compare" détaillés pour 6.2 et 6.4)
+- **10 schémas ASCII** (architecture distribuée vs centralisée, SDN layers, NB/SB APIs, overlay/underlay/fabric, Ansible vs Puppet, workflow IBN)
+- **14 commandes CLI/API** avec outputs réalistes (`show vlan brief`, `show lisp site summary`, `show vxlan vni`, `show pnp profile`, `show policy-map interface`, curl REST API)
+- **7 encadrés "Point exam"** avec pièges courants
+
+Cross-references vers les 5 modules précédents (15 liens), en suivant notamment les notes du HANDOFF-MODULE-5 (ML→automatisation, ACLs programmatiques, ISE/DNA Center, sécurité APIs).
+
+**Handoff** (`HANDOFF-MODULE-6.md`) : synthèse complète avec sections, topics, volume, décisions de contenu et notes de finalisation.

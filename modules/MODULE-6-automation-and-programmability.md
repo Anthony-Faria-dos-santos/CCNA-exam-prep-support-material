@@ -1,0 +1,1969 @@
+# Module 6 — Automation and Programmability
+
+> **Domain** : 6 — Automation and Programmability | **Poids examen** : 10%
+> **Durée estimée** : 1 semaine | **Prérequis** : Modules 1 à 5
+> **Topics couverts** : 6.1 à 6.7
+
+## Objectif du module
+
+À l'issue de ce module, vous serez capable de :
+- Expliquer comment l'automatisation transforme la gestion des réseaux d'entreprise
+- Comparer les architectures réseau traditionnelles avec les architectures controller-based (SDN)
+- Décrire les composants d'une architecture software-defined (overlay, underlay, fabric, APIs)
+- Comparer la gestion manuelle des équipements campus avec l'approche Cisco DNA Center
+- Décrire les caractéristiques des APIs REST et manipuler des données JSON
+- Reconnaître les outils de gestion de configuration (Puppet, Chef, Ansible)
+
+---
+
+## 6.1 — Impact de l'automatisation sur la gestion réseau
+
+> **Exam topic 6.1** : _Explain_ — How automation impacts network management
+> **Niveau** : Explain (Bloom 2)
+
+### Contexte
+
+Imaginez un administrateur réseau qui gère 200 switches dans une entreprise multi-sites. Chaque vendredi, il doit appliquer un changement de VLAN sur l'ensemble du parc. En CLI traditionnel, cela représente des heures de connexion SSH, switch par switch, avec le risque d'oublier un équipement ou de faire une faute de frappe sur le troisième switch à 23h un vendredi soir. L'automatisation réseau est née de cette frustration — et de ce risque.
+
+### Théorie
+
+L'automatisation réseau consiste à remplacer les tâches manuelles et répétitives par des processus programmés, reproductibles et vérifiables. Ce n'est pas simplement « écrire des scripts » : c'est un changement de paradigme dans la façon de concevoir, déployer et opérer un réseau.
+
+#### Les limites de la gestion manuelle
+
+Dans un réseau géré manuellement, chaque équipement est configuré individuellement via la ligne de commande. Ce modèle fonctionne pour une poignée de devices, mais il atteint ses limites dès que le réseau grandit :
+
+| Problème | Conséquence |
+|----------|------------|
+| Configuration device-by-device | Temps linéaire : 200 switches = 200 sessions SSH |
+| Pas de vérification automatique | Erreurs humaines non détectées avant incident |
+| Documentation manuelle | Décalage entre documentation et réalité |
+| Rollback difficile | Annuler un changement nécessite de reconfigurer manuellement |
+| Incohérence | Chaque admin a son style — les configs divergent |
+
+#### Les 5 bénéfices de l'automatisation
+
+**1. Réduction des erreurs humaines**
+La première cause de pannes réseau reste l'erreur de configuration. Un script testé et validé produit le même résultat à chaque exécution, que ce soit à 9h le lundi ou à 3h du matin lors d'une maintenance.
+
+**2. Gain de temps et scalabilité**
+Configurer un VLAN sur 1 switch ou sur 500 prend le même temps avec un outil d'automatisation. Le temps d'exécution n'est plus proportionnel au nombre d'équipements.
+
+**3. Cohérence des configurations**
+Un template unique garantit que tous les switches d'un même rôle partagent exactement la même configuration de base. Plus de surprise en découvrant qu'un switch a été configuré « à la main » différemment des autres.
+
+**4. Conformité et auditabilité**
+Chaque changement est tracé, versionné (via Git par exemple), et peut être audité. Pour les entreprises soumises à des réglementations (PCI-DSS, SOX), l'automatisation simplifie considérablement la preuve de conformité.
+
+**5. Rollback instantané**
+Puisque les configurations sont versionnées, revenir à un état précédent se fait en une commande — pas en reconstituant manuellement la config d'avant.
+
+#### Analogie : le chef cuisinier et la chaîne de restaurants
+
+Pensez à un chef qui ouvre un restaurant : il cuisine lui-même chaque plat. Quand il ouvre 50 restaurants, il ne peut plus être derrière chaque fourneau. Il rédige des recettes standardisées, forme les équipes, et met en place des contrôles qualité. L'automatisation réseau suit la même logique : les « recettes » sont des templates, les « équipes formées » sont les outils d'automatisation, et les « contrôles qualité » sont les validations automatiques.
+
+#### Types d'automatisation réseau
+
+```
++-------------------------------------------------------------+
+|              Niveaux d'automatisation réseau                 |
++-------------------------------------------------------------+
+|                                                             |
+|  Niveau 1 : Scripts CLI                                     |
+|  ┌──────────────────────────────────┐                      |
+|  │  Bash, Python, Expect            │                      |
+|  │  → Exécution de commandes show   │                      |
+|  │  → Déploiement config simple     │                      |
+|  └──────────────────────────────────┘                      |
+|                    ▼                                        |
+|  Niveau 2 : Gestion de configuration                       |
+|  ┌──────────────────────────────────┐                      |
+|  │  Ansible, Puppet, Chef           │                      |
+|  │  → Templates + variables         │                      |
+|  │  → État désiré (desired state)   │                      |
+|  └──────────────────────────────────┘                      |
+|                    ▼                                        |
+|  Niveau 3 : Controller-based (SDN)                         |
+|  ┌──────────────────────────────────┐                      |
+|  │  Cisco DNA Center, SD-WAN        │                      |
+|  │  → Orchestration centralisée     │                      |
+|  │  → Intent-based networking       │                      |
+|  └──────────────────────────────────┘                      |
+|                    ▼                                        |
+|  Niveau 4 : Intelligence artificielle                      |
+|  ┌──────────────────────────────────┐                      |
+|  │  ML/AI (voir topic 5.11)         │                      |
+|  │  → Détection d'anomalies         │                      |
+|  │  → Remédiation automatique       │                      |
+|  └──────────────────────────────────┘                      |
++-------------------------------------------------------------+
+```
+
+### Mise en pratique CLI
+
+Pour illustrer concrètement le problème que résout l'automatisation, comparons deux approches pour ajouter un VLAN sur 3 switches.
+
+**Approche traditionnelle — CLI manuelle :**
+
+```cisco
+! Session SSH sur SW1
+SW1# configure terminal
+SW1(config)# vlan 50
+SW1(config-vlan)# name MARKETING
+SW1(config-vlan)# exit
+SW1(config)# interface range GigabitEthernet0/1 - 10
+SW1(config-if-range)# switchport access vlan 50
+SW1(config-if-range)# end
+SW1# copy running-config startup-config
+
+! Répéter sur SW2, SW3... (même commandes, mêmes risques d'erreur)
+```
+
+**Approche automatisée — Ansible (aperçu, détaillé en section 6.6) :**
+
+```yaml
+# Fichier: deploy_vlan50.yml — appliqué sur TOUS les switches en une commande
+- name: Déployer VLAN 50 Marketing
+  hosts: access_switches
+  tasks:
+    - name: Créer VLAN 50
+      cisco.ios.ios_vlans:
+        config:
+          - vlan_id: 50
+            name: MARKETING
+            state: active
+
+    - name: Assigner les ports
+      cisco.ios.ios_l2_interfaces:
+        config:
+          - name: "GigabitEthernet0/{{ item }}"
+            access:
+              vlan: 50
+      loop: "{{ range(1, 11) | list }}"
+```
+
+**Résultat : une seule commande déploie la config sur les 3 switches simultanément.**
+
+Pour vérifier la configuration déployée :
+
+```cisco
+SW1# show vlan brief
+```
+
+**Output attendu :**
+```
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Gi0/11, Gi0/12
+10   SERVEURS                         active    Gi0/22, Gi0/23, Gi0/24
+20   COMPTABILITE                     active    Gi0/13, Gi0/14, Gi0/15
+50   MARKETING                        active    Gi0/1, Gi0/2, Gi0/3, Gi0/4
+                                                Gi0/5, Gi0/6, Gi0/7, Gi0/8
+                                                Gi0/9, Gi0/10
+```
+
+**Interprétation** : Le VLAN 50 a été créé avec le nom MARKETING et les ports Gi0/1 à Gi0/10 y sont assignés. La même vérification sur SW2 et SW3 montrerait un résultat identique — c'est la garantie de cohérence qu'apporte l'automatisation.
+
+### Point exam
+
+> **Piège courant** : L'examen ne demande pas de configurer l'automatisation, mais d'**expliquer ses bénéfices**. Les réponses portent sur la réduction des erreurs, la scalabilité, la cohérence et le rollback — pas sur les outils spécifiques.
+>
+> **À retenir** : L'automatisation ne remplace pas l'ingénieur réseau — elle lui permet de se concentrer sur la conception et le troubleshooting plutôt que sur les tâches répétitives. L'examen teste cette nuance : automatisation = outil, pas remplacement.
+
+### Exercice 6.1 — Identifier les bénéfices de l'automatisation
+
+**Contexte** : L'entreprise NetCorp gère 150 switches répartis sur 5 sites. Trois scénarios sont présentés.
+
+**Consigne** : Pour chaque scénario, identifiez le(s) bénéfice(s) principal(aux) de l'automatisation.
+
+1. L'équipe réseau doit appliquer une mise à jour de sécurité (désactivation de Telnet, activation de SSH) sur tous les switches en 24h suite à un audit.
+2. Un nouveau site de 30 switches doit être déployé avec la même configuration que les sites existants.
+3. Après un changement de QoS qui a dégradé le VoIP, l'équipe doit revenir à la configuration précédente immédiatement.
+
+**Indice** : <details><summary>Voir l'indice</summary>Repensez aux 5 bénéfices listés dans la théorie. Chaque scénario met en avant un ou deux bénéfices spécifiques.</details>
+
+<details>
+<summary>Solution</summary>
+
+1. **Gain de temps + cohérence** : déployer la mise à jour de sécurité sur 150 switches en une seule exécution garantit que tous sont traités, sans en oublier un. Manuellement, 150 sessions SSH en 24h = risque élevé d'erreur sous pression.
+
+2. **Cohérence + scalabilité** : un template existant est réutilisé pour 30 nouveaux switches. Le résultat est garanti identique aux sites existants, quel que soit le nombre d'équipements.
+
+3. **Rollback instantané** : si la configuration est versionnée (Git), revenir à la version précédente se fait en une commande. Sans automatisation, il faudrait reconstituer la config d'avant manuellement sur chaque équipement.
+
+</details>
+
+### Voir aussi
+
+- Topic 5.11 dans Module 5 (ML pour la sécurité réseau — niveau 4 d'automatisation)
+- Topic 4.4 dans Module 4 (SNMP — collecte automatisée de données réseau)
+- Topic 4.5 dans Module 4 (Syslog — logs centralisés, base de l'observabilité automatisée)
+
+---
+
+## 6.2 — Réseau traditionnel vs controller-based
+
+> **Exam topic 6.2** : _Compare_ — Traditional networks with controller-based networking
+> **Niveau** : Compare (Bloom 3)
+
+### Contexte
+
+Pendant des décennies, les réseaux fonctionnaient sur un principe simple : chaque équipement prend ses propres décisions. Un switch apprend les MAC addresses seul, un routeur calcule ses routes via OSPF indépendamment. Ce modèle distribué a fait ses preuves, mais les exigences modernes (agilité, sécurité, visibilité) poussent vers un nouveau paradigme : le réseau piloté par un contrôleur central.
+
+### Théorie
+
+#### Le modèle traditionnel (distribué)
+
+Dans un réseau traditionnel, chaque équipement fonctionne de manière autonome. L'intelligence est distribuée : chaque routeur exécute son propre processus OSPF, chaque switch maintient sa propre table MAC, chaque AP gère ses associations clients.
+
+```
+Réseau traditionnel — Intelligence distribuée
+                                                  
+   ┌─────────┐     ┌─────────┐     ┌─────────┐  
+   │  SW1    │     │  SW2    │     │  SW3    │  
+   │ ┌─────┐ │     │ ┌─────┐ │     │ ┌─────┐ │  
+   │ │Control│ │     │ │Control│ │     │ │Control│ │  
+   │ │ Plane│ │     │ │ Plane│ │     │ │ Plane│ │  
+   │ ├─────┤ │     │ ├─────┤ │     │ ├─────┤ │  
+   │ │ Data │ │     │ │ Data │ │     │ │ Data │ │  
+   │ │ Plane│ │     │ │ Plane│ │     │ │ Plane│ │  
+   │ └─────┘ │     │ └─────┘ │     │ └─────┘ │  
+   └────┬────┘     └────┬────┘     └────┬────┘  
+        │               │               │         
+   ─────┴───────────────┴───────────────┴─────    
+                                                  
+   Admin: SSH vers SW1, puis SW2, puis SW3...     
+   Config: device-by-device (CLI)                 
+```
+
+La gestion s'effectue équipement par équipement : l'administrateur se connecte en SSH (ou console) sur chaque device et tape les commandes. Les protocoles de routage (OSPF, STP) assurent la convergence réseau, mais sans vision globale centralisée.
+
+#### Le modèle controller-based (centralisé)
+
+Dans un réseau controller-based, un contrôleur central prend les décisions pour l'ensemble du réseau. Les équipements conservent leur data plane (transfert des paquets) mais délèguent une partie ou la totalité de leur control plane au contrôleur.
+
+```
+Réseau controller-based — Intelligence centralisée
+                                                  
+          ┌───────────────────────┐               
+          │     CONTRÔLEUR        │               
+          │  ┌─────────────────┐  │               
+          │  │  Control Plane  │  │               
+          │  │  centralisé     │  │               
+          │  │  (décisions)    │  │               
+          │  └─────────────────┘  │               
+          └──────┬────┬────┬──────┘               
+       Southbound│    │    │APIs                  
+          ┌──────┘    │    └──────┐               
+          ▼           ▼          ▼               
+   ┌─────────┐  ┌─────────┐  ┌─────────┐        
+   │  SW1    │  │  SW2    │  │  SW3    │        
+   │ ┌─────┐ │  │ ┌─────┐ │  │ ┌─────┐ │        
+   │ │ Data │ │  │ │ Data │ │  │ │ Data │ │        
+   │ │ Plane│ │  │ │ Plane│ │  │ │ Plane│ │        
+   │ └─────┘ │  │ └─────┘ │  │ └─────┘ │        
+   └─────────┘  └─────────┘  └─────────┘        
+                                                  
+   Admin: interface unique (GUI/API contrôleur)   
+   Config: centralisée, appliquée en masse        
+```
+
+L'administrateur ne touche plus les équipements directement. Il interagit avec le contrôleur, qui traduit les intentions en configurations spécifiques pour chaque device.
+
+#### Tableau comparatif détaillé
+
+| Critère | Réseau traditionnel | Réseau controller-based |
+|---------|-------------------|------------------------|
+| **Intelligence** | Distribuée (chaque device) | Centralisée (contrôleur) |
+| **Configuration** | CLI device-by-device | GUI/API centralisée |
+| **Protocole de gestion** | SSH/Telnet vers chaque device | Southbound APIs (NETCONF, RESTCONF) |
+| **Visibilité** | Partielle (per-device) | Globale (vue réseau entière) |
+| **Déploiement d'un changement** | Séquentiel, device par device | Simultané, en masse |
+| **Cohérence** | Dépend de la rigueur de l'admin | Garantie par le contrôleur |
+| **Scalabilité** | Limitée par le temps humain | Linéaire (ajout de devices trivial) |
+| **Troubleshooting** | `show` et `debug` sur chaque device | Dashboard centralisé + corrélation |
+| **Coût initial** | Faible (pas de contrôleur) | Plus élevé (licence contrôleur) |
+| **Compétences requises** | CLI Cisco, protocoles réseau | CLI + APIs + concepts SDN |
+| **Single point of failure** | Non (distribué) | Oui (le contrôleur — à mitiger avec HA) |
+
+#### Un point essentiel : le contrôleur n'est pas dans le data path
+
+Le contrôleur ne transmet pas les paquets des utilisateurs. Si le contrôleur tombe en panne, les switches et routeurs continuent de transférer le trafic normalement — ils gardent leur data plane intacte. Ce qui est perdu, c'est la capacité de management centralisé : plus de nouvelles configs, plus de visibilité globale, jusqu'au retour du contrôleur.
+
+C'est comparable à un chef d'orchestre : s'il s'évanouit en plein concert, les musiciens peuvent finir le morceau en cours (data plane continue), mais ils ne pourront pas commencer un nouveau morceau différent (pas de nouvelles instructions du control plane).
+
+### Mise en pratique CLI
+
+Voici comment un même diagnostic se fait dans les deux modèles.
+
+**Approche traditionnelle — vérifier les VLANs sur chaque switch :**
+
+```cisco
+! Se connecter en SSH à chaque switch individuellement
+SW1# show vlan brief | include 50
+50   MARKETING                        active    Gi0/1, Gi0/2, Gi0/3
+
+SW2# show vlan brief | include 50
+50   MARKETING                        active    Gi0/1, Gi0/4
+
+SW3# show vlan brief | include 50
+50   MARKETING                        active    Gi0/1, Gi0/2, Gi0/5
+```
+
+**Interprétation** : L'admin doit se connecter à 3 switches séparément et croiser mentalement les résultats. Avec 200 switches, cette approche devient impossible dans un délai raisonnable.
+
+**Approche controller-based — API REST vers DNA Center :**
+
+```bash
+# Une seule requête API vers le contrôleur
+curl -s -X GET "https://dnac.entreprise.local/dna/intent/api/v1/topology/vlan/50" \
+  -H "X-Auth-Token: eyJhbGciOi..." \
+  -H "Content-Type: application/json"
+```
+
+**Output attendu (JSON simplifié) :**
+```json
+{
+  "response": {
+    "vlanId": 50,
+    "vlanName": "MARKETING",
+    "nodes": [
+      {"deviceName": "SW1", "ports": ["Gi0/1", "Gi0/2", "Gi0/3"]},
+      {"deviceName": "SW2", "ports": ["Gi0/1", "Gi0/4"]},
+      {"deviceName": "SW3", "ports": ["Gi0/1", "Gi0/2", "Gi0/5"]}
+    ]
+  }
+}
+```
+
+**Interprétation** : Une seule requête renvoie la vue complète du VLAN 50 sur l'ensemble du réseau. Le contrôleur agrège les informations de tous les switches et les présente en un point unique. La réponse est en JSON, exploitable par un script ou un dashboard.
+
+### Point exam
+
+> **Piège courant** : L'examen peut demander ce qui se passe quand le contrôleur tombe en panne. La réponse : le **data plane continue de fonctionner** (les paquets sont toujours transférés). Seul le management centralisé est perdu temporairement.
+>
+> **À retenir** : Le contrôleur centralise le **control plane**, pas le **data plane**. Les équipements conservent leur capacité de forwarding même sans contrôleur. C'est la distinction fondamentale à retenir.
+
+### Exercice 6.2 — Comparer les approches
+
+**Contexte** : L'entreprise GlobeNet migre d'un réseau traditionnel (45 switches, 12 routeurs) vers une architecture controller-based avec Cisco DNA Center.
+
+**Consigne** : Complétez le tableau ci-dessous pour les 4 scénarios opérationnels. Pour chaque scénario, indiquez la méthode (traditionnelle vs controller-based) et le nombre approximatif d'étapes.
+
+| Scénario | Méthode traditionnelle | Méthode controller-based |
+|----------|----------------------|------------------------|
+| Créer un VLAN sur tous les switches d'accès | ? | ? |
+| Identifier quel switch a un port en err-disabled | ? | ? |
+| Appliquer une ACL sur toutes les interfaces trunk | ? | ? |
+| Générer un rapport d'inventaire réseau complet | ? | ? |
+
+**Indice** : <details><summary>Voir l'indice</summary>Pour la méthode traditionnelle, comptez une connexion SSH par équipement. Pour la méthode controller-based, comptez les interactions avec le contrôleur (souvent 1-2 étapes via GUI ou API).</details>
+
+<details>
+<summary>Solution</summary>
+
+| Scénario | Méthode traditionnelle | Méthode controller-based |
+|----------|----------------------|------------------------|
+| Créer un VLAN sur 45 switches | 45 sessions SSH × 4 commandes = ~180 étapes | 1 template + 1 déploiement = 2 étapes |
+| Identifier un port err-disabled | `show interfaces status` sur chaque switch → 45 sessions | 1 recherche dans le dashboard = 1 étape |
+| Appliquer une ACL sur tous les trunks | Identifier les trunks manuellement + appliquer l'ACL sur chaque interface → des dizaines d'étapes | 1 policy + 1 déploiement = 2 étapes |
+| Rapport d'inventaire complet | `show version` + `show inventory` sur 57 devices, puis consolider dans Excel → 114+ étapes | 1 export depuis l'inventaire DNA Center = 1 étape |
+
+**Explication** : Le gain est d'autant plus significatif que le nombre d'équipements est élevé. La méthode controller-based découple le nombre d'étapes du nombre de devices.
+
+</details>
+
+### Voir aussi
+
+- Topic 1.1.e dans Module 1 (rôle des contrôleurs — DNA Center et WLC)
+- Topic 2.8 dans Module 2 (méthodes d'accès management — SSH, HTTPS, cloud-managed)
+- Topic 5.8 dans Module 5 (AAA — gestion d'accès centralisée vs distribuée)
+
+---
+
+## 6.3 — Architecture SDN (overlay, underlay, fabric)
+
+> **Exam topic 6.3** : _Describe_ — Controller-based, software-defined architecture (overlay, underlay, and fabric)
+> **6.3.a** : Separation of control plane and data plane
+> **6.3.b** : Northbound and southbound APIs
+> **Niveau** : Describe (Bloom 2)
+
+### Contexte
+
+Le terme SDN (Software-Defined Networking) revient partout dans l'industrie réseau depuis une dizaine d'années. Mais derrière le marketing, les concepts techniques sont précis et bien définis. L'architecture SDN repose sur une séparation claire entre les décisions (control plane) et l'acheminement du trafic (data plane), le tout orchestré via des APIs standardisées.
+
+### Théorie
+
+#### Rappel : control plane vs data plane
+
+Chaque équipement réseau remplit deux fonctions distinctes :
+
+| Plan | Rôle | Exemples |
+|------|------|----------|
+| **Control plane** | Prendre des décisions : construire les tables de routage, apprendre les MAC, calculer STP | OSPF, STP, ARP, table de routage |
+| **Data plane** (ou forwarding plane) | Transférer les paquets selon les décisions du control plane | Lookup table MAC, forwarding table IP, switching ASIC |
+| **Management plane** | Permettre l'accès administrateur | SSH, SNMP, HTTPS, console |
+
+Dans un réseau traditionnel, les trois plans coexistent sur chaque équipement. Dans une architecture SDN, le control plane est extrait (partiellement ou totalement) et centralisé sur un contrôleur.
+
+```
+Séparation des plans dans un réseau SDN
+
+  ┌──────────────────────────────────────────┐
+  │          Management Plane                │
+  │  (GUI/API du contrôleur — accès admin)   │
+  └────────────────┬─────────────────────────┘
+                   │  Northbound APIs
+                   │  (REST, gRPC)
+  ┌────────────────┴─────────────────────────┐
+  │          Control Plane                   │
+  │     (centralisé sur le contrôleur)       │
+  │  Décisions : routing, policies, QoS      │
+  └────────────────┬─────────────────────────┘
+                   │  Southbound APIs
+                   │  (NETCONF, OpenFlow, RESTCONF, CLI)
+  ┌────────────────┴─────────────────────────┐
+  │          Data Plane                      │
+  │    (distribué sur les équipements)       │
+  │  Forwarding : switch, route, filter      │
+  └──────────────────────────────────────────┘
+```
+
+#### Northbound APIs et Southbound APIs
+
+Les APIs sont les interfaces de communication entre les couches de l'architecture SDN. Leur nom vient de la convention qui place le contrôleur au centre, avec les applications au-dessus (nord) et les équipements en-dessous (sud).
+
+**Southbound APIs** (contrôleur → équipements) :
+- Le contrôleur utilise ces APIs pour programmer les équipements réseau
+- Protocoles : OpenFlow, NETCONF, RESTCONF, SNMP, CLI (SSH)
+- Analogie : les ordres du chef d'orchestre vers les musiciens
+
+**Northbound APIs** (applications → contrôleur) :
+- Les applications métier ou d'administration utilisent ces APIs pour demander des services réseau
+- Protocoles : REST APIs (HTTP/HTTPS), gRPC
+- Analogie : le directeur artistique qui communique ses souhaits au chef d'orchestre
+
+```
+Architecture SDN — Northbound et Southbound APIs
+
+  ┌─────────────────────────────────────────┐
+  │         APPLICATIONS                    │
+  │  ┌──────────┐  ┌───────┐  ┌─────────┐  │
+  │  │Dashboard │  │ IPAM  │  │ Sécurité│  │
+  │  │monitoring│  │       │  │ (ISE)   │  │
+  │  └────┬─────┘  └───┬───┘  └────┬────┘  │
+  └───────┼────────────┼───────────┼────────┘
+          │            │           │
+  ════════╪════════════╪═══════════╪════════
+          │   Northbound APIs (REST)│
+  ════════╪════════════╪═══════════╪════════
+          ▼            ▼           ▼
+  ┌─────────────────────────────────────────┐
+  │          CONTRÔLEUR SDN                 │
+  │      (ex: Cisco DNA Center)             │
+  │  Vision globale + décisions + policies  │
+  └─────┬──────────┬──────────┬─────────────┘
+        │          │          │
+  ══════╪══════════╪══════════╪═════════════
+        │ Southbound APIs     │
+        │ (NETCONF, RESTCONF, CLI)
+  ══════╪══════════╪══════════╪═════════════
+        ▼          ▼          ▼
+  ┌────────┐ ┌────────┐ ┌────────┐
+  │ Switch │ │ Router │ │  AP    │
+  │  (DP)  │ │  (DP)  │ │  (DP)  │
+  └────────┘ └────────┘ └────────┘
+```
+
+#### Overlay, Underlay et Fabric
+
+Ces trois termes décrivent les couches d'un réseau SDN de campus ou de datacenter.
+
+**Underlay** : le réseau physique sous-jacent. Les câbles, les switches, les routeurs, les liens — tout le matériel et la connectivité IP de base qui assure le transport des paquets. L'underlay doit simplement fournir une connectivité IP fiable entre tous les équipements.
+
+**Overlay** : un réseau virtuel construit *par-dessus* l'underlay. L'overlay utilise des tunnels (VXLAN, GRE, IPsec) pour créer des réseaux logiques qui ne dépendent pas de la topologie physique. Un même underlay peut supporter plusieurs overlays indépendants.
+
+**Fabric** : la combinaison de l'underlay et de l'overlay, orchestrée par le contrôleur. Le terme « fabric » désigne le réseau SDN complet — le tissu qui relie tous les composants. Cisco SD-Access utilise le terme « fabric » pour décrire son architecture de campus.
+
+```
+Overlay, Underlay et Fabric
+
+  ┌─────────────────────────────────────────────────────┐
+  │                    FABRIC                           │
+  │                                                     │
+  │  ┌───────────────────────────────────────────────┐  │
+  │  │              OVERLAY (VXLAN)                   │  │
+  │  │                                               │  │
+  │  │   VLAN 10 ···> Tunnel VXLAN ···> VLAN 10     │  │
+  │  │   (Site A)     (VNI 10010)       (Site B)     │  │
+  │  │                                               │  │
+  │  │   VLAN 20 ···> Tunnel VXLAN ···> VLAN 20     │  │
+  │  │   (Site A)     (VNI 10020)       (Site B)     │  │
+  │  └───────────────────────────────────────────────┘  │
+  │                                                     │
+  │  ┌───────────────────────────────────────────────┐  │
+  │  │              UNDERLAY (IP)                     │  │
+  │  │                                               │  │
+  │  │   [SW1]──────[R1]──────[R2]──────[SW2]       │  │
+  │  │    Site A     │         │        Site B       │  │
+  │  │              WAN      WAN                     │  │
+  │  │       Routage IP classique (OSPF/IS-IS)       │  │
+  │  └───────────────────────────────────────────────┘  │
+  │                                                     │
+  │  Contrôleur : orchestre overlay + underlay          │
+  └─────────────────────────────────────────────────────┘
+```
+
+**Analogie** : pensez à un réseau postal. L'underlay, ce sont les routes physiques entre les villes. L'overlay, ce sont les différents services (courrier standard, express, recommandé) qui utilisent les mêmes routes mais avec des règles différentes. La fabric, c'est l'ensemble du système postal — routes + services + le siège central qui coordonne tout.
+
+#### Exemples d'architectures SDN Cisco
+
+| Solution Cisco | Type | Contrôleur | Southbound | Overlay |
+|---------------|------|-----------|------------|---------|
+| **SD-Access** | Campus | DNA Center | LISP, VXLAN, TrustSec | VXLAN |
+| **SD-WAN** | WAN | vManage | OMP, IPsec | IPsec tunnels |
+| **ACI** | Datacenter | APIC | OpFlex | VXLAN |
+
+### Mise en pratique CLI
+
+Même si le contrôleur gère la plupart des opérations, les équipements SDN restent accessibles en CLI pour le diagnostic.
+
+```cisco
+! Vérifier le statut du fabric sur un switch SD-Access
+SW-FABRIC# show lisp site summary
+```
+
+**Output attendu :**
+```
+LISP Site Registration Summary for Router lisp 0
+  Site Name       Registered  Unregistered
+  CAMPUS-FABRIC   45          0
+  Total           45          0
+```
+
+**Interprétation** : 45 devices sont enregistrés dans la fabric SD-Access et aucun n'est en état « unregistered ». LISP (Locator/ID Separation Protocol) est le protocole de control plane utilisé par SD-Access pour séparer l'identité des endpoints de leur localisation physique.
+
+```cisco
+! Vérifier les tunnels overlay VXLAN
+SW-FABRIC# show vxlan vni
+```
+
+**Output attendu :**
+```
+VNI        Multicast-group  VNI state  Mode   BD     cfg  vrf
+10010      225.0.0.10       Up         L2CP   10     CLI  N/A
+10020      225.0.0.20       Up         L2CP   20     CLI  N/A
+50000      N/A              Up         L3CP   N/A    CLI  CORP
+```
+
+**Interprétation** : Deux VNI (Virtual Network Identifiers) de Layer 2 correspondent aux VLANs 10 et 20 transportés à travers l'overlay VXLAN. Le VNI 50000 est un VNI de Layer 3 pour le VRF « CORP ». Tous les tunnels sont opérationnels (Up).
+
+### Point exam
+
+> **Piège courant** : Ne confondez pas les directions des APIs. **Northbound** = vers le haut = applications vers contrôleur (REST). **Southbound** = vers le bas = contrôleur vers équipements (NETCONF, OpenFlow). Un moyen mnémotechnique : les applications « demandent » au nord, le contrôleur « commande » au sud.
+>
+> **À retenir** : L'**overlay** est le réseau virtuel (tunnels), l'**underlay** est le réseau physique (IP), et la **fabric** est l'ensemble orchestré par le contrôleur. L'underlay n'a besoin que de connectivité IP — la complexité est dans l'overlay.
+
+### Exercice 6.3 — Schématiser l'architecture SDN
+
+**Contexte** : Une entreprise déploie Cisco SD-Access sur son campus. Vous devez identifier les composants.
+
+**Consigne** : Pour chaque élément ci-dessous, indiquez s'il appartient à l'**overlay**, l'**underlay**, au **control plane** ou au **data plane**, et s'il communique via une API **northbound** ou **southbound** (quand applicable).
+
+1. Le câble fibre entre deux switches de distribution
+2. Un tunnel VXLAN transportant le VLAN 10 entre deux sites
+3. DNA Center qui pousse une politique de segmentation
+4. Un switch qui transfère une trame Ethernet
+5. Une application de monitoring qui interroge DNA Center via REST
+
+**Indice** : <details><summary>Voir l'indice</summary>Demandez-vous : est-ce physique ou virtuel ? Est-ce une décision ou un transfert de données ? La communication va-t-elle vers le contrôleur ou depuis le contrôleur ?</details>
+
+<details>
+<summary>Solution</summary>
+
+1. **Câble fibre** → **Underlay** (infrastructure physique) — pas d'API, c'est du Layer 1.
+2. **Tunnel VXLAN** → **Overlay** (réseau virtuel construit sur l'underlay). Transporte les données = **data plane** de l'overlay.
+3. **DNA Center pousse une politique** → **Control plane** centralisé, communiqué via **southbound API** (NETCONF/RESTCONF vers les switches).
+4. **Switch transfère une trame** → **Data plane** (forwarding local sur l'équipement).
+5. **Application monitoring → DNA Center** → Communication via **northbound API** (REST). L'application est au-dessus du contrôleur dans l'architecture.
+
+</details>
+
+### Voir aussi
+
+- Topic 2.5 dans Module 2 (STP — exemple de control plane distribué traditionnel)
+- Topic 3.4 dans Module 3 (OSPF — control plane distribué qui peut être complété par SDN)
+- Topic 1.1.e dans Module 1 (contrôleurs DNA Center et WLC)
+
+---
+
+## 6.4 — Gestion traditionnelle vs Cisco DNA Center
+
+> **Exam topic 6.4** : _Compare_ — Traditional campus device management with Cisco DNA Center-enabled device management
+> **Niveau** : Compare (Bloom 3)
+
+### Contexte
+
+Cisco DNA Center (souvent abrégé DNAC) est le contrôleur phare de Cisco pour les réseaux campus. Il incarne concrètement les concepts SDN vus en section 6.3. Plutôt que de gérer chaque switch individuellement, l'administrateur exprime ses **intentions** (« je veux que le département Marketing ait accès au réseau sur le VLAN 50 avec telle QoS ») et DNA Center traduit ces intentions en configurations spécifiques pour chaque équipement. C'est ce que Cisco appelle l'**Intent-Based Networking** (IBN).
+
+### Théorie
+
+#### Les fonctions principales de DNA Center
+
+DNA Center n'est pas simplement un outil de configuration centralisée. C'est une plateforme complète qui couvre l'ensemble du cycle de vie réseau :
+
+| Fonction | Description | Équivalent traditionnel |
+|----------|------------|----------------------|
+| **Design** | Définir les sites, bâtiments, étages | Documentation manuelle (Visio, Excel) |
+| **Policy** | Créer des règles de segmentation et QoS | ACLs + QoS configurés switch par switch |
+| **Provision** | Déployer les configs sur les équipements | Sessions SSH + copier/coller |
+| **Assurance** | Monitoring, health scores, analytics | SNMP + Syslog + outils tiers |
+| **Platform** | APIs REST pour l'intégration | Pas d'équivalent natif |
+
+#### Intent-Based Networking (IBN)
+
+Le concept central de DNA Center est l'IBN. L'administrateur ne raisonne plus en termes de commandes CLI, mais en termes d'intentions métier :
+
+```
+Workflow IBN — De l'intention à la configuration
+
+  Intention admin                    Traduction DNA Center
+  ──────────────────                 ──────────────────────
+  "Le département Marketing         DNA Center génère :
+   doit accéder au réseau            - VLAN 50 sur SW1, SW2, SW3
+   avec une QoS premium              - Policy-map MARKETING-QOS
+   et être isolé de la R&D"          - SGT (Security Group Tag) 50
+                                     - ACLs d'isolation Marketing/R&D
+                                     - Déploiement via NETCONF
+
+  ┌──────────┐    Intent     ┌──────────┐    Config     ┌────────┐
+  │  Admin   │ ──────────▶  │   DNAC   │ ──────────▶  │ SW1-3  │
+  │  (GUI)   │              │(traduit) │  Southbound  │ (apply) │
+  └──────────┘              └──────────┘              └────────┘
+```
+
+#### Comparaison détaillée des workflows
+
+**Scénario : déployer un nouveau VLAN sur 20 switches d'accès**
+
+| Étape | Gestion traditionnelle | Cisco DNA Center |
+|-------|----------------------|-----------------|
+| 1 | Planifier les interfaces (Excel) | Définir le Virtual Network dans Design |
+| 2 | SSH vers SW1, `vlan 50`, `name MARKETING` | Créer la policy de segmentation |
+| 3 | Assigner les ports (`switchport access vlan 50`) | Associer le pool d'IP au site |
+| 4 | Répéter sur SW2 à SW20 (19 fois) | Cliquer « Provision » → déploiement auto |
+| 5 | Vérifier avec `show vlan brief` sur chaque SW | Dashboard Assurance : health check auto |
+| 6 | Documenter dans Excel/Wiki | Historique automatique dans DNAC |
+| **Temps estimé** | **2-4 heures** | **15-20 minutes** |
+| **Risque d'erreur** | Élevé (copier/coller, oubli d'un switch) | Faible (template unique) |
+
+#### DNA Center Assurance
+
+La fonction Assurance de DNA Center mérite une mention particulière. Elle utilise des indicateurs de santé (health scores) pour fournir une visibilité en temps réel :
+
+| Métrique | Score | Signification |
+|----------|-------|--------------|
+| Network Health | 0-100 | Santé globale du réseau (devices, liens) |
+| Client Health | 0-100 | Expérience des clients connectés (wired + wireless) |
+| Application Health | 0-100 | Performance des applications (latence, drops) |
+
+Un score inférieur à 70 déclenche une investigation automatique. DNA Center corrèle les événements (logs, traps, flows) pour identifier la cause racine — là où un admin traditionnel devrait analyser manuellement les logs de chaque équipement.
+
+### Mise en pratique CLI
+
+Même avec DNA Center, les commandes CLI restent utiles pour le diagnostic. Voici comment vérifier qu'un switch est bien managé par DNAC.
+
+```cisco
+! Vérifier l'enregistrement PnP (Plug and Play) du switch dans DNA Center
+SW-ACCESS# show pnp profile
+```
+
+**Output attendu :**
+```
+PnP Profile Information
+-----------------------
+  Profile Name  : pnp-zero-touch
+  Discovery     : DHCP Option 43
+  Transport     : HTTPS
+  Server        : dnac.entreprise.local
+  Port          : 443
+  Status        : Connected
+  Last Contact  : Apr 04 2026 08:23:15
+```
+
+**Interprétation** : Le switch est connecté à DNA Center via HTTPS (port 443). Le mécanisme Plug and Play (PnP) a été utilisé pour l'onboarding automatique : le switch a découvert DNA Center via l'option DHCP 43. Le statut « Connected » confirme que le contrôleur peut gérer ce device.
+
+```cisco
+! Vérifier les politiques appliquées par DNA Center
+SW-ACCESS# show policy-map interface GigabitEthernet0/1
+```
+
+**Output attendu :**
+```
+  Service-policy input: DNAC-MARKING-IN
+
+    Class-map: MARKETING-DATA (match-all)
+      15234 packets, 9140400 bytes
+      5 minute rate 72000 bps
+      QoS Set
+        dscp af21
+
+    Class-map: VOICE (match-all)
+      8921 packets, 2141040 bytes
+      5 minute rate 34000 bps
+      QoS Set
+        dscp ef
+
+    Class-map: class-default (match-any)
+      45678 packets, 27406800 bytes
+      5 minute rate 210000 bps
+```
+
+**Interprétation** : DNA Center a déployé automatiquement une policy-map « DNAC-MARKING-IN » qui classe le trafic Marketing en AF21 et le trafic voix en EF. Ces marquages auraient nécessité une configuration manuelle de QoS (class-map, policy-map, service-policy) sur chaque interface de chaque switch en approche traditionnelle.
+
+### Point exam
+
+> **Piège courant** : L'examen demande de **comparer** les deux approches, pas de configurer DNA Center. Concentrez-vous sur les différences opérationnelles : temps, risque d'erreur, scalabilité, visibilité. DNA Center ne supprime pas le besoin de comprendre le CLI — il le complète.
+>
+> **À retenir** : DNA Center utilise l'**Intent-Based Networking** (IBN) : l'admin exprime une intention, le contrôleur la traduit en configuration. Les 4 piliers sont **Design**, **Policy**, **Provision** et **Assurance**.
+
+### Exercice 6.4 — Workflow DNA Center vs CLI
+
+**Contexte** : L'entreprise MediNet (hôpital, 35 switches d'accès) doit déployer un nouveau SSID Wi-Fi « Patient-Guest » avec QoS limitée et isolation du réseau médical.
+
+**Consigne** : Décrivez les étapes nécessaires avec les deux approches (traditionnelle et DNA Center), puis identifiez les avantages spécifiques de DNA Center pour cet environnement hospitalier.
+
+**Indice** : <details><summary>Voir l'indice</summary>Dans un hôpital, la sécurité (isolation des réseaux) et la fiabilité (pas d'erreur de config) sont critiques. Pensez aussi à la traçabilité des changements pour la conformité réglementaire.</details>
+
+<details>
+<summary>Solution</summary>
+
+**Approche traditionnelle :**
+1. Configurer le WLC : créer le WLAN « Patient-Guest »
+2. Définir le VLAN invité sur chaque switch (35 sessions SSH)
+3. Configurer les ACLs d'isolation sur chaque switch
+4. Configurer la QoS (rate-limit) sur chaque interface trunk vers les APs
+5. Tester depuis un client Wi-Fi sur chaque site
+6. Documenter toutes les modifications
+
+**Approche DNA Center :**
+1. Design : associer le profil « Guest » au site « Hôpital »
+2. Policy : créer une politique « Patient-Guest » avec QoS limitée et segmentation (SGT)
+3. Provision : déployer en un clic sur l'ensemble du site
+4. Assurance : vérifier le health score du nouveau SSID
+
+**Avantages DNA Center pour l'hôpital :**
+- **Isolation garantie** : la segmentation par SGT est appliquée uniformément — pas de risque d'oublier une ACL sur un switch
+- **Traçabilité** : chaque changement est journalisé automatiquement (conformité HDS/HIPAA)
+- **Rollback rapide** : si le nouveau SSID cause un problème, retour en arrière en un clic
+- **Monitoring continu** : Assurance détecte immédiatement si un patient perd la connectivité
+
+</details>
+
+### Voir aussi
+
+- Topic 2.6 dans Module 2 (architectures wireless et modes AP — DNA Center les orchestre)
+- Topic 2.9 dans Module 2 (GUI WLC — DNA Center intègre et dépasse le WLC standalone)
+- Topic 5.8 dans Module 5 (AAA — DNA Center s'intègre avec Cisco ISE pour l'authentification)
+
+---
+
+## 6.5 — APIs REST (CRUD, HTTP verbs, data encoding)
+
+> **Exam topic 6.5** : _Describe_ — Characteristics of REST-based APIs (CRUD, HTTP verbs, and data encoding)
+> **Niveau** : Describe (Bloom 2)
+
+### Contexte
+
+Quand DNA Center déploie une configuration sur un switch, ou quand une application de monitoring interroge l'inventaire réseau, la communication passe par une API REST. Les APIs REST sont le langage commun de l'automatisation réseau moderne. Comprendre leurs principes, c'est comprendre comment les différentes couches de l'architecture SDN communiquent entre elles.
+
+### Théorie
+
+#### Qu'est-ce qu'une API REST ?
+
+REST (Representational State Transfer) est un style d'architecture pour les services web. Une API REST permet à un programme d'interagir avec un autre via le protocole HTTP — le même protocole que celui de votre navigateur web.
+
+Pensez à un restaurant : le menu est l'API (il décrit ce que vous pouvez demander), le serveur est le protocole HTTP (il transporte vos demandes), et la cuisine est le serveur qui traite la requête. Vous n'avez pas besoin de savoir comment le plat est préparé — vous passez commande et vous recevez le résultat.
+
+#### Les 6 contraintes REST
+
+| Contrainte | Signification |
+|-----------|---------------|
+| **Client-Server** | Le client (qui demande) et le serveur (qui répond) sont séparés |
+| **Stateless** | Chaque requête contient toutes les informations nécessaires — le serveur ne mémorise rien entre deux requêtes |
+| **Cacheable** | Les réponses peuvent être mises en cache pour améliorer les performances |
+| **Uniform Interface** | Les ressources sont identifiées par des URIs standardisées |
+| **Layered System** | Le client ne sait pas s'il communique directement avec le serveur ou via un proxy |
+| **Code on Demand** (optionnel) | Le serveur peut envoyer du code exécutable au client |
+
+La contrainte la plus testée à l'examen est **stateless** : chaque requête est indépendante. Si vous envoyez une requête GET pour lire un VLAN, puis une requête PUT pour le modifier, la seconde requête doit contenir toutes les informations d'authentification — le serveur ne se souvient pas de la première.
+
+#### CRUD et HTTP Verbs
+
+CRUD est l'acronyme des quatre opérations fondamentales sur les données. Chaque opération CRUD correspond à un verbe HTTP :
+
+| Opération CRUD | Verbe HTTP | Description | Exemple réseau |
+|---------------|-----------|------------|---------------|
+| **C**reate | **POST** | Créer une nouvelle ressource | Créer un nouveau VLAN |
+| **R**ead | **GET** | Lire/récupérer une ressource | Lire la liste des VLANs |
+| **U**pdate | **PUT** / **PATCH** | Modifier une ressource existante | Renommer un VLAN |
+| **D**elete | **DELETE** | Supprimer une ressource | Supprimer un VLAN |
+
+La différence entre PUT et PATCH : PUT remplace la ressource entière, PATCH ne modifie que les champs spécifiés. Sur un VLAN, un PUT remplacerait toutes les propriétés (nom, ID, état), tandis qu'un PATCH ne changerait que le nom, par exemple.
+
+#### Anatomie d'une requête REST
+
+```
+Requête HTTP REST — Structure
+
+  ┌─────────────────────────────────────────────────────┐
+  │  MÉTHODE   URI                         VERSION      │
+  │  GET       /api/v1/vlans/50            HTTP/1.1     │
+  ├─────────────────────────────────────────────────────┤
+  │  HEADERS                                            │
+  │  Host: dnac.entreprise.local                        │
+  │  Accept: application/json                           │
+  │  X-Auth-Token: eyJhbGciOi...                        │
+  │  Content-Type: application/json                     │
+  ├─────────────────────────────────────────────────────┤
+  │  BODY (optionnel — vide pour GET)                   │
+  │  { "vlanName": "MARKETING", "vlanId": 50 }         │
+  └─────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────┐
+  │  RÉPONSE                                            │
+  ├─────────────────────────────────────────────────────┤
+  │  HTTP/1.1 200 OK                                    │
+  │  Content-Type: application/json                     │
+  ├─────────────────────────────────────────────────────┤
+  │  {                                                  │
+  │    "vlanId": 50,                                    │
+  │    "vlanName": "MARKETING",                         │
+  │    "status": "active"                               │
+  │  }                                                  │
+  └─────────────────────────────────────────────────────┘
+```
+
+#### Codes de réponse HTTP
+
+| Code | Catégorie | Signification | Exemple |
+|------|----------|---------------|---------|
+| **200** | Succès | OK — requête réussie | GET réussi |
+| **201** | Succès | Created — ressource créée | POST réussi |
+| **204** | Succès | No Content — réussi, pas de body | DELETE réussi |
+| **400** | Erreur client | Bad Request — syntaxe invalide | JSON malformé |
+| **401** | Erreur client | Unauthorized — authentification requise | Token manquant/expiré |
+| **403** | Erreur client | Forbidden — droits insuffisants | Lecture seule, tentative de DELETE |
+| **404** | Erreur client | Not Found — ressource inexistante | VLAN 999 n'existe pas |
+| **500** | Erreur serveur | Internal Server Error | Bug côté serveur |
+
+#### Data encoding : JSON vs XML
+
+Les APIs REST transportent les données dans un format structuré. Les deux formats les plus courants sont JSON et XML :
+
+| Caractéristique | JSON | XML |
+|----------------|------|-----|
+| **Lisibilité humaine** | Très lisible | Lisible mais verbeux |
+| **Taille** | Compact | Plus volumineux (balises ouvrantes/fermantes) |
+| **Parsing** | Natif en JavaScript et Python | Nécessite un parser dédié |
+| **Usage réseau** | Standard de facto (REST APIs) | Historique (SOAP, NETCONF) |
+| **Types de données** | String, Number, Boolean, Array, Object, null | Tout est texte (types via schéma) |
+
+**Exemple — même donnée en JSON et XML :**
+
+```json
+{
+  "vlan": {
+    "id": 50,
+    "name": "MARKETING",
+    "status": "active",
+    "ports": ["Gi0/1", "Gi0/2", "Gi0/3"]
+  }
+}
+```
+
+```xml
+<vlan>
+  <id>50</id>
+  <name>MARKETING</name>
+  <status>active</status>
+  <ports>
+    <port>Gi0/1</port>
+    <port>Gi0/2</port>
+    <port>Gi0/3</port>
+  </ports>
+</vlan>
+```
+
+Le JSON est nettement plus compact. C'est pourquoi il est devenu le format standard des APIs REST modernes, y compris celles de Cisco DNA Center. L'XML reste utilisé par NETCONF (southbound API).
+
+#### Authentification des APIs REST
+
+La sécurité des APIs repose sur les mêmes principes que ceux vus dans le Module 5 (topic 5.3, 5.4) :
+
+| Méthode | Mécanisme | Usage |
+|---------|----------|-------|
+| **Basic Auth** | Username:password encodé en Base64 | Simple mais peu sécurisé |
+| **Token-based** | Token obtenu après authentification initiale | DNA Center, la plupart des APIs réseau |
+| **API Key** | Clé unique dans le header | Services cloud |
+| **OAuth 2.0** | Token d'accès avec scopes et expiration | Intégrations tierces |
+
+DNA Center utilise l'authentification par token : une première requête POST avec les credentials renvoie un token, qui est ensuite passé dans le header `X-Auth-Token` de chaque requête suivante.
+
+### Mise en pratique CLI
+
+Voici des exemples concrets d'interactions REST API avec un contrôleur réseau, en utilisant `curl`.
+
+**Étape 1 : Obtenir un token d'authentification**
+
+```bash
+curl -s -X POST "https://dnac.entreprise.local/dna/system/api/v1/auth/token" \
+  -H "Content-Type: application/json" \
+  --basic -u admin:Cisco123
+```
+
+**Output attendu :**
+```json
+{
+  "Token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2M..."
+}
+```
+
+**Étape 2 : Lire la liste des équipements (GET)**
+
+```bash
+curl -s -X GET "https://dnac.entreprise.local/dna/intent/api/v1/network-device" \
+  -H "X-Auth-Token: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2M..." \
+  -H "Content-Type: application/json"
+```
+
+**Output attendu (simplifié) :**
+```json
+{
+  "response": [
+    {
+      "hostname": "SW-ACCESS-01",
+      "managementIpAddress": "10.10.10.1",
+      "platformId": "C9300-48U",
+      "softwareVersion": "17.9.4",
+      "role": "ACCESS",
+      "reachabilityStatus": "Reachable"
+    },
+    {
+      "hostname": "SW-DISTRIB-01",
+      "managementIpAddress": "10.10.10.2",
+      "platformId": "C9500-24Y4C",
+      "softwareVersion": "17.9.4",
+      "role": "DISTRIBUTION",
+      "reachabilityStatus": "Reachable"
+    }
+  ]
+}
+```
+
+**Interprétation** : La requête GET renvoie l'inventaire complet du réseau en une seule réponse JSON. Chaque device a un hostname, une IP de management, un modèle, une version IOS et un rôle dans la hiérarchie. Traditionnellement, ces informations nécessiteraient un `show version` sur chaque équipement.
+
+**Étape 3 : Créer un nouveau VLAN (POST)**
+
+```bash
+curl -s -X POST "https://dnac.entreprise.local/dna/intent/api/v1/vlans" \
+  -H "X-Auth-Token: eyJhbGciOi..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "vlanId": 60,
+    "vlanName": "RH",
+    "interfaceType": "access",
+    "sites": ["Global/Paris/Building-A"]
+  }'
+```
+
+**Output attendu :**
+```json
+{
+  "response": {
+    "taskId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "url": "/dna/intent/api/v1/task/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  }
+}
+```
+
+**Interprétation** : Le POST ne renvoie pas un résultat immédiat mais un `taskId`. DNA Center traite la demande de manière asynchrone — il déploie le VLAN sur tous les switches du site « Building-A ». On peut suivre l'avancement via le endpoint `/task/{taskId}`.
+
+### Point exam
+
+> **Piège courant** : POST crée une **nouvelle** ressource, PUT **remplace** une ressource existante. L'examen peut proposer un scénario où il faut choisir le bon verbe HTTP. Si la question parle de « modifier le nom d'un VLAN existant », c'est PUT (ou PATCH), pas POST.
+>
+> **À retenir** : REST = **stateless** (chaque requête est indépendante). Les verbes HTTP correspondent aux opérations CRUD : POST=Create, GET=Read, PUT/PATCH=Update, DELETE=Delete. Les données sont encodées en **JSON** (standard) ou **XML**.
+
+### Exercice 6.5 — Associer CRUD et HTTP verbs
+
+**Contexte** : Vous développez un script Python pour automatiser la gestion réseau via l'API REST de DNA Center.
+
+**Consigne** : Pour chaque opération ci-dessous, indiquez le verbe HTTP approprié, l'URI probable et le code de réponse attendu en cas de succès.
+
+1. Récupérer la configuration d'un switch dont l'ID est « abc-123 »
+2. Ajouter un nouveau réseau Wi-Fi « Invites »
+3. Modifier le nom du VLAN 50 de « MARKETING » à « MKT »
+4. Supprimer un ancien profil QoS inutilisé
+5. Lister tous les clients Wi-Fi connectés
+
+**Indice** : <details><summary>Voir l'indice</summary>L'URI contient généralement le type de ressource et son identifiant. Les codes 2xx signifient le succès, mais le code exact dépend de l'opération (200 pour lecture, 201 pour création, 204 pour suppression).</details>
+
+<details>
+<summary>Solution</summary>
+
+| # | Opération | Verbe HTTP | URI probable | Code réponse |
+|---|-----------|-----------|-------------|-------------|
+| 1 | Lire la config d'un switch | **GET** | `/api/v1/network-device/abc-123/config` | **200 OK** |
+| 2 | Créer un SSID | **POST** | `/api/v1/wireless/ssid` | **201 Created** |
+| 3 | Modifier le nom d'un VLAN | **PUT** ou **PATCH** | `/api/v1/vlans/50` | **200 OK** |
+| 4 | Supprimer un profil QoS | **DELETE** | `/api/v1/qos-profiles/{id}` | **204 No Content** |
+| 5 | Lister les clients Wi-Fi | **GET** | `/api/v1/clients?connectionType=wireless` | **200 OK** |
+
+**Explication** : Chaque opération CRUD mappe directement sur un verbe HTTP. Notez que la lecture (#1 et #5) utilise toujours GET, la création (#2) utilise POST, la modification (#3) utilise PUT ou PATCH, et la suppression (#4) utilise DELETE. Les URIs suivent une convention RESTful : `/ressource` pour les collections, `/ressource/{id}` pour une ressource spécifique.
+
+</details>
+
+### Voir aussi
+
+- Topic 6.7 dans ce module (JSON — format de données des APIs REST)
+- Topic 5.3 et 5.4 dans Module 5 (sécurité des accès — applicable à l'authentification API)
+- Topic 1.5 dans Module 1 (TCP vs UDP — REST utilise TCP via HTTP/HTTPS)
+
+---
+
+## 6.6 — Outils de gestion de configuration (Puppet, Chef, Ansible)
+
+> **Exam topic 6.6** : _Recognize_ — The capabilities of configuration management mechanisms (Puppet, Chef, and Ansible)
+> **Niveau** : Recognize (Bloom 1)
+
+### Contexte
+
+Les contrôleurs SDN comme DNA Center sont puissants, mais ils ne sont pas le seul moyen d'automatiser un réseau. Les outils de gestion de configuration — nés dans le monde des serveurs — se sont progressivement étendus au réseau. Puppet, Chef et Ansible permettent de définir l'état désiré d'un réseau et de l'appliquer de manière automatique et reproductible, sans nécessiter un contrôleur dédié.
+
+### Théorie
+
+#### Le concept d'état désiré (desired state)
+
+Le principe fondamental des outils de gestion de configuration est simple : plutôt que de décrire les **étapes** pour atteindre un résultat (approche impérative : « crée le VLAN 50, puis assigne le port »), on décrit le **résultat souhaité** (approche déclarative : « le VLAN 50 doit exister avec ces ports »). L'outil se charge de déterminer les étapes nécessaires.
+
+```
+Approche impérative vs déclarative
+
+  Impératif (script bash/python) :           Déclaratif (Ansible/Puppet) :
+  ─────────────────────────────              ─────────────────────────────
+  1. Se connecter à SW1                       État désiré :
+  2. Vérifier si VLAN 50 existe               - VLAN 50 : présent
+  3. Si non, créer VLAN 50                    - Nom : MARKETING
+  4. Nommer le VLAN MARKETING                 - Ports : Gi0/1-10
+  5. Assigner les ports Gi0/1-10              
+  6. Si erreur, annuler                       L'outil gère la logique :
+  7. Répéter sur SW2, SW3...                  vérification, création, idempotence
+```
+
+**Idempotence** : un concept clé. Exécuter l'outil deux fois de suite produit le même résultat. Si le VLAN 50 existe déjà, l'outil ne fait rien (au lieu de générer une erreur « VLAN already exists »).
+
+#### Puppet, Chef et Ansible — Comparaison
+
+| Caractéristique | Puppet | Chef | Ansible |
+|----------------|--------|------|---------|
+| **Architecture** | Agent-based (maître/agent) | Agent-based (serveur/client) | **Agentless** (SSH/NETCONF) |
+| **Langage** | Puppet DSL (déclaratif) | Ruby DSL (impératif) | **YAML** (déclaratif) |
+| **Modèle** | Pull (l'agent tire la config) | Pull (le client tire la config) | **Push** (le serveur pousse la config) |
+| **Agent sur le device** | Oui (Puppet Agent) | Oui (Chef Client) | **Non** (utilise SSH) |
+| **Terminologie config** | Manifests + Modules | Recipes + Cookbooks | **Playbooks** + Roles |
+| **Support réseau** | Modules réseau disponibles | Limité pour le réseau | **Excellent** (cisco.ios, cisco.nxos) |
+| **Courbe d'apprentissage** | Moyenne (DSL propriétaire) | Élevée (Ruby) | **Faible** (YAML lisible) |
+| **Idempotent** | Oui | Oui | Oui |
+
+#### Focus sur Ansible (le plus pertinent pour le réseau)
+
+Ansible est l'outil de gestion de configuration le plus adopté dans le monde réseau, pour trois raisons :
+
+1. **Agentless** : pas besoin d'installer un agent sur chaque switch — Ansible se connecte via SSH (ou NETCONF/RESTCONF), les protocoles que les équipements réseau supportent déjà.
+
+2. **YAML** : le format des playbooks est lisible par un humain, même sans expérience de programmation.
+
+3. **Modules Cisco** : Cisco maintient officiellement des collections Ansible (cisco.ios, cisco.nxos, cisco.asa) avec des modules pour chaque type de configuration.
+
+```
+Architecture Ansible — Agentless Push
+
+  ┌──────────────────────────────┐
+  │     Ansible Control Node     │
+  │  (Linux, Python, Ansible)    │
+  │                              │
+  │  ┌────────────────────────┐  │
+  │  │  Inventory (hosts)     │  │
+  │  │  sw1  10.10.10.1       │  │
+  │  │  sw2  10.10.10.2       │  │
+  │  │  sw3  10.10.10.3       │  │
+  │  └────────────────────────┘  │
+  │  ┌────────────────────────┐  │
+  │  │  Playbook (YAML)       │  │
+  │  │  "VLAN 50 must exist"  │  │
+  │  └────────────────────────┘  │
+  └──────────┬─────┬─────┬───────┘
+             │     │     │   Push via SSH
+             ▼     ▼     ▼
+  ┌──────┐ ┌──────┐ ┌──────┐
+  │ SW1  │ │ SW2  │ │ SW3  │
+  │(SSH) │ │(SSH) │ │(SSH) │
+  └──────┘ └──────┘ └──────┘
+  Pas d'agent installé !
+```
+
+#### Puppet — Architecture Agent-based
+
+```
+Architecture Puppet — Agent Pull
+
+  ┌──────────────────────────────┐
+  │     Puppet Master            │
+  │  (Manifests + Modules)       │
+  └──────────┬─────┬─────┬───────┘
+             │     │     │   Agents pull
+             │     │     │   (toutes les 30 min)
+             ▼     ▼     ▼
+  ┌──────┐ ┌──────┐ ┌──────┐
+  │ SW1  │ │ SW2  │ │ SW3  │
+  │Agent │ │Agent │ │Agent │
+  └──────┘ └──────┘ └──────┘
+  Agent Puppet installé sur chaque device
+```
+
+Puppet utilise un modèle pull : l'agent sur chaque device contacte le Puppet Master à intervalle régulier (par défaut 30 minutes) pour vérifier si sa configuration est conforme à l'état désiré. Ce modèle garantit la convergence continue — même si quelqu'un modifie manuellement un switch, Puppet le remettra en conformité au prochain cycle.
+
+#### Chef — Architecture similaire à Puppet
+
+Chef utilise également un modèle agent-based, avec une terminologie culinaire : les configurations sont des « recipes » (recettes) organisées en « cookbooks » (livres de recettes). Un « Chef Client » tourne sur chaque device et contacte le « Chef Server ». Le langage est basé sur Ruby, ce qui offre une grande flexibilité mais impose une courbe d'apprentissage plus raide.
+
+### Mise en pratique CLI
+
+Voici un playbook Ansible concret pour configurer un switch Cisco IOS :
+
+```yaml
+# Fichier: configure_access_switch.yml
+---
+- name: Configurer les switches d'accès
+  hosts: access_switches
+  gather_facts: no
+  connection: network_cli
+
+  vars:
+    vlans:
+      - id: 50
+        name: MARKETING
+      - id: 60
+        name: RH
+
+  tasks:
+    - name: Créer les VLANs
+      cisco.ios.ios_vlans:
+        config:
+          - vlan_id: "{{ item.id }}"
+            name: "{{ item.name }}"
+            state: active
+      loop: "{{ vlans }}"
+
+    - name: Configurer le banner MOTD
+      cisco.ios.ios_banner:
+        banner: motd
+        text: |
+          *** Accès réservé - Toute tentative non autorisée sera poursuivie ***
+        state: present
+
+    - name: Sauvegarder la configuration
+      cisco.ios.ios_config:
+        save_when: modified
+```
+
+Pour exécuter ce playbook :
+
+```bash
+$ ansible-playbook -i inventory.ini configure_access_switch.yml
+```
+
+**Output attendu :**
+```
+PLAY [Configurer les switches d'accès] ***************************
+
+TASK [Créer les VLANs] *******************************************
+changed: [sw1] => (item={'id': 50, 'name': 'MARKETING'})
+changed: [sw1] => (item={'id': 60, 'name': 'RH'})
+changed: [sw2] => (item={'id': 50, 'name': 'MARKETING'})
+changed: [sw2] => (item={'id': 60, 'name': 'RH'})
+ok: [sw3] => (item={'id': 50, 'name': 'MARKETING'})
+ok: [sw3] => (item={'id': 60, 'name': 'RH'})
+
+TASK [Configurer le banner MOTD] *********************************
+changed: [sw1]
+changed: [sw2]
+ok: [sw3]
+
+TASK [Sauvegarder la configuration] ******************************
+changed: [sw1]
+changed: [sw2]
+ok: [sw3]
+
+PLAY RECAP *******************************************************
+sw1  : ok=3  changed=3  unreachable=0  failed=0  skipped=0
+sw2  : ok=3  changed=3  unreachable=0  failed=0  skipped=0
+sw3  : ok=3  changed=0  unreachable=0  failed=0  skipped=0
+```
+
+**Interprétation** : Ansible a déployé les VLANs sur SW1 et SW2 (`changed`), mais SW3 avait déjà la bonne configuration (`ok` sans `changed`). C'est l'**idempotence** en action : Ansible ne modifie que ce qui doit l'être. Le résultat `ok=3 changed=0` pour SW3 confirme que rien n'a été touché.
+
+### Point exam
+
+> **Piège courant** : Ansible est **agentless** et utilise le modèle **push** — c'est la distinction la plus testée. Puppet et Chef nécessitent un **agent** installé et utilisent le modèle **pull**. Si la question mentionne « pas d'agent nécessaire sur les équipements réseau », la réponse est Ansible.
+>
+> **À retenir** : Le niveau de l'examen est **Recognize** — vous devez reconnaître les caractéristiques de chaque outil, pas les configurer. Retenez : Ansible = agentless/push/YAML, Puppet = agent/pull/DSL, Chef = agent/pull/Ruby.
+
+### Exercice 6.6 — Comparer les outils de configuration
+
+**Contexte** : Trois entreprises cherchent un outil de gestion de configuration pour leur réseau.
+
+**Consigne** : Pour chaque scénario, recommandez l'outil le plus adapté parmi Puppet, Chef et Ansible, et justifiez.
+
+1. **TechStartup** (15 switches) : équipe de 2 admins réseau sans expérience de programmation, besoin de déployer des changements rapidement.
+2. **BankCorp** (500 switches) : exigences de conformité strictes, besoin de garantir que la configuration reste conforme en permanence, même si quelqu'un modifie un switch manuellement.
+3. **DevOps Inc** (100 switches + 200 serveurs) : équipe mixte dev/ops déjà familière avec Ruby, infrastructure serveurs déjà gérée par Chef.
+
+**Indice** : <details><summary>Voir l'indice</summary>Pensez au modèle push vs pull (correction continue ou à la demande ?), à la courbe d'apprentissage (YAML vs Ruby vs DSL), et à l'existant technologique.</details>
+
+<details>
+<summary>Solution</summary>
+
+1. **TechStartup → Ansible** : agentless (pas d'infrastructure supplémentaire pour 15 switches), YAML lisible sans expérience de programmation, modèle push = exécution immédiate. Idéal pour une petite équipe qui veut démarrer vite.
+
+2. **BankCorp → Puppet** : le modèle pull avec vérification toutes les 30 minutes garantit la conformité continue — si quelqu'un modifie manuellement un switch, Puppet le remettra en conformité au prochain cycle. Essentiel pour les exigences de compliance bancaire.
+
+3. **DevOps Inc → Chef** : l'équipe maîtrise déjà Ruby et l'infrastructure serveurs est déjà sous Chef. Ajouter le réseau dans le même outil simplifie la gestion et capitalise sur les compétences existantes.
+
+</details>
+
+### Voir aussi
+
+- Topic 6.1 dans ce module (bénéfices de l'automatisation — ces outils concrétisent ces bénéfices)
+- Topic 6.5 dans ce module (REST APIs — Ansible peut utiliser les APIs REST via le module `uri`)
+- Topic 4.8 dans Module 4 (SSH — protocole de transport utilisé par Ansible)
+
+---
+
+## 6.7 — Données JSON
+
+> **Exam topic 6.7** : _Recognize_ — Components of JSON-encoded data
+> **Niveau** : Recognize (Bloom 1)
+
+### Contexte
+
+JSON (JavaScript Object Notation) est le format de données omniprésent dans l'automatisation réseau. Chaque requête REST, chaque réponse de DNA Center, chaque playbook Ansible renvoie ou consomme du JSON. Savoir lire et interpréter un document JSON est aussi fondamental que savoir lire un output `show` en CLI.
+
+### Théorie
+
+#### Structure de JSON
+
+JSON est construit sur deux structures universelles :
+
+1. **Object** (objet) : une collection de paires clé/valeur, délimitée par des accolades `{}`
+2. **Array** (tableau) : une liste ordonnée de valeurs, délimitée par des crochets `[]`
+
+#### Les 6 types de données JSON
+
+| Type | Exemple | Description |
+|------|---------|------------|
+| **String** | `"MARKETING"` | Texte entre guillemets doubles |
+| **Number** | `50`, `3.14` | Entier ou décimal (pas de guillemets) |
+| **Boolean** | `true`, `false` | Valeur logique (pas de guillemets, minuscules) |
+| **null** | `null` | Absence de valeur (pas de guillemets, minuscules) |
+| **Object** | `{"key": "value"}` | Collection clé/valeur entre `{}` |
+| **Array** | `[1, 2, 3]` | Liste ordonnée entre `[]` |
+
+#### Anatomie d'un document JSON réseau
+
+Voici un document JSON typique décrivant un équipement réseau, avec chaque composant annoté :
+
+```json
+{                                          ← Objet racine (accolade ouvrante)
+  "hostname": "SW-ACCESS-01",             ← Clé: String, Valeur: String
+  "managementIp": "10.10.10.1",           ← String (les IPs sont des strings en JSON)
+  "model": "C9300-48U",                   ← String
+  "iosVersion": "17.9.4",                 ← String (pas un nombre car contient des points)
+  "uptime": 1209600,                      ← Number (secondes, pas de guillemets)
+  "reachable": true,                      ← Boolean (pas de guillemets)
+  "lastBackup": null,                     ← null (aucun backup effectué)
+  "vlans": [                              ← Array d'objets (crochet ouvrant)
+    {                                      ← Premier objet du tableau
+      "id": 1,
+      "name": "default",
+      "ports": ["Gi0/47", "Gi0/48"]      ← Array imbriqué de strings
+    },
+    {                                      ← Deuxième objet du tableau
+      "id": 50,
+      "name": "MARKETING",
+      "ports": ["Gi0/1", "Gi0/2", "Gi0/3"]
+    }
+  ],                                       ← Fin du tableau vlans
+  "neighbors": {                           ← Objet imbriqué
+    "cdp": ["SW-DISTRIB-01"],
+    "lldp": ["SW-DISTRIB-01", "AP-FLOOR2"]
+  }
+}                                          ← Fin de l'objet racine
+```
+
+#### Règles de syntaxe JSON
+
+| Règle | Correct | Incorrect |
+|-------|---------|-----------|
+| Les clés sont toujours des strings | `"name": "value"` | `name: "value"` |
+| Strings entre guillemets **doubles** | `"MARKETING"` | `'MARKETING'` |
+| Pas de virgule après le dernier élément | `["a", "b"]` | `["a", "b",]` |
+| Pas de commentaires | — | `// ceci est un commentaire` |
+| Booléens en minuscules | `true`, `false` | `True`, `FALSE` |
+| null en minuscules | `null` | `Null`, `NULL`, `None` |
+| Nombres sans guillemets | `50` | `"50"` (c'est un string, pas un nombre) |
+
+#### Lire du JSON : les chemins d'accès
+
+Pour extraire une valeur d'un document JSON, on utilise un chemin (notation pointée) :
+
+En reprenant l'exemple ci-dessus :
+- `hostname` → `"SW-ACCESS-01"`
+- `vlans[0].name` → `"default"` (premier élément du tableau, clé name)
+- `vlans[1].ports[2]` → `"Gi0/3"` (deuxième VLAN, troisième port)
+- `neighbors.cdp[0]` → `"SW-DISTRIB-01"`
+- `reachable` → `true`
+- `lastBackup` → `null`
+
+### Mise en pratique CLI
+
+Voici comment manipuler des données JSON dans un contexte réseau avec `jq` (un outil de ligne de commande pour parser le JSON) :
+
+```bash
+# Récupérer l'inventaire réseau et extraire les hostnames
+curl -s -X GET "https://dnac.entreprise.local/dna/intent/api/v1/network-device" \
+  -H "X-Auth-Token: eyJhbGciOi..." | jq '.response[].hostname'
+```
+
+**Output attendu :**
+```
+"SW-ACCESS-01"
+"SW-ACCESS-02"
+"SW-DISTRIB-01"
+"R-WAN-01"
+```
+
+```bash
+# Filtrer uniquement les switches d'accès
+curl -s -X GET "https://dnac.entreprise.local/dna/intent/api/v1/network-device" \
+  -H "X-Auth-Token: eyJhbGciOi..." \
+  | jq '[.response[] | select(.role == "ACCESS") | {hostname, ip: .managementIpAddress}]'
+```
+
+**Output attendu :**
+```json
+[
+  {
+    "hostname": "SW-ACCESS-01",
+    "ip": "10.10.10.1"
+  },
+  {
+    "hostname": "SW-ACCESS-02",
+    "ip": "10.10.10.3"
+  }
+]
+```
+
+**Interprétation** : La commande `jq` filtre la réponse JSON pour ne garder que les devices avec le rôle « ACCESS » et n'affiche que les champs hostname et IP de management. C'est l'équivalent d'un `show cdp neighbors | include Access` mais appliqué aux données JSON d'une API REST.
+
+Pour valider la syntaxe d'un fichier JSON localement :
+
+```bash
+$ python3 -m json.tool device_config.json
+```
+
+**Output en cas d'erreur :**
+```
+json.decoder.JSONDecodeError: Expecting ',' delimiter: line 8 column 5 (char 142)
+```
+
+**Interprétation** : l'erreur indique qu'une virgule manque à la ligne 8, colonne 5 du fichier. Les erreurs de syntaxe JSON les plus courantes sont : virgule manquante entre les éléments, virgule en trop après le dernier élément (trailing comma), ou guillemets simples au lieu de doubles.
+
+### Point exam
+
+> **Piège courant** : L'examen peut montrer un document JSON avec une erreur de syntaxe et demander de l'identifier. Les erreurs les plus fréquentes dans les questions : **trailing comma** (virgule après le dernier élément d'un tableau ou objet), **guillemets simples** au lieu de doubles, **True/False** au lieu de **true/false**.
+>
+> **À retenir** : JSON n'a que **6 types** (string, number, boolean, null, object, array). Les clés sont **toujours des strings** entre guillemets doubles. Il n'y a **pas de commentaires** en JSON. Les booléens et null sont en **minuscules**.
+
+### Exercice 6.7 — Lire et corriger du JSON
+
+**Contexte** : Un collègue a écrit un fichier JSON pour décrire la configuration d'un routeur, mais le fichier contient des erreurs de syntaxe.
+
+**Consigne** : Identifiez et corrigez toutes les erreurs dans le document suivant.
+
+```json
+{
+  "hostname": "R-WAN-01",
+  "interfaces": [
+    {
+      "name": "GigabitEthernet0/0",
+      "ip": '10.0.1.1',
+      "mask": "255.255.255.0",
+      "status": "up",
+      "description": "Lien vers SW-DISTRIB",
+    },
+    {
+      "name": "GigabitEthernet0/1",
+      "ip": "10.0.2.1",
+      "mask": "255.255.255.0",
+      "status": "down"
+      "description": None
+    }
+  ],
+  "ospf": {
+    "processId": 1,
+    "routerId": "1.1.1.1",
+    "networks": ["10.0.1.0/24", "10.0.2.0/24"],
+    "passive": True
+  }
+  // Configuration complète
+}
+```
+
+**Indice** : <details><summary>Voir l'indice</summary>Il y a 5 erreurs. Cherchez : les types de guillemets, les virgules (manquantes et en trop), les mots-clés Python vs JSON, et les commentaires.</details>
+
+<details>
+<summary>Solution</summary>
+
+**5 erreurs identifiées :**
+
+1. **Ligne 6** : `'10.0.1.1'` → `"10.0.1.1"` — guillemets simples au lieu de doubles
+2. **Ligne 10** : virgule après `"description": "Lien vers SW-DISTRIB",` → supprimer la trailing comma (c'est le dernier élément de l'objet)
+3. **Ligne 15** : `"status": "down"` suivi de `"description"` → il manque une virgule après `"down"`
+4. **Ligne 16** : `None` → `null` — `None` est du Python, pas du JSON
+5. **Ligne 22** : `True` → `true` — les booléens JSON sont en minuscules
+6. **Ligne 24** : `// Configuration complète` → supprimer — JSON ne supporte pas les commentaires
+
+**JSON corrigé :**
+
+```json
+{
+  "hostname": "R-WAN-01",
+  "interfaces": [
+    {
+      "name": "GigabitEthernet0/0",
+      "ip": "10.0.1.1",
+      "mask": "255.255.255.0",
+      "status": "up",
+      "description": "Lien vers SW-DISTRIB"
+    },
+    {
+      "name": "GigabitEthernet0/1",
+      "ip": "10.0.2.1",
+      "mask": "255.255.255.0",
+      "status": "down",
+      "description": null
+    }
+  ],
+  "ospf": {
+    "processId": 1,
+    "routerId": "1.1.1.1",
+    "networks": ["10.0.1.0/24", "10.0.2.0/24"],
+    "passive": true
+  }
+}
+```
+
+**Note** : c'est en réalité 6 erreurs si on compte le commentaire. L'indice en annonce 5 car la trailing comma et la virgule manquante sont parfois comptées ensemble comme « erreurs de virgule ».
+
+</details>
+
+### Voir aussi
+
+- Topic 6.5 dans ce module (REST APIs — JSON est le format de données standard)
+- Topic 6.6 dans ce module (Ansible — les playbooks YAML produisent/consomment du JSON)
+- Topic 4.4 dans Module 4 (SNMP — les MIBs SNMP commencent à être exposées en JSON via RESTCONF)
+
+---
+
+## Labs Module 6
+
+### Lab 6.1 — REST API et JSON (Postman/curl)
+
+**Environnement :**
+Ce lab n'utilise pas Packet Tracer. Il utilise le sandbox gratuit Cisco DevNet (devnetsandbox.cisco.com) ou Postman avec une API simulée.
+
+```
+Topologie conceptuelle
+
+  ┌──────────────┐          HTTPS           ┌──────────────────┐
+  │  Votre PC    │ ─────────────────────▶  │  DNA Center       │
+  │  (Postman    │                          │  Sandbox DevNet   │
+  │   ou curl)   │ ◀─────────────────────  │  (Always-On)      │
+  │              │       JSON response      │                    │
+  └──────────────┘                          └──────────────────┘
+```
+
+**Informations de connexion DevNet Sandbox :**
+
+| Paramètre | Valeur |
+|-----------|--------|
+| URL | `https://sandboxdnac.cisco.com` |
+| Username | `devnetuser` |
+| Password | `Cisco123!` |
+| API Base | `/dna/intent/api/v1/` |
+
+**Objectifs :**
+1. Obtenir un token d'authentification via l'API REST
+2. Lire la liste des équipements réseau (GET)
+3. Interpréter la réponse JSON
+4. Filtrer les résultats avec des paramètres de requête
+
+**Étapes :**
+
+1. **Obtenir un token d'authentification**
+
+   **Avec curl :**
+   ```bash
+   curl -s -X POST "https://sandboxdnac.cisco.com/dna/system/api/v1/auth/token" \
+     --basic -u devnetuser:Cisco123! \
+     -H "Content-Type: application/json"
+   ```
+
+   **Avec Postman :**
+   - Méthode : POST
+   - URL : `https://sandboxdnac.cisco.com/dna/system/api/v1/auth/token`
+   - Onglet Authorization : Basic Auth, username `devnetuser`, password `Cisco123!`
+   - Cliquer Send
+
+   **Résultat attendu :**
+   ```json
+   {
+     "Token": "eyJhbGciOiJSUzI1NiIs..."
+   }
+   ```
+   Copiez ce token pour les requêtes suivantes.
+
+2. **Lire l'inventaire réseau (GET)**
+
+   ```bash
+   curl -s -X GET "https://sandboxdnac.cisco.com/dna/intent/api/v1/network-device" \
+     -H "X-Auth-Token: <votre_token>" \
+     -H "Content-Type: application/json" | python3 -m json.tool
+   ```
+
+   **Résultat attendu (extrait) :**
+   ```json
+   {
+     "response": [
+       {
+         "hostname": "cat_9k_1.abc.inc",
+         "managementIpAddress": "10.10.20.81",
+         "platformId": "C9300-24UX",
+         "softwareVersion": "17.9.4a",
+         "role": "ACCESS",
+         "reachabilityStatus": "Reachable",
+         "serialNumber": "FCW2214L0VK"
+       },
+       {
+         "hostname": "cs3850.abc.inc",
+         "managementIpAddress": "10.10.20.80",
+         "platformId": "WS-C3850-48U-E",
+         "softwareVersion": "16.12.5",
+         "role": "DISTRIBUTION",
+         "reachabilityStatus": "Reachable",
+         "serialNumber": "FOC1234567A"
+       }
+     ]
+   }
+   ```
+
+3. **Extraire des informations spécifiques avec jq**
+
+   ```bash
+   # Lister uniquement les hostnames et versions IOS
+   curl -s -X GET "https://sandboxdnac.cisco.com/dna/intent/api/v1/network-device" \
+     -H "X-Auth-Token: <votre_token>" \
+     | jq '[.response[] | {hostname, version: .softwareVersion, model: .platformId}]'
+   ```
+
+4. **Compter les équipements par rôle**
+
+   ```bash
+   curl -s -X GET "https://sandboxdnac.cisco.com/dna/intent/api/v1/network-device" \
+     -H "X-Auth-Token: <votre_token>" \
+     | jq '.response | group_by(.role) | map({role: .[0].role, count: length})'
+   ```
+
+**Vérification finale :**
+- Vous avez obtenu un token valide (réponse 200 avec un champ Token)
+- Vous avez lu la liste des devices (réponse 200 avec un tableau response)
+- Vous savez extraire des champs spécifiques du JSON
+
+**Questions de validation :**
+1. Pourquoi l'authentification initiale utilise-t-elle un POST et non un GET ?
+2. Que se passerait-il si vous envoyiez la requête GET sans le header `X-Auth-Token` ?
+3. Dans la réponse JSON, les adresses IP sont-elles des strings ou des numbers ? Pourquoi ?
+
+<details>
+<summary>Réponses</summary>
+
+1. POST car l'authentification **crée** une nouvelle ressource (le token). GET est réservé à la lecture de ressources existantes. C'est l'opération CRUD « Create ».
+
+2. Le serveur répondrait avec un code **401 Unauthorized** — l'API REST de DNA Center exige un token valide pour toute requête (à l'exception de l'endpoint d'authentification lui-même).
+
+3. Les IPs sont des **strings** (`"10.10.20.81"`) car elles contiennent des points. Un number JSON ne peut pas contenir plusieurs points. De plus, les octets d'une IP (comme `081`) ne sont pas des nombres (le zéro initial serait supprimé).
+
+</details>
+
+---
+
+### Lab 6.2 — Cisco DNA Center — Exploration GUI (DevNet Sandbox)
+
+**Environnement :**
+Ce lab utilise le sandbox DNA Center Always-On de Cisco DevNet.
+
+```
+Topologie DNA Center Sandbox
+
+  ┌──────────────┐                    ┌──────────────────────────┐
+  │  Votre PC    │    Navigateur      │   DNA Center Sandbox     │
+  │  (Chrome/    │ ──────────────▶   │   sandboxdnac.cisco.com  │
+  │   Firefox)   │                    │                          │
+  └──────────────┘                    │   Réseau simulé :        │
+                                      │   - 2 Catalyst 9300      │
+                                      │   - 1 Catalyst 3850      │
+                                      │   - 1 Catalyst 9800 WLC  │
+                                      │   - 2 Access Points      │
+                                      └──────────────────────────┘
+```
+
+**Informations de connexion :**
+
+| Paramètre | Valeur |
+|-----------|--------|
+| URL | `https://sandboxdnac.cisco.com` |
+| Username | `devnetuser` |
+| Password | `Cisco123!` |
+
+**Objectifs :**
+1. Explorer le dashboard Assurance et les health scores
+2. Naviguer l'inventaire réseau centralisé
+3. Comparer les informations disponibles en GUI vs CLI traditionnel
+4. Observer la hiérarchie Design (site/building/floor)
+
+**Étapes :**
+
+1. **Se connecter et explorer le Dashboard**
+   - Ouvrir `https://sandboxdnac.cisco.com` dans votre navigateur
+   - Se connecter avec les identifiants ci-dessus
+   - Observer le dashboard principal : Network Health, Client Health, Application Health
+   - Notez les scores affichés pour chaque catégorie
+
+2. **Explorer l'inventaire (Provision > Inventory)**
+   - Naviguer vers Provision > Network Devices > Inventory
+   - Pour chaque équipement, noter : hostname, IP, modèle, version IOS, rôle
+   - Comparer avec ce que `show version` + `show inventory` donneraient en CLI
+
+3. **Explorer la topologie (Provision > Topology)**
+   - Visualiser la topologie automatiquement découverte
+   - Identifier les liens entre les devices
+   - Comparer avec `show cdp neighbors` sur chaque device
+
+4. **Explorer Assurance (Assurance > Network Health)**
+   - Observer les métriques de santé globale
+   - Cliquer sur un device spécifique pour voir ses détails
+   - Identifier les informations qui nécessiteraient `show interfaces`, `show processes cpu` et `show environment` en CLI
+
+**Questions de validation :**
+1. Combien de sessions SSH seriez-vous en train de gérer pour obtenir les mêmes informations en méthode traditionnelle ?
+2. Quelles informations DNA Center fournit-il que le CLI seul ne peut pas offrir facilement ?
+3. Le sandbox est en lecture seule — mais si vous aviez les droits, quelles actions du menu « Provision » permettraient de remplacer des tâches CLI répétitives ?
+
+<details>
+<summary>Réponses</summary>
+
+1. Au minimum **5 sessions SSH** (une par device). Pour un inventaire complet avec versions, interfaces et voisins, ce serait au moins 3 commandes par device = **15 commandes manuelles** au total.
+
+2. DNA Center fournit :
+   - Les **health scores** (vision agrégée impossible en CLI seul)
+   - La **corrélation d'événements** entre devices (un problème sur SW1 impactant les clients de SW2)
+   - La **topologie visuelle** automatiquement construite
+   - L'**historique des changements** et les tendances
+
+3. Les actions « Provision » permettraient de :
+   - Déployer des templates de configuration en masse
+   - Assigner des devices à des sites
+   - Pousser des mises à jour IOS sur plusieurs devices simultanément
+   - Appliquer des politiques de segmentation (SGT) sans configurer les ACLs manuellement
+
+</details>
+
+---
+
+## Quiz Module 6 — 15 questions
+
+**Q1.** Quel est le principal avantage de l'automatisation réseau en termes de fiabilité ? _(Topic 6.1)_
+
+- A) Elle élimine le besoin d'équipements redondants
+- B) Elle réduit les erreurs humaines en standardisant les configurations
+- C) Elle augmente la bande passante disponible
+- D) Elle remplace les protocoles de routage dynamique
+
+<details>
+<summary>Réponse</summary>
+
+**B** — L'automatisation réduit les erreurs humaines en appliquant des configurations standardisées et testées. A est faux : la redondance physique reste nécessaire. C est faux : l'automatisation ne modifie pas la bande passante. D est faux : les protocoles de routage (OSPF, etc.) continuent de fonctionner, l'automatisation concerne la gestion et le provisioning.
+
+</details>
+
+---
+
+**Q2.** Que se passe-t-il si le contrôleur SDN tombe en panne dans un réseau controller-based ? _(Topic 6.2)_
+
+- A) Tout le trafic réseau s'arrête immédiatement
+- B) Les équipements continuent de transférer le trafic mais ne peuvent plus recevoir de nouvelles configurations
+- C) Les équipements redémarrent automatiquement
+- D) Le réseau bascule en mode traditionnel avec OSPF
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Le contrôleur gère le control plane centralisé, mais le data plane reste sur les équipements. Les switches continuent de transférer le trafic avec leurs tables de forwarding existantes. Seule la capacité de management centralisé (nouvelles configs, nouvelles policies) est perdue. A est faux : le data plane est indépendant du contrôleur. C est faux : il n'y a pas de redémarrage automatique. D est faux : il n'y a pas de basculement de mode automatique.
+
+</details>
+
+---
+
+**Q3.** Dans une architecture SDN, quelle API est utilisée entre le contrôleur et les équipements réseau ? _(Topic 6.3)_
+
+- A) Northbound API
+- B) Southbound API
+- C) Eastbound API
+- D) Westbound API
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Les Southbound APIs connectent le contrôleur aux équipements réseau (vers le « sud » = vers le bas). Les Northbound APIs (A) connectent les applications au contrôleur (vers le « nord » = vers le haut). C et D (Eastbound/Westbound) existent dans certaines architectures multi-contrôleurs mais ne sont pas au programme CCNA.
+
+</details>
+
+---
+
+**Q4.** Quel composant d'une architecture SDN représente le réseau physique sous-jacent ? _(Topic 6.3)_
+
+- A) Overlay
+- B) Underlay
+- C) Fabric
+- D) Control plane
+
+<details>
+<summary>Réponse</summary>
+
+**B** — L'underlay est le réseau physique (câbles, switches, routeurs, connectivité IP de base). L'overlay (A) est le réseau virtuel construit par-dessus l'underlay via des tunnels. La fabric (C) est la combinaison overlay + underlay orchestrée par le contrôleur. Le control plane (D) est la couche de décision, pas l'infrastructure physique.
+
+</details>
+
+---
+
+**Q5.** Quelle technologie Cisco DNA Center utilise-t-il pour créer l'overlay dans SD-Access ? _(Topic 6.3)_
+
+- A) GRE
+- B) IPsec
+- C) VXLAN
+- D) MPLS
+
+<details>
+<summary>Réponse</summary>
+
+**C** — SD-Access utilise VXLAN (Virtual Extensible LAN) pour créer les tunnels overlay. GRE (A) et IPsec (B) sont des technologies de tunneling mais ne sont pas le standard SD-Access. MPLS (D) est utilisé dans les WAN des opérateurs, pas dans SD-Access campus.
+
+</details>
+
+---
+
+**Q6.** Quel pilier de Cisco DNA Center permet de surveiller la santé du réseau avec des health scores ? _(Topic 6.4)_
+
+- A) Design
+- B) Policy
+- C) Provision
+- D) Assurance
+
+<details>
+<summary>Réponse</summary>
+
+**D** — Assurance est le pilier de monitoring et d'analytics de DNA Center, avec les health scores (Network, Client, Application). Design (A) concerne la définition des sites et hiérarchie. Policy (B) concerne les règles de segmentation et QoS. Provision (C) concerne le déploiement des configurations.
+
+</details>
+
+---
+
+**Q7.** Quel verbe HTTP est utilisé pour créer une nouvelle ressource via une API REST ? _(Topic 6.5)_
+
+- A) GET
+- B) PUT
+- C) POST
+- D) DELETE
+
+<details>
+<summary>Réponse</summary>
+
+**C** — POST correspond à l'opération CRUD « Create ». GET (A) est pour lire (Read). PUT (B) est pour mettre à jour (Update). DELETE (D) est pour supprimer (Delete). POST crée une **nouvelle** ressource, tandis que PUT modifie une ressource **existante**.
+
+</details>
+
+---
+
+**Q8.** Quelle caractéristique fondamentale signifie que chaque requête REST doit contenir toutes les informations nécessaires ? _(Topic 6.5)_
+
+- A) Cacheable
+- B) Stateless
+- C) Client-Server
+- D) Layered System
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Stateless signifie que le serveur ne conserve aucun état de session entre les requêtes. Chaque requête doit inclure toutes les informations (authentification, paramètres) nécessaires à son traitement. Cacheable (A) concerne la mise en cache des réponses. Client-Server (C) concerne la séparation des rôles. Layered System (D) concerne la transparence de l'infrastructure intermédiaire.
+
+</details>
+
+---
+
+**Q9.** Un administrateur envoie une requête API REST et reçoit un code 401. Que signifie ce code ? _(Topic 6.5)_
+
+- A) La ressource demandée n'existe pas
+- B) La requête est syntaxiquement incorrecte
+- C) L'authentification est requise ou le token est invalide
+- D) Le serveur a rencontré une erreur interne
+
+<details>
+<summary>Réponse</summary>
+
+**C** — 401 Unauthorized signifie que l'authentification a échoué (token manquant, expiré ou invalide). 404 (A) signifie Not Found. 400 (B) signifie Bad Request (syntaxe). 500 (D) signifie Internal Server Error côté serveur. Un piège fréquent : 401 = problème d'authentification, 403 = authentifié mais pas autorisé (droits insuffisants).
+
+</details>
+
+---
+
+**Q10.** Quel outil de gestion de configuration est agentless et utilise SSH pour se connecter aux équipements ? _(Topic 6.6)_
+
+- A) Puppet
+- B) Chef
+- C) Ansible
+- D) SaltStack
+
+<details>
+<summary>Réponse</summary>
+
+**C** — Ansible est agentless : il ne nécessite aucun agent installé sur les équipements cibles et utilise SSH (ou NETCONF/RESTCONF) pour se connecter. Puppet (A) et Chef (B) nécessitent un agent installé sur chaque device et utilisent un modèle pull. SaltStack (D) n'est pas au programme CCNA.
+
+</details>
+
+---
+
+**Q11.** Quel modèle de déploiement Puppet utilise-t-il ? _(Topic 6.6)_
+
+- A) Push — le serveur pousse la config vers les agents
+- B) Pull — les agents récupèrent la config depuis le master
+- C) Peer-to-peer — les agents échangent entre eux
+- D) On-demand — l'admin déclenche manuellement chaque déploiement
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Puppet utilise un modèle pull : l'agent Puppet installé sur chaque device contacte le Puppet Master à intervalle régulier (par défaut 30 min) pour vérifier si sa configuration est conforme. Ansible (pas Puppet) utilise le modèle push (A). C et D ne correspondent à aucun outil standard de gestion de configuration.
+
+</details>
+
+---
+
+**Q12.** Dans un document JSON, quel type de données est représenté par `true` (sans guillemets) ? _(Topic 6.7)_
+
+- A) String
+- B) Number
+- C) Boolean
+- D) null
+
+<details>
+<summary>Réponse</summary>
+
+**C** — `true` et `false` (sans guillemets, en minuscules) sont des booléens en JSON. `"true"` (avec guillemets) serait un string (A). Les numbers (B) sont des valeurs numériques. null (D) représente l'absence de valeur. Attention : `True` (majuscule) n'est pas du JSON valide — c'est du Python.
+
+</details>
+
+---
+
+**Q13.** Quel est l'erreur dans le JSON suivant : `{"name": "SW1", "ports": [1, 2, 3,]}` ? _(Topic 6.7)_
+
+- A) Les nombres doivent être entre guillemets
+- B) Il y a une virgule en trop après le dernier élément du tableau
+- C) Les crochets doivent être remplacés par des accolades
+- D) Il manque un guillemet fermant
+
+<details>
+<summary>Réponse</summary>
+
+**B** — La trailing comma (virgule après `3,`) est invalide en JSON. Le dernier élément d'un array ou d'un object ne doit **pas** être suivi d'une virgule. A est faux : les nombres n'ont pas de guillemets en JSON. C est faux : les crochets `[]` sont corrects pour un array. D est faux : les guillemets sont correctement appariés.
+
+</details>
+
+---
+
+**Q14.** Quelle Northbound API est la plus couramment utilisée par les applications pour communiquer avec un contrôleur SDN ? _(Topic 6.3)_
+
+- A) OpenFlow
+- B) NETCONF
+- C) REST API (HTTP/HTTPS)
+- D) SNMP
+
+<details>
+<summary>Réponse</summary>
+
+**C** — Les REST APIs (via HTTP/HTTPS) sont le standard pour les Northbound APIs entre les applications et le contrôleur. OpenFlow (A) et NETCONF (B) sont des **Southbound** APIs (contrôleur → équipements). SNMP (D) est un protocole de monitoring, pas une API Northbound au sens SDN.
+
+</details>
+
+---
+
+**Q15.** Quel concept décrit l'approche de DNA Center où l'administrateur exprime ce qu'il veut (intention) plutôt que comment le configurer ? _(Topic 6.4)_
+
+- A) Software-Defined Networking
+- B) Intent-Based Networking
+- C) Infrastructure as Code
+- D) Network Function Virtualization
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Intent-Based Networking (IBN) est le concept où l'administrateur exprime une intention métier (« le département Marketing doit être isolé avec une QoS premium ») et le contrôleur traduit cette intention en configurations techniques. SDN (A) est le concept plus large d'architecture. Infrastructure as Code (C) est un concept DevOps (Ansible/Terraform). NFV (D) concerne la virtualisation des fonctions réseau (firewall virtuel, routeur virtuel).
+
+</details>
+
+---
+
+## Récapitulatif Module 6
+
+| Topic | Concept clé | Commande(s) / outil essentiels |
+|-------|------------|-------------------------------|
+| 6.1 | Automatisation = réduction erreurs, scalabilité, cohérence, rollback | Ansible, scripts Python |
+| 6.2 | Traditionnel = distribué, CLI par device / Controller = centralisé, GUI/API | `show vlan brief` vs API REST |
+| 6.3 | SDN : overlay (virtuel), underlay (physique), fabric (ensemble). NB/SB APIs | VXLAN, NETCONF, REST |
+| 6.4 | DNA Center : Design, Policy, Provision, Assurance. IBN. | `show pnp profile`, dashboard DNAC |
+| 6.5 | REST : stateless, CRUD↔HTTP verbs, JSON/XML. Codes 2xx/4xx/5xx. | `curl -X GET/POST/PUT/DELETE` |
+| 6.6 | Ansible = agentless/push/YAML. Puppet = agent/pull/DSL. Chef = agent/pull/Ruby. | `ansible-playbook` |
+| 6.7 | JSON : 6 types, clés = strings, guillemets doubles, pas de commentaires | `jq`, `python3 -m json.tool` |
+
+**Check-list avant de conclure la préparation :**
+- [ ] Je sais expliquer les 5 bénéfices de l'automatisation réseau
+- [ ] Je sais comparer un réseau traditionnel et un réseau controller-based
+- [ ] Je sais distinguer overlay, underlay et fabric
+- [ ] Je sais la direction des Northbound et Southbound APIs
+- [ ] Je sais associer les 4 opérations CRUD aux verbes HTTP
+- [ ] Je sais différencier Ansible (agentless/push) de Puppet/Chef (agent/pull)
+- [ ] Je sais identifier les 6 types de données JSON et les erreurs de syntaxe courantes
+- [ ] J'ai complété les 7 exercices
+- [ ] J'ai réalisé les 2 labs (REST API + DNA Center GUI)
+- [ ] J'ai obtenu >70% au quiz (11/15 minimum)

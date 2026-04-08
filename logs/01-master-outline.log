@@ -1,0 +1,19 @@
+Le fichier `MASTER-OUTLINE.md` est generé. Voici le résumé de ce qu'il contient :
+
+**6 modules** couvrant les 56 topics officiels CCNA 200-301 v1.1 (y compris les 3 nouveautés : GenAI, Cloud Management, ML) :
+
+| Module | Poids | Pages | Exercices | Labs | Quiz |
+|--------|-------|-------|-----------|------|------|
+| 1 - Network Fundamentals | 20% | ~55 | 14 | 2 | 15 Q |
+| 2 - Network Access | 20% | ~40 | 9 | 3 | 12 Q |
+| 3 - IP Connectivity | 25% | ~35 | 8 | 4 | 15 Q |
+| 4 - IP Services | 10% | ~31 | 9 | 2 | 10 Q |
+| 5 - Security Fundamentals | 15% | ~45 | 11 | 3 | 12 Q |
+| 6 - Automation | 10% | ~28 | 7 | 2 | 10 Q |
+
+**Points clés** :
+- **234 pages** de contenu principal + **~80 pages** d'annexes
+- **58 exercices**, **16 labs Packet Tracer**, **74 questions de quiz**
+- OSPF (topic 3.4) traité sur 10 pages avec 2 labs dédiés
+- Planning sur **10 semaines** (~15h/semaine), semaine 10 = révisions + 2 examens blancs
+- 4 annexes : Subnetting Drill (50 ex.), Examens blancs (2x120 Q), Glossaire (~150 termes), Cheat-sheet commandes

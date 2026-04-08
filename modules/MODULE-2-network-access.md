@@ -1,0 +1,2110 @@
+# Module 2 — Network Access
+
+> **Domain** : 2 — Network Access | **Poids examen** : 20%
+> **Durée estimée** : 2 semaines | **Prérequis** : Module 1
+> **Topics couverts** : 2.1 à 2.9
+
+## Objectif du module
+
+À l'issue de ce module, vous serez capable de :
+- Configurer et vérifier des VLANs sur plusieurs switches, y compris le routage inter-VLAN
+- Configurer des trunks 802.1Q et comprendre le rôle du VLAN natif
+- Utiliser CDP et LLDP pour cartographier un réseau
+- Configurer un EtherChannel LACP et vérifier son fonctionnement
+- Interpréter le fonctionnement de Rapid PVST+ (root bridge, rôles de ports, PortFast)
+- Décrire les architectures wireless Cisco et les modes AP
+- Décrire l'infrastructure physique d'un déploiement WLAN
+- Décrire les différentes méthodes d'accès de gestion aux équipements réseau
+- Interpréter la configuration d'un WLAN via l'interface GUI d'un WLC
+
+---
+
+## 2.1 — VLANs : configuration multi-switch
+
+> **Exam topic 2.1** : *Configure and verify* — VLANs (normal range) spanning multiple switches
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Dans une entreprise de 200 employés répartis sur trois services — comptabilité, développement et direction — tout le monde partage le même réseau physique. Sans segmentation, une tempête de broadcast paralyse tout le monde, et n'importe quel employé peut potentiellement sniffer le trafic de la direction. Les VLANs résolvent exactement ce problème : ils créent des réseaux logiques isolés sur une même infrastructure physique.
+
+### Théorie
+
+Un **VLAN (Virtual Local Area Network)** segmente un switch physique en plusieurs domaines de broadcast indépendants. Chaque VLAN se comporte comme un switch virtuel distinct. Les trames envoyées dans le VLAN 10 ne sont jamais transmises aux ports du VLAN 20, même s'ils sont sur le même switch.
+
+Pensez aux VLANs comme aux étages d'un immeuble de bureaux. Chaque étage a ses propres couloirs et portes — les personnes d'un étage ne peuvent pas accéder à un autre sans passer par l'ascenseur (le routeur).
+
+#### Plages de VLANs
+
+| Plage | Range | Stockage | Propagation VTP |
+|-------|-------|----------|-----------------|
+| Normal | 1–1005 | vlan.dat (flash) | Oui |
+| Étendu | 1006–4094 | running-config | Non (VTP transparent uniquement) |
+
+L'examen CCNA se concentre sur les VLANs **normal range** (1–1005). Le VLAN 1 existe par défaut et ne peut pas être supprimé.
+
+#### 2.1.a — Ports d'accès (data et voice)
+
+Un **port d'accès** (access port) appartient à un seul VLAN. Tout appareil connecté à ce port fait partie de ce VLAN, sans en avoir conscience — c'est le switch qui gère l'affectation. Le PC n'a pas besoin de configuration particulière.
+
+Pour les téléphones IP Cisco, un cas particulier existe : le port doit transporter à la fois le trafic du PC (data VLAN) et celui du téléphone (voice VLAN). Le switch envoie un tag 802.1Q au téléphone pour qu'il marque son trafic voix avec le bon VLAN, tandis que le trafic du PC passe sans tag (VLAN d'accès normal).
+
+```
+   [PC] ---- câble ---- [Téléphone IP] ---- câble ---- [Switch]
+                              |                           Port Fa0/1
+                              |                     access vlan 10 (data)
+                         Data VLAN 10               voice vlan 50
+                         Voice VLAN 50
+```
+
+#### 2.1.b — VLAN par défaut
+
+Le **VLAN 1** est le VLAN par défaut sur tous les switches Cisco. Tous les ports appartiennent au VLAN 1 à la sortie d'usine. Plusieurs protocoles de gestion utilisent aussi le VLAN 1 par défaut :
+
+- CDP (Cisco Discovery Protocol)
+- VTP (VLAN Trunking Protocol)
+- Le trafic de gestion STP (BPDU)
+
+Bonne pratique de sécurité : déplacer tous les ports utilisateurs vers d'autres VLANs et ne laisser aucun port actif dans le VLAN 1. On ne peut pas supprimer le VLAN 1, mais on peut cesser de l'utiliser activement.
+
+#### 2.1.c — Connectivité inter-VLAN
+
+Les VLANs isolent le trafic — c'est leur raison d'être. Mais dans la plupart des entreprises, les services doivent quand même communiquer entre eux (le développeur doit accéder au serveur de la comptabilité, par exemple). Pour cela, il faut un équipement de couche 3 : un routeur ou un switch L3.
+
+Trois méthodes de routage inter-VLAN existent :
+
+| Méthode | Description | Avantage | Inconvénient |
+|---------|-------------|----------|--------------|
+| Routeur dédié (un port par VLAN) | Chaque VLAN connecté à une interface physique du routeur | Simple à comprendre | Nécessite autant de ports que de VLANs |
+| Router-on-a-stick | Un seul lien trunk entre le switch et le routeur, avec des sous-interfaces | Économise les ports | Le lien unique est un goulot d'étranglement |
+| Switch L3 (SVI) | Le switch route directement entre les VLANs via des interfaces virtuelles | Performance maximale, pas de lien externe | Coût du switch L3 |
+
+**Router-on-a-stick** est la méthode la plus testée au CCNA. Le routeur utilise une seule interface physique découpée en **sous-interfaces**, chacune associée à un VLAN :
+
+```
+                          Trunk 802.1Q
+   [SW1] ========================== [R1]
+    │                                 │
+    ├─ VLAN 10 (data)                 ├─ Gi0/0.10 → 192.168.10.1/24
+    ├─ VLAN 20 (data)                 ├─ Gi0/0.20 → 192.168.20.1/24
+    └─ VLAN 50 (voice)                └─ Gi0/0.50 → 192.168.50.1/24
+```
+
+### Mise en pratique CLI
+
+```cisco
+! === Sur le switch SW1 — Création des VLANs ===
+SW1# configure terminal
+SW1(config)# vlan 10
+SW1(config-vlan)# name COMPTABILITE
+SW1(config-vlan)# exit
+SW1(config)# vlan 20
+SW1(config-vlan)# name DEVELOPPEMENT
+SW1(config-vlan)# exit
+SW1(config)# vlan 50
+SW1(config-vlan)# name VOIX
+SW1(config-vlan)# exit
+
+! === Affectation des ports d'accès ===
+SW1(config)# interface range FastEthernet0/1-10
+SW1(config-if-range)# switchport mode access
+SW1(config-if-range)# switchport access vlan 10
+SW1(config-if-range)# switchport voice vlan 50
+SW1(config-if-range)# exit
+SW1(config)# interface range FastEthernet0/11-20
+SW1(config-if-range)# switchport mode access
+SW1(config-if-range)# switchport access vlan 20
+SW1(config-if-range)# exit
+```
+
+**Vérification :**
+```
+SW1# show vlan brief
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -------------------------------
+1    default                          active    Fa0/21, Fa0/22, Fa0/23, Fa0/24
+                                                Gi0/1, Gi0/2
+10   COMPTABILITE                     active    Fa0/1, Fa0/2, Fa0/3, Fa0/4
+                                                Fa0/5, Fa0/6, Fa0/7, Fa0/8
+                                                Fa0/9, Fa0/10
+20   DEVELOPPEMENT                    active    Fa0/11, Fa0/12, Fa0/13, Fa0/14
+                                                Fa0/15, Fa0/16, Fa0/17, Fa0/18
+                                                Fa0/19, Fa0/20
+50   VOIX                             active
+1002 fddi-default                     act/unsup
+1003 token-ring-default               act/unsup
+1004 fddinet-default                  act/unsup
+1005 trnet-default                    act/unsup
+```
+
+**Interprétation** : Le VLAN 50 (VOIX) apparaît sans ports listés car les voice VLANs ne s'affichent pas dans `show vlan brief` — ils se vérifient avec `show interfaces switchport`. Les VLANs 1002-1005 sont des reliquats FDDI/Token Ring ; ignorez-les, ils ne peuvent pas être supprimés.
+
+```cisco
+! === Sur le routeur R1 — Router-on-a-stick ===
+R1# configure terminal
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# no shutdown
+R1(config-if)# exit
+R1(config)# interface GigabitEthernet0/0.10
+R1(config-subif)# encapsulation dot1Q 10
+R1(config-subif)# ip address 192.168.10.1 255.255.255.0
+R1(config-subif)# exit
+R1(config)# interface GigabitEthernet0/0.20
+R1(config-subif)# encapsulation dot1Q 20
+R1(config-subif)# ip address 192.168.20.1 255.255.255.0
+R1(config-subif)# exit
+R1(config)# interface GigabitEthernet0/0.50
+R1(config-subif)# encapsulation dot1Q 50
+R1(config-subif)# ip address 192.168.50.1 255.255.255.0
+R1(config-subif)# exit
+```
+
+**Vérification :**
+```
+R1# show ip interface brief
+Interface                  IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0         unassigned      YES unset  up                    up
+GigabitEthernet0/0.10      192.168.10.1    YES manual up                    up
+GigabitEthernet0/0.20      192.168.20.1    YES manual up                    up
+GigabitEthernet0/0.50      192.168.50.1    YES manual up                    up
+```
+
+**Interprétation** : L'interface physique Gi0/0 n'a pas d'adresse IP — c'est normal. Seules les sous-interfaces portent des adresses. L'interface physique doit être `up/up` pour que les sous-interfaces fonctionnent. Chaque sous-interface sert de **passerelle par défaut** pour son VLAN.
+
+### Point exam
+
+> **Piège courant** : Oublier le `no shutdown` sur l'interface physique du routeur. Les sous-interfaces héritent de l'état de l'interface physique — si Gi0/0 est down, toutes les sous-interfaces Gi0/0.X sont down aussi.
+>
+> **À retenir** : Le numéro de sous-interface (Gi0/0.**10**) n'a PAS besoin de correspondre au numéro de VLAN, mais c'est une convention universelle. Ce qui fait le lien, c'est la commande `encapsulation dot1Q 10`. L'examen peut tester cette subtilité.
+
+### Exercice 2.1 — Plan VLAN pour une PME
+
+**Contexte** : La société LogiTech (80 employés) possède 2 switches (SW1, SW2) et 1 routeur (R1). Les services sont répartis ainsi :
+- Administration (15 postes + 15 téléphones IP) → VLAN 10
+- Technique (25 postes) → VLAN 20
+- Direction (10 postes) → VLAN 30
+- Le serveur DHCP/DNS est sur le VLAN 99 (management)
+
+**Consigne** : Écrivez la configuration complète de SW1 (VLANs, ports d'accès Fa0/1-15 pour l'admin avec voice VLAN, Fa0/16-24 pour la technique) et la configuration router-on-a-stick de R1 sur Gi0/0.
+
+**Indice** : <details><summary>Voir l'indice</summary>N'oubliez pas de configurer les 4 sous-interfaces sur R1, avec `encapsulation dot1Q` pour chaque VLAN. L'interface physique doit être activée.</details>
+
+<details>
+<summary>Solution</summary>
+
+```cisco
+! === SW1 ===
+SW1(config)# vlan 10
+SW1(config-vlan)# name ADMIN
+SW1(config-vlan)# vlan 20
+SW1(config-vlan)# name TECHNIQUE
+SW1(config-vlan)# vlan 30
+SW1(config-vlan)# name DIRECTION
+SW1(config-vlan)# vlan 50
+SW1(config-vlan)# name VOIX
+SW1(config-vlan)# vlan 99
+SW1(config-vlan)# name MANAGEMENT
+SW1(config-vlan)# exit
+!
+SW1(config)# interface range Fa0/1-15
+SW1(config-if-range)# switchport mode access
+SW1(config-if-range)# switchport access vlan 10
+SW1(config-if-range)# switchport voice vlan 50
+SW1(config-if-range)# exit
+SW1(config)# interface range Fa0/16-24
+SW1(config-if-range)# switchport mode access
+SW1(config-if-range)# switchport access vlan 20
+SW1(config-if-range)# exit
+
+! === R1 ===
+R1(config)# interface Gi0/0
+R1(config-if)# no shutdown
+R1(config-if)# exit
+R1(config)# interface Gi0/0.10
+R1(config-subif)# encapsulation dot1Q 10
+R1(config-subif)# ip address 192.168.10.1 255.255.255.0
+R1(config-subif)# exit
+R1(config)# interface Gi0/0.20
+R1(config-subif)# encapsulation dot1Q 20
+R1(config-subif)# ip address 192.168.20.1 255.255.255.0
+R1(config-subif)# exit
+R1(config)# interface Gi0/0.30
+R1(config-subif)# encapsulation dot1Q 30
+R1(config-subif)# ip address 192.168.30.1 255.255.255.0
+R1(config-subif)# exit
+R1(config)# interface Gi0/0.50
+R1(config-subif)# encapsulation dot1Q 50
+R1(config-subif)# ip address 192.168.50.1 255.255.255.0
+R1(config-subif)# exit
+R1(config)# interface Gi0/0.99
+R1(config-subif)# encapsulation dot1Q 99
+R1(config-subif)# ip address 192.168.99.1 255.255.255.0
+R1(config-subif)# exit
+```
+
+**Explication** : Chaque VLAN a sa propre sous-interface sur le routeur. Le routeur agit comme passerelle par défaut pour chaque sous-réseau. Les PCs de l'admin (VLAN 10) qui veulent joindre la technique (VLAN 20) envoient leur trafic à 192.168.10.1, le routeur consulte sa table et transmet via Gi0/0.20.
+
+</details>
+
+### Voir aussi
+
+- Topic 1.13 dans Module 1 (relation : MAC address table segmentée par VLAN)
+- Topic 1.1.b dans Module 1 (relation : switches L3 et SVI pour inter-VLAN routing)
+- Topic 2.2 ci-dessous (relation : trunks nécessaires pour VLANs multi-switch)
+
+---
+
+## 2.2 — Interconnexion inter-switch : trunks 802.1Q
+
+> **Exam topic 2.2** : *Configure and verify* — interswitch connectivity
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Quand un VLAN doit exister sur plusieurs switches — par exemple le VLAN 10 de la comptabilité est sur SW1 au 1er étage et sur SW2 au 2ème étage — il faut un mécanisme pour transporter les trames de plusieurs VLANs sur un seul lien physique entre les deux switches. C'est exactement le rôle du **trunk**.
+
+### Théorie
+
+#### 2.2.a — Ports trunk
+
+Un **port trunk** transporte les trames de **tous les VLANs** (ou d'une sélection) sur un seul lien physique. Contrairement au port d'accès qui appartient à un unique VLAN, le trunk est multi-VLAN.
+
+Analogie : imaginez une autoroute avec des voies réservées. Chaque voie transporte un type de véhicule (bus, voitures, camions). Le trunk est cette autoroute — un seul câble, mais le trafic de chaque VLAN est étiqueté pour être séparé logiquement.
+
+#### 2.2.b — 802.1Q (dot1Q)
+
+**IEEE 802.1Q** est le standard d'encapsulation trunk utilisé sur les réseaux modernes. Quand une trame traverse un trunk, le switch insère un **tag de 4 octets** dans l'en-tête Ethernet, entre l'adresse MAC source et le champ EtherType :
+
+```
+Trame Ethernet normale :
+┌──────────┬──────────┬───────────┬─────────┬─────┐
+│ Dest MAC │ Src MAC  │ EtherType │ Payload │ FCS │
+│  6 oct   │  6 oct   │   2 oct   │  var.   │ 4   │
+└──────────┴──────────┴───────────┴─────────┴─────┘
+
+Trame 802.1Q (avec tag) :
+┌──────────┬──────────┬──────────────┬───────────┬─────────┬─────┐
+│ Dest MAC │ Src MAC  │  802.1Q Tag  │ EtherType │ Payload │ FCS │
+│  6 oct   │  6 oct   │    4 oct     │   2 oct   │  var.   │ 4   │
+└──────────┴──────────┴──────────────┴───────────┴─────────┴─────┘
+                            │
+                    ┌───────┴───────┐
+                    │ TPID │  TCI   │
+                    │0x8100│ 2 oct  │
+                    │      │        │
+                    │      ├─ PCP (3 bits) : priorité QoS (CoS)
+                    │      ├─ DEI (1 bit)  : drop eligible
+                    │      └─ VID (12 bits): VLAN ID (0-4095)
+                    └───────────────┘
+```
+
+Le champ **VID** (VLAN ID) sur 12 bits permet d'identifier jusqu'à 4096 VLANs (0 et 4095 étant réservés, d'où les VLANs 1–4094 utilisables).
+
+L'ancien protocole propriétaire Cisco **ISL (Inter-Switch Link)** n'est plus utilisé et n'est plus au programme CCNA. Si vous le voyez mentionné, sachez simplement qu'il encapsulait la trame entière plutôt que d'insérer un tag.
+
+#### 2.2.c — VLAN natif
+
+Le **VLAN natif** est le VLAN dont les trames traversent le trunk **sans tag 802.1Q**. Par défaut, c'est le VLAN 1.
+
+Pourquoi ça existe ? À l'origine, pour assurer la compatibilité avec les équipements qui ne comprennent pas le 802.1Q. Aujourd'hui, c'est surtout un concept à bien maîtriser pour l'examen et un vecteur de sécurité à contrôler.
+
+Règle fondamentale : **le VLAN natif doit être identique des deux côtés du trunk**. Si SW1 a le VLAN natif 1 et SW2 le VLAN natif 99, les trames sont mal routées et le switch génère une erreur CDP :
+
+```
+%CDP-4-NATIVE_VLAN_MISMATCH: Native VLAN mismatch discovered on
+GigabitEthernet0/1 (1), with SW2 GigabitEthernet0/1 (99).
+```
+
+#### Schéma : Trunk 802.1Q entre deux switches
+
+```
+                        Trunk 802.1Q (Gi0/1)
+   ┌──────────┐ ══════════════════════════════ ┌──────────┐
+   │          │  VLAN 10 → tag VID=10          │          │
+   │   SW1    │  VLAN 20 → tag VID=20          │   SW2    │
+   │          │  VLAN 1  → pas de tag (natif)  │          │
+   └──────────┘                                └──────────┘
+     │  │  │                                     │  │  │
+    Fa0/1-10                                    Fa0/1-10
+    VLAN 10                                     VLAN 10
+    Fa0/11-20                                   Fa0/11-20
+    VLAN 20                                     VLAN 20
+```
+
+### Mise en pratique CLI
+
+```cisco
+! === Configuration du trunk sur SW1 ===
+SW1(config)# interface GigabitEthernet0/1
+SW1(config-if)# switchport trunk encapsulation dot1q
+SW1(config-if)# switchport mode trunk
+SW1(config-if)# switchport trunk native vlan 99
+SW1(config-if)# switchport trunk allowed vlan 10,20,50,99
+SW1(config-if)# exit
+
+! === Même configuration sur SW2 ===
+SW2(config)# interface GigabitEthernet0/1
+SW2(config-if)# switchport trunk encapsulation dot1q
+SW2(config-if)# switchport mode trunk
+SW2(config-if)# switchport trunk native vlan 99
+SW2(config-if)# switchport trunk allowed vlan 10,20,50,99
+SW2(config-if)# exit
+```
+
+> **Note** : La commande `switchport trunk encapsulation dot1q` n'est nécessaire que sur les switches qui supportent aussi ISL (anciens Catalyst). Sur les modèles récents (Catalyst 9000), 802.1Q est le seul protocole et la commande n'est pas disponible.
+
+**Vérification :**
+```
+SW1# show interfaces trunk
+
+Port        Mode         Encapsulation  Status        Native vlan
+Gi0/1       on           802.1q         trunking      99
+
+Port        Vlans allowed on trunk
+Gi0/1       10,20,50,99
+
+Port        Vlans allowed and active in management domain
+Gi0/1       10,20,50,99
+
+Port        Vlans in spanning tree forwarding state and not pruned
+Gi0/1       10,20,50,99
+```
+
+**Interprétation** :
+- **Mode "on"** : le trunk a été configuré manuellement (pas de négociation DTP)
+- **Native vlan 99** : les trames du VLAN 99 ne seront pas taguées
+- **Vlans allowed** : seuls les VLANs 10, 20, 50 et 99 traversent ce trunk ; le VLAN 1 est bloqué (bonne pratique de sécurité)
+- Les trois dernières sections montrent un filtrage progressif : autorisés → actifs → en forwarding STP
+
+### Point exam
+
+> **Piège courant** : La question vous montre un `show interfaces trunk` où le Native VLAN diffère entre deux switches. L'examen attend que vous identifiiez ce mismatch comme la cause du problème de communication.
+>
+> **À retenir** : Par défaut, le trunk autorise **tous les VLANs** (1-4094). La commande `switchport trunk allowed vlan` restreint cette liste. Pour ajouter un VLAN sans écraser la liste existante : `switchport trunk allowed vlan add 30`. Sans le mot-clé `add`, la commande remplace toute la liste.
+
+### Exercice 2.2 — Configuration trunk et vérification
+
+**Contexte** : Vous êtes administrateur réseau chez MédiCorp. Deux switches (SW-RDC et SW-ETAGE1) sont reliés par un câble Gi0/1. Les VLANs 10 (Médecins), 20 (Infirmiers) et 30 (Admin) doivent transiter. Le VLAN natif doit être 99.
+
+**Consigne** : Configurez les trunks sur les deux switches, puis écrivez la commande de vérification et indiquez ce que vous devez vérifier dans l'output.
+
+**Indice** : <details><summary>Voir l'indice</summary>Pensez à créer le VLAN 99 sur les deux switches, même s'il ne contient aucun port d'accès — il doit exister pour être utilisé comme VLAN natif.</details>
+
+<details>
+<summary>Solution</summary>
+
+```cisco
+! === Sur les DEUX switches ===
+SW-RDC(config)# vlan 99
+SW-RDC(config-vlan)# name NATIVE-TRUNK
+SW-RDC(config-vlan)# exit
+SW-RDC(config)# interface Gi0/1
+SW-RDC(config-if)# switchport trunk encapsulation dot1q
+SW-RDC(config-if)# switchport mode trunk
+SW-RDC(config-if)# switchport trunk native vlan 99
+SW-RDC(config-if)# switchport trunk allowed vlan 10,20,30,99
+SW-RDC(config-if)# exit
+
+! Vérification :
+SW-RDC# show interfaces trunk
+! Vérifier : Mode = on, Encapsulation = 802.1q, Native vlan = 99
+! Vérifier : Vlans allowed = 10,20,30,99
+```
+
+**Explication** : Le VLAN 99 doit être créé même s'il ne sert qu'au trunk — sinon le switch ne peut pas l'utiliser comme native VLAN. La liste `allowed vlan` exclut volontairement le VLAN 1 pour limiter la surface d'attaque (VLAN hopping).
+
+</details>
+
+### Voir aussi
+
+- Topic 2.1 ci-dessus (relation : les trunks transportent les VLANs entre switches)
+- Topic 5.7 dans Module 5 (relation : sécurité L2, VLAN hopping via double tagging du native VLAN)
+- Topic 2.5 ci-dessous (relation : STP s'exécute par VLAN sur les trunks)
+
+---
+
+## 2.3 — Protocoles de découverte Layer 2 : CDP et LLDP
+
+> **Exam topic 2.3** : *Configure and verify* — Layer 2 discovery protocols (Cisco Discovery Protocol and LLDP)
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Vous arrivez dans une salle serveur avec 50 équipements réseau. Les câbles partent dans tous les sens et la documentation est obsolète. Comment savoir quel switch est connecté à quel routeur, sur quel port, et avec quelle adresse IP de management ? Les protocoles de découverte L2 répondent à cette question en quelques secondes.
+
+### Théorie
+
+Les protocoles de découverte Layer 2 permettent aux équipements réseau d'annoncer leur identité à leurs voisins directs. Ils fonctionnent à la couche 2 (liaison de données) — aucune configuration IP n'est nécessaire pour qu'ils fonctionnent.
+
+| Caractéristique | CDP | LLDP |
+|----------------|-----|------|
+| Standard | Propriétaire Cisco | IEEE 802.1AB (ouvert) |
+| Activé par défaut | Oui (sur Cisco) | Non (à activer manuellement) |
+| Timer par défaut | 60 secondes | 30 secondes |
+| Hold time par défaut | 180 secondes | 120 secondes |
+| Couche OSI | 2 (Data Link) | 2 (Data Link) |
+| Multicast destination | 01:00:0C:CC:CC:CC | 01:80:C2:00:00:0E |
+| Interopérabilité multi-vendeur | Non | Oui |
+| Informations partagées | Device ID, IP, plateforme, capabilities, native VLAN, duplex | System name, IP management, system description, capabilities, port ID |
+
+CDP envoie ses annonces toutes les **60 secondes**. Si aucune annonce n'est reçue pendant le **hold time** (180 secondes = 3 timers), l'entrée voisine est supprimée. LLDP fonctionne sur le même principe, mais avec des timers plus courts (30s / 120s).
+
+**Quand utiliser quoi ?** En environnement 100% Cisco, CDP suffit et fournit plus de détails (native VLAN, VTP domain). En environnement multi-vendeur (switches HP, Juniper, etc.), LLDP est le seul choix — c'est un standard IEEE que tout le monde implémente.
+
+### Mise en pratique CLI
+
+```cisco
+! === CDP — déjà actif par défaut ===
+SW1# show cdp neighbors
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, V - VoIP-Phone
+                  D - Remotely-Managed Device, s - Supports-STP-Dispute
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+SW2              Gi0/1             145              S I   WS-C2960  Gi0/1
+R1               Gi0/2             162              R S   ISR4331   Gi0/0/0
+AP-SALLE-B       Fa0/10            130              T     AIR-AP    Gi0
+
+SW1# show cdp neighbors detail
+-------------------------
+Device ID: SW2
+Entry address(es):
+  IP address: 192.168.99.2
+Platform: cisco WS-C2960-24TT-L, Capabilities: Switch IGMP
+Interface: GigabitEthernet0/1, Port ID (outgoing port): GigabitEthernet0/1
+Holdtime : 145 sec
+Version : Cisco IOS Software, C2960 Software (C2960-LANBASEK9-M), Version 15.2(7)E2
+advertisement version: 2
+Native VLAN: 99
+Duplex: full
+Management address(es):
+  IP address: 192.168.99.2
+```
+
+```cisco
+! === LLDP — activation manuelle ===
+SW1(config)# lldp run
+!
+! Pour désactiver LLDP sur un port spécifique :
+SW1(config)# interface Fa0/24
+SW1(config-if)# no lldp transmit
+SW1(config-if)# no lldp receive
+SW1(config-if)# exit
+
+SW1# show lldp neighbors
+Capability codes:
+    (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+    (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+
+Device ID           Local Intf     Hold-time  Capability      Port ID
+SW2                 Gi0/1          120        B,R             Gi0/1
+R1                  Gi0/2          120        R               Gi0/0/0
+
+Total entries displayed: 2
+
+SW1# show lldp neighbors detail
+------------------------------------------------
+Local Intf: Gi0/1
+Chassis id: 0023.04ee.be01
+Port id: Gi0/1
+Port Description: GigabitEthernet0/1
+System Name: SW2
+System Description:
+Cisco IOS Software, C2960 Software
+Time remaining: 99 seconds
+System Capabilities: B,R
+Enabled Capabilities: B
+Management Addresses:
+    IP: 192.168.99.2
+```
+
+**Interprétation** :
+- **Device ID** : le hostname du voisin
+- **Local Intrfce** : le port *local* (sur notre switch) connecté au voisin
+- **Port ID** : le port *distant* (sur le voisin)
+- **Capability** : R=Router, S/B=Switch (Bridge), T=Telephone, W=WLAN AP
+- La version `detail` ajoute l'adresse IP de management, la version IOS, et le Native VLAN (CDP uniquement)
+
+### Point exam
+
+> **Piège courant** : L'examen peut demander quelle commande utiliser pour trouver l'adresse IP d'un voisin. `show cdp neighbors` ne montre PAS l'IP — il faut `show cdp neighbors detail` (ou `show cdp entry *`).
+>
+> **À retenir** : CDP est activé par défaut, LLDP ne l'est pas. Pour activer LLDP globalement : `lldp run`. Côté sécurité, CDP devrait être désactivé sur les ports face aux utilisateurs (`no cdp enable` par interface) pour éviter de divulguer des informations sur l'infrastructure.
+
+### Exercice 2.3 — Cartographie réseau avec CDP/LLDP
+
+**Contexte** : Vous êtes envoyé en mission chez un client. Le réseau comporte des équipements Cisco et des switches HPE. Aucune documentation réseau n'existe.
+
+**Consigne** : À partir des outputs suivants, dessinez la topologie et identifiez chaque voisin (nom, plateforme, port local, port distant, IP management).
+
+```
+Switch-A# show cdp neighbors detail
+Device ID: Router-Core
+  IP address: 10.0.0.1
+  Platform: ISR4331, Capabilities: Router Switch
+  Interface: Gi0/1, Port ID: Gi0/0/1
+
+Switch-A# show lldp neighbors detail
+Device ID: HPE-Switch-B
+  Management Address: 10.0.0.3
+  Port Description: 48
+  Local Intf: Gi0/2, Port id: 48
+```
+
+**Indice** : <details><summary>Voir l'indice</summary>CDP ne voit que les Cisco, LLDP voit tout le monde. Combinez les deux outputs pour une cartographie complète.</details>
+
+<details>
+<summary>Solution</summary>
+
+```
+                    Gi0/0/1          Gi0/1
+  [Router-Core] ─────────────────── [Switch-A] ──────────── [HPE-Switch-B]
+   10.0.0.1                          Gi0/2          Port 48   10.0.0.3
+   ISR4331                                                    HPE (non-Cisco)
+```
+
+**Topologie identifiée :**
+| Équipement | Plateforme | IP Management | Connecté à | Port local | Port distant |
+|------------|-----------|---------------|------------|------------|--------------|
+| Router-Core | ISR4331 | 10.0.0.1 | Switch-A | Gi0/0/1 | Gi0/1 |
+| HPE-Switch-B | HPE | 10.0.0.3 | Switch-A | Port 48 | Gi0/2 |
+
+**Explication** : Router-Core apparaît en CDP (c'est un Cisco). HPE-Switch-B n'apparaît qu'en LLDP car ce n'est pas un équipement Cisco. C'est pourquoi activer les deux protocoles donne la meilleure visibilité en environnement hétérogène.
+
+</details>
+
+### Voir aussi
+
+- Topic 1.1 dans Module 1 (relation : CDP utilisé pour vérifier les composants connectés)
+- Topic 2.8 ci-dessous (relation : les adresses IP de management découvertes par CDP/LLDP)
+
+---
+
+## 2.4 — EtherChannel LACP
+
+> **Exam topic 2.4** : *Configure and verify* — (Layer 2/Layer 3) EtherChannel (LACP)
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Entre deux switches d'un campus, vous avez besoin de plus de bande passante qu'un seul lien 1 Gbps. La solution naïve — brancher 4 câbles — ne fonctionne pas directement : STP bloquerait les liens redondants pour éviter les boucles. **EtherChannel** résout ce dilemme en regroupant plusieurs liens physiques en un seul lien logique, combinant la bande passante tout en restant compatible avec STP.
+
+### Théorie
+
+Un **EtherChannel** (aussi appelé Port-Channel ou LAG — Link Aggregation Group) combine 2 à 8 liens physiques en un seul lien logique. STP voit ce lien logique comme un port unique — pas de blocage. Si un lien physique tombe, les autres continuent à fonctionner (redondance).
+
+```
+Sans EtherChannel :                 Avec EtherChannel :
+┌────────┐     ┌────────┐          ┌────────┐     ┌────────┐
+│        │─────│        │          │        │═════│        │
+│  SW1   │─────│  SW2   │   →      │  SW1   │═════│  SW2   │
+│        │─────│        │          │        │═════│        │
+└────────┘     └────────┘          └────────┘     └────────┘
+ 3 liens → STP bloque 2            1 Port-Channel = 3 Gbps
+ Bande passante = 1 Gbps           Tous les liens actifs
+```
+
+#### Protocoles de négociation
+
+| Protocole | Standard | Modes | Remarque |
+|-----------|----------|-------|----------|
+| **LACP** (Link Aggregation Control Protocol) | IEEE 802.3ad | active / passive | Standard ouvert — **à connaître pour le CCNA** |
+| **PAgP** (Port Aggregation Protocol) | Propriétaire Cisco | desirable / auto | Ancien, Cisco uniquement |
+| **Static** (on) | — | on | Pas de négociation, risqué |
+
+L'examen CCNA v1.1 se concentre sur **LACP**. Voici la logique de négociation :
+
+| SW1 | SW2 | EtherChannel formé ? |
+|-----|-----|---------------------|
+| active | active | Oui |
+| active | passive | Oui |
+| passive | passive | **Non** — aucun côté n'initie |
+| on | on | Oui (pas de négociation) |
+| on | active/passive | **Non** — incompatible |
+
+Analogie : LACP active = quelqu'un qui propose une poignée de main. LACP passive = quelqu'un qui accepte mais ne propose jamais. Si les deux sont passifs, personne ne tend la main et il ne se passe rien.
+
+#### Conditions de formation
+
+Pour qu'un EtherChannel se forme, **tous les ports membres doivent avoir des paramètres identiques** :
+- Même vitesse et duplex
+- Même mode switchport (tous en access ou tous en trunk)
+- Même VLAN d'accès (si access) ou même native VLAN et allowed VLANs (si trunk)
+- Même coût STP
+
+Si un seul paramètre diffère, le channel ne se forme pas et les ports restent individuels (ou en `suspended`/`err-disabled`).
+
+#### Load balancing
+
+L'EtherChannel ne fonctionne pas comme un simple agrégat de bande passante brute. Le trafic est **distribué entre les liens** selon un algorithme de hachage configurable :
+
+| Méthode | Description | Cas d'usage |
+|---------|-------------|-------------|
+| src-mac | Hash sur MAC source | Topologies simples |
+| dst-mac | Hash sur MAC destination | Trafic vers serveurs |
+| src-dst-mac | Hash sur MAC source + destination | Le plus courant L2 |
+| src-ip | Hash sur IP source | EtherChannel L3 |
+| dst-ip | Hash sur IP destination | EtherChannel L3 |
+| src-dst-ip | Hash sur IP source + destination | Le meilleur pour L3 |
+
+### Mise en pratique CLI
+
+```cisco
+! === Configuration EtherChannel LACP sur SW1 ===
+SW1(config)# interface range GigabitEthernet0/1-2
+SW1(config-if-range)# switchport trunk encapsulation dot1q
+SW1(config-if-range)# switchport mode trunk
+SW1(config-if-range)# switchport trunk native vlan 99
+SW1(config-if-range)# channel-group 1 mode active
+Creating a port-channel interface Port-channel1
+SW1(config-if-range)# exit
+
+! L'interface Port-channel hérite de la config des membres
+! mais on peut aussi appliquer la config sur le port-channel :
+SW1(config)# interface Port-channel1
+SW1(config-if)# switchport trunk allowed vlan 10,20,50,99
+SW1(config-if)# exit
+
+! === Configuration EtherChannel LACP sur SW2 ===
+SW2(config)# interface range GigabitEthernet0/1-2
+SW2(config-if-range)# switchport trunk encapsulation dot1q
+SW2(config-if-range)# switchport mode trunk
+SW2(config-if-range)# switchport trunk native vlan 99
+SW2(config-if-range)# channel-group 1 mode passive
+Creating a port-channel interface Port-channel1
+SW2(config-if-range)# exit
+```
+
+**Vérification :**
+```
+SW1# show etherchannel summary
+Flags:  D - down        P - bundled in port-channel
+        I - stand-alone s - suspended
+        H - Hot-standby (LACP only)
+        R - Layer3      S - Layer2
+        U - in use      f - failed to allocate aggregator
+
+        u - unsuitable for bundling
+        w - waiting to be aggregated
+        d - default port
+
+Number of channel-groups in use: 1
+Number of aggregators:           1
+
+Group  Port-channel  Protocol    Ports
+------+-------------+-----------+----------------------------------------------
+1      Po1(SU)       LACP        Gi0/1(P)    Gi0/2(P)
+```
+
+```
+SW1# show etherchannel port-channel
+                Channel-group listing:
+                ----------------------
+
+Group: 1
+----------
+                Port-channels in the group:
+                ---------------------------
+
+Port-channel: Po1    (Primary Aggregator)
+
+------------
+
+Age of the Port-channel   = 0d:02h:15m:30s
+Logical slot/port   = 2/1          Number of ports = 2
+HotStandBy port = null
+Port state          = Port-channel Ag-Inuse
+Protocol            =   LACP
+
+Ports in the Port-channel:
+
+Index   Load   Port     EC state        No of bits
+------+------+------+------------------+-----------
+  0     55     Gi0/1    Active             4
+  1     AA     Gi0/2    Active             4
+```
+
+**Interprétation** :
+- **Po1(SU)** : S = Layer 2, U = in use → le port-channel est opérationnel
+- **Gi0/1(P), Gi0/2(P)** : P = bundled → les deux ports sont actifs dans le channel
+- **Protocol: LACP** confirme le protocole de négociation
+- Si vous voyez **(I)** (stand-alone) au lieu de **(P)**, le port n'a pas réussi à joindre le channel — vérifiez les paramètres
+
+### Point exam
+
+> **Piège courant** : L'examen présente une configuration où un côté est en `mode active` et l'autre en `mode desirable`. Résultat : l'EtherChannel ne se forme PAS car `active` est LACP et `desirable` est PAgP — ce sont des protocoles incompatibles.
+>
+> **À retenir** : Les combinaisons valides pour LACP sont active/active et active/passive. Pour PAgP : desirable/desirable et desirable/auto. Ne mélangez JAMAIS les protocoles. Le mode `on` ne fonctionne qu'avec `on` de l'autre côté.
+
+### Exercice 2.4 — EtherChannel LACP entre switches
+
+**Contexte** : Dans le datacenter de TechnoVille, SW-CORE et SW-DIST1 sont reliés par 4 liens Gi0/1-4. Vous devez créer un EtherChannel LACP (Port-channel 2) en mode trunk, transportant les VLANs 100, 200 et 300, avec le VLAN natif 999.
+
+**Consigne** : Écrivez la configuration des deux switches. SW-CORE doit initier la négociation (active), SW-DIST1 doit répondre (passive).
+
+**Indice** : <details><summary>Voir l'indice</summary>Configurez d'abord les paramètres switchport sur les interfaces physiques, puis ajoutez le `channel-group`. La config du Port-channel héritera automatiquement.</details>
+
+<details>
+<summary>Solution</summary>
+
+```cisco
+! === SW-CORE ===
+SW-CORE(config)# interface range Gi0/1-4
+SW-CORE(config-if-range)# switchport trunk encapsulation dot1q
+SW-CORE(config-if-range)# switchport mode trunk
+SW-CORE(config-if-range)# switchport trunk native vlan 999
+SW-CORE(config-if-range)# switchport trunk allowed vlan 100,200,300,999
+SW-CORE(config-if-range)# channel-group 2 mode active
+SW-CORE(config-if-range)# exit
+
+! === SW-DIST1 ===
+SW-DIST1(config)# interface range Gi0/1-4
+SW-DIST1(config-if-range)# switchport trunk encapsulation dot1q
+SW-DIST1(config-if-range)# switchport mode trunk
+SW-DIST1(config-if-range)# switchport trunk native vlan 999
+SW-DIST1(config-if-range)# switchport trunk allowed vlan 100,200,300,999
+SW-DIST1(config-if-range)# channel-group 2 mode passive
+SW-DIST1(config-if-range)# exit
+
+! Vérification :
+SW-CORE# show etherchannel summary
+! Attendu : Po2(SU)  LACP  Gi0/1(P) Gi0/2(P) Gi0/3(P) Gi0/4(P)
+```
+
+**Explication** : Le mode `active` sur SW-CORE initie les PDUs LACP. SW-DIST1 en `passive` les accepte. Les 4 liens sont regroupés en Po2 avec 4 Gbps de bande passante agrégée. Si Gi0/3 tombe, le channel continue à 3 Gbps avec les 3 liens restants.
+
+</details>
+
+### Voir aussi
+
+- Topic 2.5 ci-dessous (relation : STP traite le Port-Channel comme un seul lien logique)
+- Topic 2.7 ci-dessous (relation : LAG utilisé dans l'infrastructure WLC)
+- Topic 1.3 dans Module 1 (relation : types de câbles et bande passante par interface)
+
+---
+
+## 2.5 — Rapid PVST+ Spanning Tree Protocol
+
+> **Exam topic 2.5** : *Interpret* — basic operations of Rapid PVST+ Spanning Tree Protocol
+> **Niveau** : Interpret
+
+### Contexte
+
+Les réseaux d'entreprise ont besoin de redondance — si un câble est coupé, le réseau doit continuer à fonctionner. Mais la redondance crée un problème mortel : les **boucles de commutation**. Sans STP, une trame broadcast envoyée dans une topologie avec des liens redondants tournerait en boucle indéfiniment, se multipliant à chaque passage, jusqu'à saturer totalement le réseau en quelques secondes. C'est une **broadcast storm**.
+
+Le Module 1 (topic 1.13.c) a expliqué le flooding : quand un switch ne connaît pas la MAC de destination, il envoie la trame sur tous les ports. Avec une boucle physique, ce flooding devient infini.
+
+### Théorie
+
+**Spanning Tree Protocol (STP)** empêche les boucles en désactivant logiquement certains liens redondants, créant une topologie sans boucle en forme d'arbre (tree). En cas de panne d'un lien actif, STP réactive un lien précédemment bloqué — la redondance est préservée.
+
+**Rapid PVST+ (Per-VLAN Spanning Tree Plus)** est la version améliorée utilisée par défaut sur les switches Cisco modernes. Deux améliorations majeures :
+- **Rapid** : convergence en 1-2 secondes (contre 30-50 secondes pour le STP original 802.1D)
+- **Per-VLAN** : un arbre STP distinct par VLAN, permettant d'utiliser des chemins différents selon le VLAN (load balancing)
+
+#### 2.5.a — Root bridge, root port, et rôles des ports
+
+L'algorithme STP élit un **root bridge** — le switch central de l'arbre. Tous les autres switches calculent le meilleur chemin vers ce root bridge.
+
+**Élection du root bridge :**
+1. Chaque switch a un **Bridge ID** composé de : Priorité (4 bits) + VLAN ID étendu (12 bits) + adresse MAC
+2. Le switch avec le **Bridge ID le plus bas** devient root bridge
+3. La priorité par défaut est **32768** (+ VLAN ID). Elle est configurable par incréments de 4096
+4. À priorité égale, c'est la **MAC la plus basse** qui gagne
+
+```
+Exemple d'élection (VLAN 1) :
+
+SW1: Priority 32769 (32768+1), MAC 0001.0001.0001  ← Root Bridge (BID le plus bas)
+SW2: Priority 32769 (32768+1), MAC 0002.0002.0002
+SW3: Priority 32769 (32768+1), MAC 0003.0003.0003
+```
+
+Pour forcer un switch comme root bridge :
+```cisco
+SW1(config)# spanning-tree vlan 1 root primary
+! Équivalent à : spanning-tree vlan 1 priority 24576
+```
+
+Pour un root bridge de secours (si le primary tombe) :
+```cisco
+SW2(config)# spanning-tree vlan 1 root secondary
+! Équivalent à : spanning-tree vlan 1 priority 28672
+```
+
+**Rôles des ports :**
+
+| Rôle | Signification | Qui l'a ? |
+|------|--------------|-----------|
+| **Root Port (RP)** | Le port avec le meilleur chemin vers le root bridge | Chaque non-root switch (exactement 1 par switch) |
+| **Designated Port (DP)** | Le port qui transmet le trafic vers un segment | Le root bridge a tous ses ports en DP. Sur chaque segment, un DP. |
+| **Alternate Port** | Port bloqué — sauvegarde du root port | Non-root switches avec liens redondants |
+| **Backup Port** | Port bloqué — sauvegarde d'un designated port (rare) | Même switch avec deux liens vers le même segment |
+
+**Sélection du root port** (du plus prioritaire au moins) :
+1. **Coût le plus bas** vers le root bridge
+2. **Bridge ID le plus bas** du switch émetteur
+3. **Port ID le plus bas** du switch émetteur
+
+| Bande passante | Coût STP (802.1D) | Coût STP (Rapid) |
+|---------------|-------------------|-------------------|
+| 10 Mbps | 100 | 2 000 000 |
+| 100 Mbps | 19 | 200 000 |
+| 1 Gbps | 4 | 20 000 |
+| 10 Gbps | 2 | 2 000 |
+
+#### Schéma : Topologie STP en triangle
+
+```
+                    [SW1] — Root Bridge
+                   /  DP  \  DP
+              Cost=4    Cost=4
+                /            \
+          [SW2] ──────────── [SW3]
+          RP=Gi0/1          RP=Gi0/1
+          DP=Gi0/2          ALT=Gi0/2 (bloqué)
+
+     Gi0/1          Gi0/2  Gi0/2          Gi0/1
+      │                 │    │                │
+      └── vers SW1     └────┘── vers SW1 ────┘
+                     segment SW2-SW3
+```
+
+Dans cet exemple :
+- **SW1** est root bridge (priorité la plus basse ou MAC la plus basse)
+- **SW2** : Gi0/1 = Root Port (chemin direct vers SW1), Gi0/2 = Designated Port (meilleur port vers le segment SW2-SW3)
+- **SW3** : Gi0/1 = Root Port (chemin direct vers SW1), Gi0/2 = **Alternate Port** (bloqué car SW2 a un meilleur Bridge ID)
+
+Si le lien SW3→SW1 tombe, le port Alternate de SW3 (Gi0/2) passe en forwarding en 1-2 secondes grâce à RSTP — le trafic de SW3 passe désormais par SW2 pour atteindre SW1.
+
+#### 2.5.b — États des ports
+
+Le STP classique (802.1D) avait 5 états. Rapid PVST+ les simplifie en 3 :
+
+| État RSTP | Apprend les MAC ? | Transmet les données ? | Équivalent 802.1D |
+|-----------|-------------------|----------------------|-------------------|
+| **Discarding** | Non | Non | Disabled + Blocking + Listening |
+| **Learning** | Oui | Non | Learning |
+| **Forwarding** | Oui | Oui | Forwarding |
+
+Quand un port passe de Discarding à Forwarding, il traverse brièvement l'état Learning pour remplir la table MAC sans créer de boucle temporaire.
+
+#### 2.5.c — PortFast
+
+**PortFast** permet à un port d'accès de passer immédiatement en Forwarding, sans passer par les états Discarding → Learning. C'est essentiel pour les ports connectés à des PCs, imprimantes ou serveurs — ces appareils ne créent pas de boucles et n'ont pas besoin d'attendre la convergence STP.
+
+Sans PortFast, un PC qui se connecte (ou redémarre) doit attendre environ 30 secondes avant d'obtenir une adresse DHCP. Avec PortFast, c'est instantané.
+
+**BPDU Guard** est le compagnon de sécurité de PortFast. Si un port PortFast reçoit un BPDU (ce qui signifie qu'un switch y est connecté, pas un PC), le port passe immédiatement en **err-disabled**. Cela empêche un utilisateur de brancher un switch personnel et de perturber la topologie STP.
+
+### Mise en pratique CLI
+
+```cisco
+! === Vérification STP sur SW1 ===
+SW1# show spanning-tree vlan 10
+
+VLAN0010
+  Spanning tree enabled protocol rstp
+  Root ID    Priority    24586
+             Address     0001.0001.0001
+             This bridge is the root
+             Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+
+  Bridge ID  Priority    24586  (priority 24576 sys-id-ext 10)
+             Address     0001.0001.0001
+             Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+             Aging Time  300 sec
+
+Interface           Role Sts Cost      Prio.Nbr Type
+------------------- ---- --- --------- -------- --------------------------------
+Gi0/1               Desg FWD 4         128.1    P2p
+Gi0/2               Desg FWD 4         128.2    P2p
+```
+
+```
+! === Sur SW3 (non-root) ===
+SW3# show spanning-tree vlan 10
+
+VLAN0010
+  Spanning tree enabled protocol rstp
+  Root ID    Priority    24586
+             Address     0001.0001.0001
+             Cost        4
+             Port        1 (GigabitEthernet0/1)
+             Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+
+  Bridge ID  Priority    32778  (priority 32768 sys-id-ext 10)
+             Address     0003.0003.0003
+             Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+             Aging Time  300 sec
+
+Interface           Role Sts Cost      Prio.Nbr Type
+------------------- ---- --- --------- -------- --------------------------------
+Gi0/1               Root FWD 4         128.1    P2p
+Gi0/2               Altn BLK 4         128.2    P2p
+```
+
+**Interprétation** :
+- SW1 affiche `This bridge is the root` — il est root bridge pour le VLAN 10
+- Sa priorité est 24586 = 24576 (priority configurée) + 10 (VLAN ID)
+- Sur SW3 : `Root Port` = Gi0/1 (cost 4 vers le root), `Altn BLK` = Gi0/2 (alternate, bloqué)
+- `P2p` signifie que le lien est point-to-point (full-duplex) — RSTP peut utiliser la proposition/agreement pour converger rapidement
+
+```cisco
+! === Configuration PortFast et BPDU Guard ===
+SW1(config)# interface range Fa0/1-24
+SW1(config-if-range)# spanning-tree portfast
+%Warning: portfast should only be enabled on ports connected to a single
+ host. Connecting hubs, concentrators, switches, bridges, etc... to this
+ interface  when portfast is enabled, can cause temporary bridging loops.
+ Use with CAUTION
+SW1(config-if-range)# spanning-tree bpduguard enable
+SW1(config-if-range)# exit
+
+! Activation globale (s'applique à tous les ports access) :
+SW1(config)# spanning-tree portfast default
+SW1(config)# spanning-tree portfast bpduguard default
+```
+
+### Point exam
+
+> **Piège courant** : L'examen montre un `show spanning-tree` et demande d'identifier le root bridge. Attention : le **Root ID** en haut de l'output est le root bridge du réseau (pas forcément le switch local). Le **Bridge ID** est l'identité du switch local. Si les deux sont identiques → ce switch EST le root bridge.
+>
+> **À retenir** : La priorité STP inclut le numéro de VLAN (sys-id-ext). Pour le VLAN 10 avec priorité par défaut : 32768 + 10 = **32778**. Pour le VLAN 1 : 32768 + 1 = **32769**. L'examen aime tester ce calcul. PortFast ne s'utilise que sur des ports d'accès connectés à des hôtes finaux, jamais sur des ports connectés à d'autres switches.
+
+### Exercice 2.5 — Déterminer les rôles STP
+
+**Contexte** : Topologie en triangle avec 3 switches :
+- SW-A : MAC 0000.0A00.0001, priorité par défaut
+- SW-B : MAC 0000.0B00.0001, priorité par défaut
+- SW-C : MAC 0000.0C00.0001, priorité 24576
+- Tous les liens sont Gi (1 Gbps, coût = 4)
+- VLAN 1 uniquement
+
+**Consigne** : Déterminez (1) le root bridge, (2) le root port de chaque non-root switch, (3) le port bloqué et son rôle.
+
+**Indice** : <details><summary>Voir l'indice</summary>Comparez d'abord les priorités. SW-C a une priorité configurée de 24576 (+ VLAN 1 = 24577), tandis que SW-A et SW-B ont 32769. Le BID le plus bas gagne.</details>
+
+<details>
+<summary>Solution</summary>
+
+**1. Root bridge = SW-C**
+- BID SW-A : 32769.0000.0A00.0001
+- BID SW-B : 32769.0000.0B00.0001
+- BID SW-C : 24577.0000.0C00.0001 ← **le plus bas** (priorité 24576+1)
+
+**2. Root ports :**
+- SW-A : le port connecté directement à SW-C → Root Port (coût = 4)
+- SW-B : le port connecté directement à SW-C → Root Port (coût = 4)
+
+**3. Sur le segment SW-A ↔ SW-B :**
+Les deux switches ont le même coût vers le root (4). On compare les Bridge ID :
+- SW-A BID = 32769.0000.0A00.0001 ← plus bas
+- SW-B BID = 32769.0000.0B00.0001
+
+SW-A a le BID le plus bas → son port vers SW-B est **Designated Port** (FWD).
+SW-B → son port vers SW-A est **Alternate Port** (BLK).
+
+**Explication** : SW-C gagne l'élection grâce à sa priorité configurée (24576 < 32768). Sur le segment entre SW-A et SW-B, personne n'a un chemin plus court vers le root, donc c'est le BID qui départage. SW-A gagne (MAC plus basse) et obtient le Designated Port.
+
+</details>
+
+### Voir aussi
+
+- Topic 1.13.c dans Module 1 (relation : le flooding et les broadcast storms — motivation de STP)
+- Topic 2.4 ci-dessus (relation : STP voit l'EtherChannel comme un port unique)
+- Topic 5.7 dans Module 5 (relation : BPDU Guard comme mécanisme de sécurité L2)
+
+---
+
+## 2.6 — Architectures Wireless Cisco et modes AP
+
+> **Exam topic 2.6** : *Describe* — Cisco Wireless Architectures and AP modes
+> **Niveau** : Describe
+
+### Contexte
+
+Le Module 1 (topic 1.11) a posé les bases du Wi-Fi : canaux, SSID, RF et chiffrement. Maintenant, la question est architecturale : comment gérer 50, 500 ou 5000 points d'accès dans une entreprise ? La réponse dépend de l'architecture wireless choisie. Cisco propose plusieurs modèles, du plus simple au plus distribué.
+
+### Théorie
+
+#### Architecture autonome (Autonomous)
+
+Chaque AP est configuré individuellement. Il gère lui-même le SSID, la sécurité, les canaux et la puissance radio. Le trafic client est commuté localement — l'AP se comporte comme un pont entre le réseau filaire et le réseau sans fil.
+
+**Avantage** : simple, aucun contrôleur nécessaire.
+**Inconvénient** : ingérable au-delà de quelques AP. Chaque modification (changement de mot de passe Wi-Fi, ajout d'un SSID) doit être faite AP par AP.
+
+#### Architecture centralisée (Split-MAC / Lightweight)
+
+C'est l'architecture la plus courante en entreprise. Les fonctions du point d'accès sont **divisées** (split) entre l'AP et le **WLC (Wireless LAN Controller)** :
+
+| Fonction | Gérée par l'AP | Gérée par le WLC |
+|----------|---------------|-------------------|
+| Transmission/réception RF | ✓ | |
+| Chiffrement/déchiffrement temps réel | ✓ | |
+| Beacons et probe responses | ✓ | |
+| Gestion des SSIDs et profils | | ✓ |
+| Authentification des clients | | ✓ |
+| Attribution des canaux (RRM) | | ✓ |
+| Contrôle de puissance (TPC) | | ✓ |
+| Politiques QoS | | ✓ |
+| Roaming entre AP | | ✓ |
+
+L'AP et le WLC communiquent via un tunnel **CAPWAP** (Control And Provisioning of Wireless Access Points) :
+- **Canal de contrôle** : UDP port 5246 (chiffré DTLS)
+- **Canal de données** : UDP port 5247 (chiffrement optionnel)
+
+```
+                       CAPWAP tunnel
+  [Client Wi-Fi] ))) [AP Lightweight] ═══════════════ [WLC]
+                                                        │
+                                                   Infrastructure
+                                                      réseau
+```
+
+Dans ce modèle, **tout le trafic client traverse le tunnel CAPWAP** jusqu'au WLC avant d'être commuté vers le réseau. C'est simple mais crée un point central (le WLC) qui doit gérer tout le trafic.
+
+#### Architecture FlexConnect
+
+FlexConnect est un mode hybride. L'AP est toujours géré par le WLC pour la configuration, mais il peut commuter le trafic **localement** au lieu de tout envoyer dans le tunnel CAPWAP. C'est idéal pour les **sites distants** (agences, succursales) connectés au WLC via un lien WAN.
+
+Deux modes de commutation :
+- **Central switching** : le trafic passe par le tunnel CAPWAP (comme en mode centralisé)
+- **Local switching** : le trafic est commuté localement par l'AP, directement sur le VLAN local
+
+L'avantage majeur : si le lien WAN vers le WLC tombe, l'AP FlexConnect continue à fonctionner en **mode standalone** pour les SSIDs configurés en local switching.
+
+#### Architecture cloud (Cisco Meraki)
+
+Les AP sont gérés par un **dashboard cloud**. Aucun contrôleur physique sur site. La configuration, le monitoring et les mises à jour passent par Internet. Le trafic de données est commuté localement.
+
+#### Modes AP
+
+| Mode | Description | Architecture |
+|------|-------------|--------------|
+| **Local** | Mode par défaut — l'AP sert les clients et transmet via CAPWAP | Centralisée |
+| **FlexConnect** | Commutation locale possible, survie en cas de perte du WLC | Hybride |
+| **Monitor** | L'AP ne sert pas les clients — il scanne les canaux pour détecter des rogue AP ou interférences | Centralisée |
+| **Sniffer** | L'AP capture les trames Wi-Fi et les envoie à un analyseur (Wireshark) | Centralisée |
+| **Rogue Detector** | L'AP compare les adresses MAC du réseau filaire avec celles détectées en Wi-Fi pour identifier les AP non autorisés | Centralisée |
+| **SE-Connect** | Mode spectrum analysis — analyse du spectre RF avec Cisco Spectrum Expert | Centralisée |
+| **Bridge** | L'AP crée un pont sans fil point-à-point ou point-à-multipoint entre bâtiments | Centralisée |
+
+### Point exam
+
+> **Piège courant** : L'examen demande quel mode AP utiliser pour un site distant avec un lien WAN peu fiable. La réponse est **FlexConnect** (pas Local) car il permet la survie locale si le WLC est injoignable.
+>
+> **À retenir** : CAPWAP utilise **UDP 5246** (contrôle) et **UDP 5247** (données). Le canal de contrôle est TOUJOURS chiffré (DTLS). Le canal de données n'est PAS chiffré par défaut. En mode Local, tout le trafic traverse le WLC. En FlexConnect avec local switching, le trafic est commuté localement.
+
+### Exercice 2.6 — Associer les modes AP aux cas d'usage
+
+**Contexte** : Vous êtes architecte réseau chez GlobalBank. L'entreprise a un siège (200 AP, WLC local), 30 agences (3-5 AP par agence, lien WAN), et un entrepôt (besoin de surveiller les rogue AP).
+
+**Consigne** : Pour chaque site, recommandez le mode AP et justifiez votre choix.
+
+**Indice** : <details><summary>Voir l'indice</summary>Pensez au lien WAN des agences — que se passe-t-il si le WLC est injoignable ?</details>
+
+<details>
+<summary>Solution</summary>
+
+| Site | Mode AP recommandé | Justification |
+|------|-------------------|---------------|
+| Siège (200 AP) | **Local** | WLC sur le même LAN, bande passante suffisante pour centraliser tout le trafic via CAPWAP. Management simplifié pour 200 AP. |
+| 30 agences (3-5 AP) | **FlexConnect** (local switching) | Le lien WAN vers le WLC central peut tomber. FlexConnect permet aux AP de continuer à servir les clients en commutatant le trafic localement. |
+| Entrepôt (surveillance) | **Monitor** | Pas besoin de servir des clients Wi-Fi dans ce scénario — uniquement scanner les canaux pour détecter des rogue AP. Un ou deux AP en mode Monitor suffisent. |
+
+**Explication** : Le mode Local centralise tout mais nécessite que le WLC soit joignable à tout moment. FlexConnect est la solution standard pour les sites distants chez Cisco. Le mode Monitor sacrifie la capacité de servir des clients pour se dédier à la surveillance RF.
+
+</details>
+
+### Voir aussi
+
+- Topic 1.11 dans Module 1 (relation : principes RF, canaux, chiffrement — prérequis)
+- Topic 1.1.d-e dans Module 1 (relation : rôle des AP et du WLC)
+- Topic 2.7 ci-dessous (relation : infrastructure physique qui supporte ces architectures)
+- Topic 2.9 ci-dessous (relation : configuration WLAN via GUI WLC)
+
+---
+
+## 2.7 — Infrastructure physique des composants WLAN
+
+> **Exam topic 2.7** : *Describe* — physical infrastructure connections of WLAN components (AP, WLC, access/trunk ports, and LAG)
+> **Niveau** : Describe
+
+### Contexte
+
+L'architecture wireless vue en 2.6 est logique. Mais concrètement, comment câble-t-on un AP ? Sur quel type de port du switch ? Et le WLC, comment est-il connecté au réseau ? Cette section décrit les connexions physiques qui permettent à l'architecture wireless de fonctionner.
+
+### Théorie
+
+#### Connexion d'un AP au switch
+
+Un AP lightweight se connecte au switch via un **câble Ethernet** (typiquement Cat5e ou Cat6). Le port du switch est généralement configuré en **mode access** dans un VLAN dédié aux AP, avec **PoE** activé pour alimenter l'AP.
+
+Cependant, si l'AP doit gérer plusieurs SSIDs associés à différents VLANs (ce qui est le cas courant en entreprise), le port doit être en mode **trunk** pour transporter les multiples VLANs. Le VLAN natif du trunk est utilisé pour le trafic de management CAPWAP.
+
+```
+   [AP Ceiling]
+       │
+       │ Câble Ethernet Cat6 (PoE)
+       │
+   [Switch Access]
+    Port Fa0/10
+    Mode: trunk (si multi-VLAN)
+    ou access (si CAPWAP centralise tout)
+    PoE: activé (802.3at minimum)
+    Native VLAN: VLAN management AP
+```
+
+#### Connexion du WLC au réseau
+
+Le WLC est un équipement central qui gère potentiellement des centaines d'AP. Il a besoin d'une connexion **haute disponibilité** et **haute bande passante** vers le réseau. Typiquement :
+
+- Connecté au **switch de distribution ou de cœur** (pas au switch d'accès)
+- Ports configurés en **trunk** (le WLC gère plusieurs VLANs : management, données client par SSID, etc.)
+- Liens agrégés en **LAG (Link Aggregation Group)** pour la bande passante et la redondance
+
+```
+                          LAG (2-8 liens)
+   ┌─────────────┐  ══════════════════════  ┌─────────────────┐
+   │  WLC 5520   │  Trunk 802.1Q            │  SW-CORE        │
+   │             │  VLANs: 10,20,30,99      │  (Catalyst 9500)│
+   │  Port 1  ───┼──────────────────────────┼── Gi1/0/1       │
+   │  Port 2  ───┼──────────────────────────┼── Gi1/0/2       │
+   │  Port 3  ───┼──────────────────────────┼── Gi1/0/3       │
+   │  Port 4  ───┼──────────────────────────┼── Gi1/0/4       │
+   └─────────────┘                          └─────────────────┘
+```
+
+Le WLC Cisco utilise son propre mécanisme LAG (pas LACP) par défaut. Tous les ports du WLC sont combinés en un seul lien logique. Le switch côté réseau doit aussi configurer un EtherChannel correspondant.
+
+#### Topologie complète typique
+
+```
+   [Clients Wi-Fi]  )))  [AP1]───[SW-ACCESS-1]───┐
+                         PoE                      │ Trunk
+   [Clients Wi-Fi]  )))  [AP2]───[SW-ACCESS-2]───┤
+                         PoE                      │ Trunk
+                                                  │
+                                            [SW-DISTRIBUTION]
+                                                  │
+                                              LAG │ Trunk
+                                                  │
+                                              [WLC 5520]
+                                              
+   ─── = lien Ethernet filaire
+   ))) = signal radio Wi-Fi
+   ═══ = LAG (liens agrégés)
+```
+
+### Point exam
+
+> **Piège courant** : L'examen peut proposer de connecter le WLC à un port access. C'est incorrect — le WLC a besoin d'un port **trunk** car il gère le trafic de plusieurs VLANs (management, données de chaque SSID).
+>
+> **À retenir** : Un AP a besoin de PoE (minimum 802.3at pour les AP Wi-Fi 6). Le WLC se connecte au réseau via un LAG en trunk. Les ports du switch connectés aux AP peuvent être en access (si le trafic est tunnelisé via CAPWAP) ou en trunk (si l'AP fait du local switching FlexConnect).
+
+### Exercice 2.7 — Dessiner l'infrastructure WLAN
+
+**Contexte** : La société AeroSpace déploie 12 AP Wi-Fi 6 (mode Local) sur son site principal. Le WLC 9800 est dans la salle serveur. Il y a 2 switches d'accès (SW-A1, SW-A2 avec 6 AP chacun) et 1 switch de cœur (SW-CORE).
+
+**Consigne** : Dessinez le schéma de l'infrastructure physique en indiquant pour chaque connexion : le type de port (access/trunk), le protocole d'alimentation (PoE), et les agrégations éventuelles (LAG).
+
+**Indice** : <details><summary>Voir l'indice</summary>Le WLC est connecté au SW-CORE (pas aux switches d'accès). Les AP sont alimentés par PoE depuis les switches d'accès.</details>
+
+<details>
+<summary>Solution</summary>
+
+```
+   [AP1-6] ))) ──(PoE, access)──── [SW-A1] ──(trunk)── [SW-CORE] ──(LAG trunk)── [WLC 9800]
+   [AP7-12] ))) ──(PoE, access)── [SW-A2] ──(trunk)──     │
+                                                     Infrastructure
+                                                       réseau
+```
+
+Détail des connexions :
+
+| Lien | Type de port | PoE | Agrégation | Notes |
+|------|-------------|-----|------------|-------|
+| AP → SW-Access | Access (VLAN AP) | 802.3at (PoE+) | Non | Mode Local = trafic CAPWAP tunnelisé |
+| SW-Access → SW-CORE | Trunk | Non | Optionnel | Transporte CAPWAP + VLANs utilisateurs |
+| SW-CORE → WLC | Trunk | Non | LAG (4 liens) | Haute disponibilité et bande passante |
+
+**Explication** : En mode Local, les AP envoient tout le trafic via CAPWAP au WLC. Le port switch côté AP peut être en access car le trunk n'est pas nécessaire (une seule encapsulation CAPWAP). Le WLC, en revanche, doit être en trunk avec LAG car il reçoit le trafic de tous les AP et le redistribue sur les bons VLANs.
+
+</details>
+
+### Voir aussi
+
+- Topic 1.1.h dans Module 1 (relation : standards PoE et puissances — déjà détaillé)
+- Topic 2.4 ci-dessus (relation : EtherChannel/LAG pour la connexion WLC)
+- Topic 2.6 ci-dessus (relation : architecture logique qui repose sur cette infrastructure physique)
+
+---
+
+## 2.8 — Accès de gestion aux équipements réseau
+
+> **Exam topic 2.8** : *Describe* — network device management access connections (Telnet, SSH, HTTP, HTTPS, console, TACACS+/RADIUS, and cloud-managed)
+> **Niveau** : Describe
+
+### Contexte
+
+Configurer un switch ou un routeur nécessite d'y accéder. Mais comment ? Par un câble physique branché directement dessus ? À distance, via le réseau ? Via une interface web ? Le choix de la méthode d'accès a des implications majeures en termes de sécurité, de praticité et d'échelle.
+
+### Théorie
+
+#### Accès console (out-of-band)
+
+Le port **console** est un accès physique direct à l'équipement. On y branche un câble console (RJ-45 vers USB ou DB-9) depuis un PC d'administration. C'est un accès **out-of-band** (OOB) — il ne dépend pas du réseau IP, ce qui le rend indispensable pour :
+
+- La configuration initiale (le switch n'a pas encore d'adresse IP)
+- Le dépannage quand le réseau est complètement hors service
+- La récupération de mot de passe (password recovery)
+
+Paramètres série par défaut : **9600 baud, 8 data bits, no parity, 1 stop bit, no flow control** (9600 8N1).
+
+#### Telnet (insécure — à proscrire)
+
+**Telnet** permet un accès CLI à distance via le réseau IP (TCP port 23). Le problème majeur : **tout est transmis en clair**, y compris les mots de passe. Un simple sniffer (Wireshark) sur le réseau capture les identifiants en texte brut.
+
+Telnet n'est acceptable que dans un environnement de lab isolé. En production, utilisez **toujours SSH**.
+
+#### SSH (Secure Shell)
+
+**SSH** (TCP port 22) remplace Telnet avec un tunnel chiffré. Toutes les communications — authentification et données — sont protégées. SSH version 2 est le standard (SSHv1 est vulnérable et obsolète).
+
+Configuration SSH sur un switch Cisco :
+```cisco
+! Prérequis : un hostname et un domain-name (nécessaires pour générer la clé RSA)
+SW1(config)# hostname SW1
+SW1(config)# ip domain-name entreprise.local
+SW1(config)# crypto key generate rsa modulus 2048
+The name for the keys will be: SW1.entreprise.local
+% The key modulus size is 2048 bits
+...
+SW1(config)# ip ssh version 2
+SW1(config)# username admin privilege 15 secret MonMotDePasse!
+SW1(config)# line vty 0 15
+SW1(config-line)# transport input ssh
+SW1(config-line)# login local
+SW1(config-line)# exit
+```
+
+#### HTTP / HTTPS
+
+Certains équipements offrent une **interface web** (GUI) pour la configuration. Le WLC Cisco, par exemple, se configure principalement via HTTPS. Les switches Cisco supportent aussi l'interface web mais elle est rarement utilisée en environnement Cisco CLI traditionnel.
+
+- **HTTP** (TCP 80) : non chiffré — même problème que Telnet
+- **HTTPS** (TCP 443) : chiffré TLS — toujours préférer à HTTP
+
+```cisco
+! Activer/désactiver le serveur HTTP sur un switch
+SW1(config)# no ip http server
+SW1(config)# ip http secure-server
+```
+
+#### TACACS+ et RADIUS
+
+Pour un réseau de 50 switches, créer des comptes locaux sur chaque équipement est ingérable. Les protocoles **AAA** (Authentication, Authorization, Accounting) centralisent la gestion des accès :
+
+| Caractéristique | TACACS+ | RADIUS |
+|----------------|---------|--------|
+| Développeur | Cisco (propriétaire) | Standard ouvert (RFC 2865) |
+| Transport | TCP port 49 | UDP ports 1812/1813 |
+| Chiffrement | Corps entier du paquet | Mot de passe uniquement |
+| Séparation AAA | Oui (Auth, Authz, Acct séparés) | Non (Auth+Authz combinés) |
+| Cas d'usage principal | Accès management réseau (CLI) | Accès réseau (Wi-Fi, VPN, 802.1X) |
+| Granularité des commandes | Oui (autorisation par commande) | Non |
+
+**TACACS+** est privilégié pour l'accès administrateur aux équipements (il peut autoriser ou refuser chaque commande CLI individuellement). **RADIUS** est privilégié pour l'accès réseau des utilisateurs (Wi-Fi, VPN 802.1X) car il est standard et intégré à tous les serveurs NPS, FreeRADIUS, Cisco ISE, etc.
+
+#### Cloud-managed (gestion cloud)
+
+Avec des solutions comme **Cisco Meraki** ou **Cisco DNA Center (Catalyst Center)**, les équipements sont gérés depuis un **portail web cloud**. Aucun accès CLI direct n'est nécessaire. Les avantages :
+- Provisionnement zero-touch (l'équipement se configure automatiquement en se connectant au cloud)
+- Visibilité centralisée sur tous les sites
+- Mises à jour automatiques
+
+L'inconvénient : une dépendance à la connexion Internet. Sans Internet, la gestion est impossible (bien que les équipements continuent à fonctionner avec leur dernière configuration connue).
+
+#### Tableau comparatif global
+
+| Méthode | Port/Protocole | Chiffré | In-band/OOB | Cas d'usage |
+|---------|---------------|---------|-------------|-------------|
+| Console | Port série (USB/RJ-45) | N/A | OOB | Config initiale, recovery |
+| Telnet | TCP 23 | Non | In-band | Lab uniquement (obsolète) |
+| SSH | TCP 22 | Oui | In-band | Accès CLI standard en prod |
+| HTTP | TCP 80 | Non | In-band | Déconseillé |
+| HTTPS | TCP 443 | Oui | In-band | GUI WLC, management web |
+| TACACS+ | TCP 49 | Oui (intégral) | In-band | AAA pour accès admin CLI |
+| RADIUS | UDP 1812/1813 | Partiel | In-band | AAA pour accès réseau (Wi-Fi, VPN) |
+| Cloud-managed | HTTPS | Oui | In-band | Meraki, DNA Center |
+
+### Mise en pratique CLI
+
+```cisco
+! === Vérification des connexions de management ===
+SW1# show users
+    Line       User       Host(s)              Idle       Location
+   0 con 0                idle                 00:05:30
+*  1 vty 0     admin      idle                 00:00:00   192.168.99.100
+
+SW1# show ssh
+Connection  Version Mode  Encryption  Hmac         State         Username
+0           2.0     IN    aes256-ctr  hmac-sha2-256 Session started admin
+0           2.0     OUT   aes256-ctr  hmac-sha2-256 Session started admin
+
+SW1# show ip ssh
+SSH Enabled - version 2.0
+Authentication methods:publickey,keyboard-interactive,password
+Authentication timeout: 120 secs; Authentication retries: 3
+Minimum expected Diffie Hellman key size : 2048 bits
+IOS Keys in SECSH format(ssh-rsa, base64 encoded):
+ssh-rsa AAAA... (output tronqué)
+```
+
+**Interprétation** :
+- `show users` : un admin est connecté en SSH via VTY 0, depuis 192.168.99.100. La console est idle.
+- `show ssh` : connexion SSH version 2, chiffrement AES-256
+- `show ip ssh` : SSH v2 activé, clé RSA minimum 2048 bits
+
+### Point exam
+
+> **Piège courant** : L'examen peut proposer Telnet comme solution d'accès à distance. C'est techniquement fonctionnel, mais toujours incorrect si une option SSH est disponible. Retenez : Telnet = jamais en production.
+>
+> **À retenir** : TACACS+ chiffre le **paquet entier** (TCP 49), RADIUS chiffre seulement le **mot de passe** (UDP 1812/1813). TACACS+ sépare Authentication, Authorization et Accounting ; RADIUS combine Authentication et Authorization. Cette comparaison est un classique de l'examen.
+
+### Exercice 2.8 — Comparaison des méthodes d'accès
+
+**Contexte** : Vous préparez une recommandation pour sécuriser l'accès management de 30 switches et 5 routeurs dans une entreprise.
+
+**Consigne** : Complétez le tableau suivant et justifiez le choix retenu pour chaque scénario.
+
+| Scénario | Méthode recommandée | Justification |
+|----------|-------------------|---------------|
+| Configuration initiale d'un switch neuf | ? | ? |
+| Accès CLI quotidien des administrateurs | ? | ? |
+| Centralisation des comptes admin | ? | ? |
+| Gestion des AP Meraki | ? | ? |
+| Authentification Wi-Fi des employés (802.1X) | ? | ? |
+
+**Indice** : <details><summary>Voir l'indice</summary>Pour chaque scénario, posez-vous deux questions : (1) le réseau est-il disponible ? (2) le trafic doit-il être chiffré ?</details>
+
+<details>
+<summary>Solution</summary>
+
+| Scénario | Méthode recommandée | Justification |
+|----------|-------------------|---------------|
+| Configuration initiale d'un switch neuf | **Console** | Le switch n'a pas encore d'adresse IP → accès out-of-band obligatoire |
+| Accès CLI quotidien des administrateurs | **SSH v2** | Chiffré, standard, fonctionne via le réseau IP |
+| Centralisation des comptes admin | **TACACS+** | Chiffrement intégral, autorisation par commande, séparation AAA |
+| Gestion des AP Meraki | **Cloud-managed (HTTPS)** | Meraki = gestion cloud native, pas de CLI |
+| Authentification Wi-Fi des employés | **RADIUS** | Standard ouvert pour 802.1X, supporté par tous les NAS |
+
+**Explication** : Chaque méthode a son créneau. La console est irremplaçable pour l'accès initial. SSH remplace Telnet partout. TACACS+ est le choix pour l'accès admin CLI (granularité des commandes), RADIUS pour l'accès réseau des utilisateurs (standard interopérable).
+
+</details>
+
+### Voir aussi
+
+- Topic 4.8 dans Module 4 (relation : configuration détaillée de SSH)
+- Topic 5.3 dans Module 5 (relation : mots de passe locaux et contrôle d'accès)
+- Topic 5.8 dans Module 5 (relation : concepts AAA — Authentication, Authorization, Accounting)
+
+---
+
+## 2.9 — Configuration WLAN via GUI (WLC)
+
+> **Exam topic 2.9** : *Interpret* — the wireless LAN GUI configuration for client connectivity (WLAN creation, security settings, QoS profiles, and advanced settings)
+> **Niveau** : Interpret
+
+### Contexte
+
+La plupart des WLC Cisco se configurent via une interface web graphique (GUI), pas en CLI. L'examen CCNA attend que vous sachiez interpréter les écrans de configuration d'un WLAN : où se trouvent les paramètres de sécurité, comment un SSID est créé, et quels réglages QoS et avancés affectent le comportement du réseau wireless.
+
+### Théorie
+
+#### Création d'un WLAN
+
+Sur un WLC Cisco (AireOS ou IOS-XE 9800), la création d'un WLAN implique :
+
+1. **Profile Name** : nom interne pour identifier le WLAN dans la configuration du WLC
+2. **SSID** : le nom du réseau visible par les clients (peut différer du Profile Name)
+3. **WLAN ID** : identifiant numérique unique (1-512 selon le modèle)
+4. **Status** : Enabled / Disabled — un WLAN peut être créé mais pas activé
+5. **Interface/VLAN** : le VLAN auquel les clients de ce SSID seront associés
+
+#### Paramètres de sécurité (Security tab)
+
+L'onglet Security est divisé en deux sous-onglets :
+
+**Layer 2 Security** (le plus courant au CCNA) :
+
+| Option | Description | Cas d'usage |
+|--------|-------------|-------------|
+| None | Pas de chiffrement | Hotspot public (à coupler avec captive portal) |
+| WPA+WPA2 | Choix entre WPA et WPA2 | Compatibilité anciens clients |
+| WPA2 Policy | AES-CCMP obligatoire | Standard entreprise minimum |
+| WPA3 Policy | SAE (Simultaneous Authentication of Equals) | Nouveau standard, plus sûr |
+
+**Authentication Key Management** :
+
+| Méthode | Description | Cas d'usage |
+|---------|-------------|-------------|
+| PSK (Pre-Shared Key) | Mot de passe partagé par tous les clients | SOHO, petits bureaux |
+| 802.1X | Authentification individuelle via RADIUS | Entreprise (chaque employé a ses identifiants) |
+
+Pour le CCNA, la combinaison typique testée est **WPA2 + PSK** (ce qui correspond à WPA2-Personal).
+
+**Layer 3 Security** :
+- **Web Authentication** : redirection vers un portail captif (guest WiFi)
+- **Web Passthrough** : accès après acceptation des conditions d'utilisation
+
+#### Profils QoS (QoS tab)
+
+Le WLC peut appliquer des politiques QoS aux clients Wi-Fi :
+
+| Profil QoS | Marquage maximum autorisé | Cas d'usage |
+|------------|--------------------------|-------------|
+| Platinum | UP 6 (Voice) | Téléphonie Wi-Fi |
+| Gold | UP 4 (Video) | Vidéoconférence |
+| Silver | UP 0 (Best Effort) | Trafic standard (défaut) |
+| Bronze | UP 1 (Background) | Trafic invité, basse priorité |
+
+UP = User Priority (champ CoS 802.1p). Le profil QoS **limite le marquage maximum** que les clients peuvent revendiquer. Un client sur un SSID Silver ne peut pas marquer son trafic comme Voice, même s'il essaie.
+
+#### Paramètres avancés (Advanced tab)
+
+| Paramètre | Description | Valeur typique |
+|-----------|-------------|----------------|
+| Client exclusion timeout | Durée de blocage après échecs d'authentification | 60 secondes |
+| Session timeout | Durée max de session avant réauthentification | 1800 secondes (30 min) |
+| Max clients | Nombre max de clients sur ce SSID | 0 = illimité |
+| FlexConnect local switching | Active la commutation locale (si AP en FlexConnect) | Enabled/Disabled |
+| DHCP Addr. Assignment | Oblige les clients à utiliser DHCP | Required |
+| Aironet IE | Extensions Cisco propriétaires | Enabled (désactiver si clients non-Cisco) |
+
+#### Écran GUI typique — synthèse
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ WLC > WLANs > WLAN_ID 1                                   │
+├────────────────────────────────────────────────────────────┤
+│ General:                                                   │
+│   Profile Name: CORP-WIFI                                  │
+│   SSID:         CorpNet                                    │
+│   Status:       [✓] Enabled                                │
+│   Interface:    vlan-corporate (VLAN 10)                   │
+├────────────────────────────────────────────────────────────┤
+│ Security > Layer 2:                                        │
+│   Layer 2 Security: WPA+WPA2                               │
+│   WPA2 Policy:      [✓] AES                                │
+│   Auth Key Mgmt:    [✓] PSK                                │
+│   PSK Format:       ASCII                                  │
+│   PSK:              ********                                │
+├────────────────────────────────────────────────────────────┤
+│ QoS:                                                       │
+│   Quality of Service: Silver (Best Effort)                 │
+├────────────────────────────────────────────────────────────┤
+│ Advanced:                                                  │
+│   Session Timeout:     1800 sec                            │
+│   FlexConnect Local Switching: [  ] Disabled               │
+│   DHCP Addr Assignment:        [✓] Required                │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Point exam
+
+> **Piège courant** : L'examen montre une capture d'écran GUI du WLC et demande d'identifier un problème. Vérifications clés : le WLAN est-il **Enabled** ? Le bon **VLAN/interface** est-il sélectionné ? La sécurité est-elle cohérente (WPA2 avec AES, pas TKIP) ?
+>
+> **À retenir** : Le profil QoS **Silver** est le défaut (best effort). Pour la voix sur Wi-Fi, il faut **Platinum**. Le SSID peut être différent du Profile Name — le SSID est ce que voient les clients, le Profile Name est interne au WLC. WPA2 + PSK = WPA2-Personal. WPA2 + 802.1X = WPA2-Enterprise.
+
+### Exercice 2.9 — Interpréter une configuration WLAN
+
+**Contexte** : Un technicien a configuré un SSID invité sur le WLC. Les invités se plaignent qu'ils ne peuvent pas se connecter.
+
+Configuration visible dans la GUI :
+
+```
+Profile Name: GUEST-WIFI
+SSID: InviteWiFi
+Status: Disabled
+Interface: vlan-guest (VLAN 50)
+Layer 2 Security: WPA+WPA2
+  WPA2 Policy: AES
+  Auth Key Mgmt: 802.1X
+QoS: Bronze
+Session Timeout: 300 sec
+```
+
+**Consigne** : Identifiez les deux problèmes dans cette configuration et expliquez comment les corriger.
+
+**Indice** : <details><summary>Voir l'indice</summary>Un SSID invité nécessite-t-il un serveur RADIUS (802.1X) ? Et vérifiez le statut du WLAN.</details>
+
+<details>
+<summary>Solution</summary>
+
+**Problème 1 : Le WLAN est Disabled.**
+Les invités ne voient même pas le SSID car il n'est pas activé. → Passer le Status à **Enabled**.
+
+**Problème 2 : Auth Key Mgmt en 802.1X pour un réseau invité.**
+802.1X nécessite un serveur RADIUS et des identifiants individuels — inapproprié pour des invités. → Changer pour **PSK** (mot de passe partagé communiqué aux invités) ou utiliser une **Web Authentication** (portail captif) en Layer 3 Security avec aucune sécurité Layer 2.
+
+**Configuration corrigée :**
+```
+Status: Enabled
+Auth Key Mgmt: PSK  (avec un mot de passe simple communiqué à l'accueil)
+OU
+Layer 2 Security: None + Layer 3 Security: Web Authentication
+```
+
+**Explication** : Un réseau invité doit être simple d'accès. PSK avec un mot de passe affiché à l'accueil ou un portail captif sont les solutions standard. 802.1X est réservé aux réseaux corporate où chaque utilisateur a un compte (via Active Directory/RADIUS).
+
+</details>
+
+### Voir aussi
+
+- Topic 2.6 ci-dessus (relation : l'architecture détermine comment le WLC gère les WLAN)
+- Topic 5.9 dans Module 5 (relation : protocoles de sécurité wireless WPA/WPA2/WPA3 en détail)
+- Topic 5.10 dans Module 5 (relation : configuration WPA2 PSK dans la GUI — exercice pratique)
+- Topic 1.11 dans Module 1 (relation : fondamentaux Wi-Fi — SSID, RF, chiffrement)
+
+---
+
+## Labs Module 2
+
+### Lab 2.1 — VLANs, Trunks et Inter-VLAN Routing
+
+**Topologie :**
+```
+                                  Trunk Gi0/1
+   [PC1]─Fa0/1─[SW1]════════════════════════════[SW2]─Fa0/1─[PC3]
+   VLAN 10      │  Gi0/2                    Gi0/2 │      VLAN 10
+                │    │ Trunk                  │   │
+   [PC2]─Fa0/5─┘    │                        │   └─Fa0/5─[PC4]
+   VLAN 20           │                        │       VLAN 20
+                     │                        │
+                   [R1]                       │
+                Gi0/0 (trunk)                 │
+                  │                           │
+            Gi0/0.10 = 192.168.10.1/24        │
+            Gi0/0.20 = 192.168.20.1/24        │
+            Gi0/0.99 = 192.168.99.1/24        │
+```
+
+**Tableau d'adressage :**
+
+| Équipement | Interface | Adresse IP | Masque | VLAN | Passerelle |
+|------------|-----------|-----------|--------|------|------------|
+| R1 | Gi0/0.10 | 192.168.10.1 | 255.255.255.0 | 10 | — |
+| R1 | Gi0/0.20 | 192.168.20.1 | 255.255.255.0 | 20 | — |
+| R1 | Gi0/0.99 | 192.168.99.1 | 255.255.255.0 | 99 | — |
+| SW1 | VLAN 99 (SVI) | 192.168.99.11 | 255.255.255.0 | 99 | 192.168.99.1 |
+| SW2 | VLAN 99 (SVI) | 192.168.99.12 | 255.255.255.0 | 99 | 192.168.99.1 |
+| PC1 | NIC | 192.168.10.10 | 255.255.255.0 | 10 | 192.168.10.1 |
+| PC2 | NIC | 192.168.20.10 | 255.255.255.0 | 20 | 192.168.20.1 |
+| PC3 | NIC | 192.168.10.20 | 255.255.255.0 | 10 | 192.168.10.1 |
+| PC4 | NIC | 192.168.20.20 | 255.255.255.0 | 20 | 192.168.20.1 |
+
+**Objectifs :**
+1. Créer les VLANs 10 (DATA), 20 (DEV) et 99 (MANAGEMENT) sur les deux switches
+2. Configurer les ports d'accès et les trunks inter-switch
+3. Configurer le router-on-a-stick pour le routage inter-VLAN
+4. Vérifier la connectivité inter-VLAN de bout en bout
+5. Utiliser CDP pour vérifier la topologie
+
+**Configuration de départ :**
+```cisco
+! Router R1
+hostname R1
+no ip domain-lookup
+!
+! Switch SW1
+hostname SW1
+no ip domain-lookup
+!
+! Switch SW2
+hostname SW2
+no ip domain-lookup
+```
+
+**Étapes :**
+
+1. **Créer les VLANs sur SW1 et SW2**
+   - Sur chaque switch, créer les VLANs 10 (DATA), 20 (DEV), 99 (MANAGEMENT)
+   - Commandes : `vlan 10` → `name DATA`, etc.
+   - Vérification : `show vlan brief`
+
+2. **Configurer les ports d'accès sur SW1**
+   - Fa0/1-4 → VLAN 10 (mode access)
+   - Fa0/5-8 → VLAN 20 (mode access)
+   - Commandes : `switchport mode access`, `switchport access vlan X`
+
+3. **Configurer les ports d'accès sur SW2** (même logique)
+
+4. **Configurer le trunk entre SW1 et SW2**
+   - Interface Gi0/1 sur les deux switches
+   - Mode trunk, native VLAN 99, allowed VLANs 10,20,99
+   - Vérification : `show interfaces trunk`
+
+5. **Configurer le trunk entre SW1 et R1**
+   - Interface Gi0/2 sur SW1
+   - Vérification : `show interfaces trunk`
+
+6. **Configurer le router-on-a-stick sur R1**
+   - Activer Gi0/0, créer les sous-interfaces .10, .20, .99
+   - `encapsulation dot1Q` + adresse IP pour chaque
+   - Vérification : `show ip interface brief`
+
+7. **Configurer les SVI de management sur les switches**
+   - `interface vlan 99`, IP address, `no shutdown`
+   - `ip default-gateway 192.168.99.1`
+
+8. **Configurer les PCs** (IP + masque + passerelle)
+
+9. **Tester la connectivité**
+   - Ping intra-VLAN : PC1 → PC3 (même VLAN, switches différents)
+   - Ping inter-VLAN : PC1 (VLAN 10) → PC2 (VLAN 20)
+   - Ping management : SW1 → R1 via VLAN 99
+
+**Vérification finale :**
+```cisco
+PC1> ping 192.168.10.20
+Reply from 192.168.10.20: bytes=32 time=1ms TTL=128
+! Intra-VLAN OK (via trunk SW1-SW2)
+
+PC1> ping 192.168.20.10
+Reply from 192.168.20.10: bytes=32 time=2ms TTL=127
+! Inter-VLAN OK (via router-on-a-stick R1, TTL=127 car 1 hop)
+
+SW1# show cdp neighbors
+Device ID   Local Intrfce  Holdtme  Capability  Platform  Port ID
+SW2         Gi0/1          155      S I         WS-C2960  Gi0/1
+R1          Gi0/2          170      R S         ISR4331   Gi0/0
+```
+
+**Questions de validation :**
+1. Pourquoi le TTL passe de 128 à 127 pour le ping inter-VLAN, mais reste à 128 pour le ping intra-VLAN ?
+2. Que se passerait-il si vous oubliez le `no shutdown` sur l'interface Gi0/0 de R1 ?
+3. Que verriez-vous dans `show interfaces trunk` si le native VLAN de SW1 est 99 mais celui de SW2 est 1 ?
+
+---
+
+### Lab 2.2 — EtherChannel LACP
+
+**Topologie :**
+```
+                    4 liens Gi0/1-4
+   ┌──────────┐ ═══════════════════════ ┌──────────┐
+   │          │  Po1 (LACP)             │          │
+   │  SW-A    │                         │  SW-B    │
+   │          │                         │          │
+   └──────────┘                         └──────────┘
+    │         │                          │         │
+   Fa0/1-12  Fa0/13-24                  Fa0/1-12  Fa0/13-24
+   VLAN 10   VLAN 20                    VLAN 10   VLAN 20
+```
+
+**Tableau d'adressage :**
+
+| Équipement | Interface | Adresse IP | Masque | VLAN |
+|------------|-----------|-----------|--------|------|
+| SW-A | VLAN 99 (SVI) | 10.0.99.1 | 255.255.255.0 | 99 |
+| SW-B | VLAN 99 (SVI) | 10.0.99.2 | 255.255.255.0 | 99 |
+
+**Objectifs :**
+1. Configurer un EtherChannel LACP (Po1) entre SW-A et SW-B
+2. Configurer le Port-Channel en trunk avec les VLANs 10, 20 et 99
+3. Vérifier le channel-group et tester la redondance
+
+**Étapes :**
+
+1. **Créer les VLANs sur les deux switches**
+   - VLANs 10 (DATA), 20 (DEV), 99 (MGMT)
+
+2. **Configurer les ports d'accès**
+   - Fa0/1-12 → VLAN 10, Fa0/13-24 → VLAN 20
+
+3. **Configurer l'EtherChannel LACP**
+   - SW-A : `interface range Gi0/1-4` → `channel-group 1 mode active`
+   - SW-B : `interface range Gi0/1-4` → `channel-group 1 mode passive`
+   - Configurer le trunk sur les interfaces physiques AVANT le channel-group
+
+4. **Configurer le trunk sur Po1**
+   - Native VLAN 99, allowed VLANs 10,20,99
+   - Vérification : `show etherchannel summary`
+
+5. **Tester la redondance**
+   - Lancer un ping continu entre deux PCs
+   - `shutdown` un port membre (Gi0/1 sur SW-A)
+   - Observer le `show etherchannel summary` — le canal continue à 3 liens
+   - `no shutdown` pour réintégrer le lien
+
+**Vérification finale :**
+```cisco
+SW-A# show etherchannel summary
+Group  Port-channel  Protocol    Ports
+------+-------------+-----------+------------------------------------------
+1      Po1(SU)       LACP        Gi0/1(P)    Gi0/2(P)    Gi0/3(P)    Gi0/4(P)
+
+SW-A# show interfaces trunk
+Port        Mode         Encapsulation  Status        Native vlan
+Po1         on           802.1q         trunking      99
+```
+
+**Questions de validation :**
+1. Que se passe-t-il si vous configurez SW-A en `mode active` et SW-B en `mode desirable` ?
+2. Combien de bande passante totale offre ce Port-Channel (4 × Gi) ?
+3. Si vous changez le native VLAN sur Gi0/1 mais pas sur les autres ports du channel-group, que se passe-t-il ?
+
+---
+
+### Lab 2.3 — Spanning Tree (Rapid PVST+)
+
+**Topologie :**
+```
+                         [SW1]
+                        /      \
+                  Gi0/1/         \Gi0/2
+                  /                \
+              [SW2]──────Gi0/2────[SW3]
+                  Gi0/1
+```
+
+**Tableau d'adressage :**
+
+| Équipement | Interface | Adresse IP (VLAN 99) | MAC (simplifié) | Priorité STP |
+|------------|-----------|---------------------|-----------------|-------------|
+| SW1 | VLAN 99 | 10.0.99.1/24 | AA:AA:AA:00:01:01 | 24576 (root primary) |
+| SW2 | VLAN 99 | 10.0.99.2/24 | BB:BB:BB:00:02:02 | 28672 (root secondary) |
+| SW3 | VLAN 99 | 10.0.99.3/24 | CC:CC:CC:00:03:03 | 32768 (défaut) |
+
+**Objectifs :**
+1. Observer l'élection du root bridge
+2. Identifier les rôles de ports (Root, Designated, Alternate)
+3. Configurer PortFast et BPDU Guard sur les ports d'accès
+4. Simuler une panne et observer la convergence RSTP
+
+**Étapes :**
+
+1. **Créer les VLANs et configurer les trunks entre les 3 switches**
+   - Tous les liens inter-switch en trunk, native VLAN 99
+
+2. **Configurer SW1 comme root bridge primary**
+   - `spanning-tree vlan 10 root primary` (ou priority 24576)
+   - `spanning-tree vlan 20 root primary`
+
+3. **Configurer SW2 comme root bridge secondary**
+   - `spanning-tree vlan 10 root secondary`
+
+4. **Observer la topologie STP**
+   - Sur chaque switch : `show spanning-tree vlan 10`
+   - Identifier : Root bridge, Root Port, Designated Port, Alternate Port
+
+5. **Configurer PortFast et BPDU Guard**
+   - Sur les ports d'accès (Fa0/1-24) de chaque switch
+   - `spanning-tree portfast` + `spanning-tree bpduguard enable`
+
+6. **Simuler une panne**
+   - Sur SW1 : `shutdown` sur Gi0/1 (lien vers SW2)
+   - Sur SW3 : observer le port Alternate passer en Forwarding
+   - Mesurer le temps de convergence (devrait être < 2 secondes)
+
+**Vérification finale :**
+```cisco
+SW1# show spanning-tree vlan 10
+! Vérifier : "This bridge is the root"
+
+SW3# show spanning-tree vlan 10
+! Identifier : Root Port (vers SW1), Alternate Port (vers SW2 si SW1 a meilleur chemin)
+
+SW2# show spanning-tree vlan 10
+! Après shutdown de SW1-Gi0/1 : SW2 reste accessible via SW3
+```
+
+**Questions de validation :**
+1. Si tous les switches ont la priorité par défaut, lequel devient root bridge et pourquoi ?
+2. Que se passe-t-il si vous branchez un switch personnel sur un port PortFast sans BPDU Guard ?
+3. En combien de temps RSTP converge-t-il, comparé au STP classique (802.1D) ?
+
+---
+
+## Quiz Module 2 — 15 questions
+
+**Q1.** Quel est le range des VLANs "normal" sur un switch Cisco ? _(Topic 2.1)_
+
+- A) 1–1005
+- B) 1–4094
+- C) 2–1001
+- D) 1–4096
+
+<details>
+<summary>Réponse</summary>
+
+**A** — Les VLANs normal range vont de 1 à 1005. Les VLANs 1006-4094 sont le extended range. Le VLAN 0 et 4095 sont réservés. L'option B inclut les extended range. L'option C exclut le VLAN 1 et les VLANs Token Ring/FDDI. L'option D dépasse la limite 802.1Q (12 bits = 4096 valeurs, mais 0 et 4095 réservés).
+
+</details>
+
+---
+
+**Q2.** Un switch Cisco a tous ses ports dans le VLAN 1 par défaut. Quelle commande déplace le port Fa0/5 dans le VLAN 20 ? _(Topic 2.1)_
+
+- A) `switchport vlan 20`
+- B) `switchport access vlan 20`
+- C) `vlan 20 interface Fa0/5`
+- D) `switchport trunk vlan 20`
+
+<details>
+<summary>Réponse</summary>
+
+**B** — La commande correcte est `switchport access vlan 20` (en mode interface configuration). L'option A est une syntaxe incomplète/incorrecte. L'option C n'existe pas. L'option D configure un trunk, pas un port d'accès.
+
+</details>
+
+---
+
+**Q3.** Quel champ du tag 802.1Q identifie le VLAN d'une trame sur un trunk ? _(Topic 2.2)_
+
+- A) TPID
+- B) PCP
+- C) VID
+- D) DEI
+
+<details>
+<summary>Réponse</summary>
+
+**C** — Le **VID** (VLAN Identifier) sur 12 bits identifie le VLAN. Le TPID (Tag Protocol Identifier = 0x8100) identifie qu'il s'agit d'une trame 802.1Q. Le PCP (Priority Code Point) est utilisé pour la QoS (CoS). Le DEI (Drop Eligible Indicator) indique si la trame peut être supprimée en cas de congestion.
+
+</details>
+
+---
+
+**Q4.** Le VLAN natif est configuré en VLAN 99 sur SW1 et VLAN 1 sur SW2. Quel symptôme observerez-vous ? _(Topic 2.2)_
+
+- A) Le trunk ne se forme pas
+- B) Un message CDP native VLAN mismatch apparaît
+- C) Les VLANs 1 et 99 fusionnent
+- D) Aucun impact, le trafic fonctionne normalement
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Un mismatch de native VLAN génère un message CDP d'avertissement (`%CDP-4-NATIVE_VLAN_MISMATCH`). Le trunk se forme quand même (A est faux), mais le trafic non tagué est mal routé entre les VLANs. C est incorrect — les VLANs ne fusionnent pas. D est incorrect — le mismatch cause des problèmes de communication réels pour le trafic non tagué.
+
+</details>
+
+---
+
+**Q5.** Quelle combinaison LACP forme un EtherChannel ? _(Topic 2.4)_
+
+- A) passive / passive
+- B) active / desirable
+- C) active / passive
+- D) on / active
+
+<details>
+<summary>Réponse</summary>
+
+**C** — active/passive est une combinaison LACP valide (active initie, passive répond). A est incorrect : passive/passive = personne n'initie. B est incorrect : active est LACP, desirable est PAgP — incompatible. D est incorrect : on (pas de protocole) et active (LACP) sont incompatibles.
+
+</details>
+
+---
+
+**Q6.** Quel est le rôle du Root Port dans STP ? _(Topic 2.5)_
+
+- A) Le port avec le coût le plus élevé vers le root bridge
+- B) Un port sur le root bridge qui transmet vers les segments
+- C) Le port d'un non-root switch avec le meilleur chemin vers le root bridge
+- D) Un port bloqué qui sert de sauvegarde
+
+<details>
+<summary>Réponse</summary>
+
+**C** — Le Root Port est le port sur chaque non-root switch qui a le meilleur chemin (coût le plus bas) vers le root bridge. Chaque non-root switch a exactement un Root Port. A est l'inverse — c'est le coût le plus BAS. B décrit un Designated Port. D décrit un Alternate Port.
+
+</details>
+
+---
+
+**Q7.** Un switch a une priorité STP de 32768 pour le VLAN 10. Quel est son Bridge ID priority ? _(Topic 2.5)_
+
+- A) 32768
+- B) 32778
+- C) 32758
+- D) 32769
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Avec l'extended system-id, la priorité affichée inclut le VLAN ID : 32768 + 10 = **32778**. A oublie le VLAN ID. C soustrait au lieu d'additionner. D correspondrait au VLAN 1 (32768 + 1).
+
+</details>
+
+---
+
+**Q8.** Quel protocole de découverte L2 est un standard ouvert (IEEE) ? _(Topic 2.3)_
+
+- A) CDP
+- B) LLDP
+- C) VTP
+- D) DTP
+
+<details>
+<summary>Réponse</summary>
+
+**B** — **LLDP** (Link Layer Discovery Protocol) est défini par IEEE 802.1AB et fonctionne avec tous les fabricants. CDP est propriétaire Cisco. VTP (VLAN Trunking Protocol) est propriétaire Cisco et concerne la propagation des VLANs, pas la découverte. DTP (Dynamic Trunking Protocol) est propriétaire Cisco et négocie les trunks.
+
+</details>
+
+---
+
+**Q9.** Un AP est en mode FlexConnect avec local switching activé. Que se passe-t-il si le WLC devient injoignable ? _(Topic 2.6)_
+
+- A) L'AP s'éteint immédiatement
+- B) L'AP continue à servir les clients avec les SSIDs en local switching
+- C) Les clients sont déconnectés et doivent se reconnecter quand le WLC revient
+- D) L'AP bascule automatiquement en mode Monitor
+
+<details>
+<summary>Réponse</summary>
+
+**B** — En FlexConnect avec local switching, l'AP commute le trafic localement. Si le WLC tombe, l'AP passe en **standalone mode** et continue à servir les clients pour les SSIDs configurés en local switching. A est faux — l'AP ne s'éteint pas. C serait vrai en mode Local (centralisé). D n'a pas de sens — Monitor est un mode spécifique configuré manuellement.
+
+</details>
+
+---
+
+**Q10.** Quel port UDP est utilisé par le canal de contrôle CAPWAP ? _(Topic 2.6)_
+
+- A) 5246
+- B) 5247
+- C) 1812
+- D) 443
+
+<details>
+<summary>Réponse</summary>
+
+**A** — Le canal de contrôle CAPWAP utilise **UDP 5246** (chiffré DTLS). UDP 5247 est le canal de données CAPWAP. UDP 1812 est RADIUS. TCP 443 est HTTPS.
+
+</details>
+
+---
+
+**Q11.** Comment le WLC est-il typiquement connecté au réseau ? _(Topic 2.7)_
+
+- A) Un seul port access dans un VLAN de management
+- B) Un port trunk avec LAG vers le switch de distribution/cœur
+- C) Un câble console vers le routeur principal
+- D) Un lien Wi-Fi vers les AP
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Le WLC est connecté via un **port trunk** (il gère plusieurs VLANs) avec un **LAG** (agrégation de liens) pour la bande passante et la redondance, vers le switch de distribution ou de cœur. A est insuffisant (un seul VLAN). C est un accès management, pas une connexion réseau. D est absurde — le WLC est un équipement filaire.
+
+</details>
+
+---
+
+**Q12.** Quel protocole chiffre le paquet entier lors de l'authentification management ? _(Topic 2.8)_
+
+- A) RADIUS
+- B) TACACS+
+- C) Telnet
+- D) HTTP
+
+<details>
+<summary>Réponse</summary>
+
+**B** — **TACACS+** chiffre l'intégralité du corps du paquet (TCP port 49). RADIUS ne chiffre que le mot de passe. Telnet ne chiffre rien du tout. HTTP non plus.
+
+</details>
+
+---
+
+**Q13.** Quelle est la configuration de sécurité WPA2-Personal sur un WLC ? _(Topic 2.9)_
+
+- A) WPA2 + 802.1X
+- B) WPA2 + PSK
+- C) WPA3 + SAE
+- D) WPA2 + certificats
+
+<details>
+<summary>Réponse</summary>
+
+**B** — **WPA2-Personal** = WPA2 avec **PSK** (Pre-Shared Key). WPA2 + 802.1X = WPA2-Enterprise (A). WPA3 + SAE = WPA3-Personal (C). WPA2 + certificats est une variante de WPA2-Enterprise (D).
+
+</details>
+
+---
+
+**Q14.** PortFast est activé sur Fa0/1 d'un switch. Un utilisateur branche un switch personnel sur ce port. Que se passe-t-il si BPDU Guard est aussi activé ? _(Topic 2.5)_
+
+- A) Le port reste en forwarding car PortFast est prioritaire
+- B) Le port passe en err-disabled dès réception d'un BPDU
+- C) Le switch personnel devient root bridge
+- D) STP recalcule la topologie normalement
+
+<details>
+<summary>Réponse</summary>
+
+**B** — BPDU Guard protège les ports PortFast. Dès qu'un BPDU est reçu (signe qu'un switch est connecté), le port est mis en **err-disabled** immédiatement. A est faux — BPDU Guard prime sur PortFast. C pourrait arriver sans BPDU Guard (si le switch personnel a une priorité plus basse). D arriverait sans PortFast ni BPDU Guard.
+
+</details>
+
+---
+
+**Q15.** Un EtherChannel composé de 4 liens Gi présente l'output suivant. Quel est le problème ?
+
+```
+Group  Port-channel  Protocol    Ports
+------+-------------+-----------+----------------------------------------------
+1      Po1(SD)       LACP        Gi0/1(I)    Gi0/2(I)    Gi0/3(I)    Gi0/4(I)
+```
+
+_(Topic 2.4)_
+
+- A) Le protocole LACP n'est pas supporté
+- B) Le Port-Channel est down et les ports sont individuels (stand-alone)
+- C) Le Port-Channel fonctionne normalement
+- D) Les ports sont en hot-standby
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Les flags **SD** sur Po1 signifient **S** = Layer 2, **D** = down. Les ports montrent **(I)** = stand-alone (individuels, non agrégés). Le channel n'est pas formé. Causes probables : paramètres incompatibles entre les deux côtés (VLAN mismatch, mode mismatch) ou le côté distant n'est pas configuré. A est faux — LACP est bien le protocole configuré. C est faux — (SU) serait le signe d'un fonctionnement normal. D verrait le flag (H).
+
+</details>
+
+---
+
+## Récapitulatif Module 2
+
+| Topic | Concept clé | Commande(s) essentielles |
+|-------|------------|--------------------------|
+| 2.1 | VLANs segmentent les domaines de broadcast, router-on-a-stick pour inter-VLAN | `show vlan brief`, `switchport access vlan X` |
+| 2.2 | Trunks 802.1Q transportent plusieurs VLANs, native VLAN = sans tag | `show interfaces trunk`, `switchport trunk native vlan X` |
+| 2.3 | CDP (Cisco) vs LLDP (standard ouvert), cartographie réseau L2 | `show cdp neighbors detail`, `show lldp neighbors` |
+| 2.4 | EtherChannel agrège 2-8 liens, LACP active/passive | `show etherchannel summary`, `channel-group X mode active` |
+| 2.5 | RSTP élimine les boucles, root bridge élu par BID le plus bas | `show spanning-tree vlan X`, `spanning-tree vlan X root primary` |
+| 2.6 | Split-MAC (CAPWAP), FlexConnect pour sites distants, modes AP | N/A (describe) |
+| 2.7 | AP = PoE + access/trunk, WLC = LAG trunk vers cœur réseau | N/A (describe) |
+| 2.8 | Console (OOB), SSH (in-band chiffré), TACACS+ (admin), RADIUS (accès) | `show ip ssh`, `show users` |
+| 2.9 | GUI WLC : SSID, sécurité WPA2/PSK, QoS profiles, session timeout | N/A (interpret GUI) |
+
+**Check-list avant de passer au Module 3 :**
+- [ ] Je sais créer des VLANs, configurer des ports access/voice et vérifier avec `show vlan brief`
+- [ ] Je sais configurer un trunk 802.1Q avec native VLAN et allowed VLANs
+- [ ] Je sais configurer un router-on-a-stick avec des sous-interfaces
+- [ ] Je sais utiliser CDP et LLDP pour identifier les voisins directs
+- [ ] Je sais configurer un EtherChannel LACP et interpréter `show etherchannel summary`
+- [ ] Je sais identifier le root bridge, les root ports et les alternate ports dans un output STP
+- [ ] Je comprends la différence entre les modes AP Local, FlexConnect et Monitor
+- [ ] Je connais le rôle de CAPWAP (UDP 5246/5247) dans l'architecture wireless centralisée
+- [ ] Je sais différencier SSH, Telnet, TACACS+, RADIUS et leurs cas d'usage
+- [ ] Je sais interpréter une configuration WLAN dans la GUI du WLC
+- [ ] J'ai complété les 9 exercices
+- [ ] J'ai réalisé les 3 labs Packet Tracer
+- [ ] J'ai obtenu >70% au quiz

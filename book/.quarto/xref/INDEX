@@ -1,0 +1,41 @@
+{
+  "chapters/01-network-fundamentals.qmd": {
+    "01-network-fundamentals.html": "6170d005"
+  },
+  "chapters/02-network-access.qmd": {
+    "02-network-access.html": "3d513c61"
+  },
+  "chapters/03-ip-connectivity.qmd": {
+    "03-ip-connectivity.html": "65efa13b"
+  },
+  "chapters/04-ip-services.qmd": {
+    "04-ip-services.html": "b33b6545"
+  },
+  "chapters/05-security-fundamentals.qmd": {
+    "05-security-fundamentals.html": "4770d1fb"
+  },
+  "chapters/06-automation.qmd": {
+    "06-automation.html": "65576509"
+  },
+  "chapters/07-labs.qmd": {
+    "07-labs.html": "2342b7b9"
+  },
+  "chapters/08-exercices.qmd": {
+    "08-exercices.html": "33374cb7"
+  },
+  "chapters/09-exam-blanc.qmd": {
+    "09-exam-blanc.html": "67ddfac1"
+  },
+  "chapters/10-glossaire.qmd": {
+    "10-glossaire.html": "3f52779a"
+  },
+  "index-test.qmd": {
+    "index-test.html": "d4cd83ca"
+  },
+  "index.qmd": {
+    "index.html": "c9275986"
+  },
+  "test.qmd": {
+    "test.html": "4a8e8098"
+  }
+}

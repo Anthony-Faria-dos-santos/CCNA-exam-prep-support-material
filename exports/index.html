@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guide CCNA 200-301 v1.1</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 800px; margin: 2rem auto; padding: 2rem; }
+        .header { text-align: center; margin-bottom: 3rem; }
+        .error { background: #fee; border: 1px solid #fcc; padding: 1rem; border-radius: 4px; }
+        .info { background: #e8f4f8; border: 1px solid #bee5eb; padding: 1rem; border-radius: 4px; }
+        h1 { color: #1a2332; border-bottom: 3px solid #049fd9; padding-bottom: 0.5rem; }
+        code { background: #f5f5f5; padding: 0.2em 0.4em; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Guide CCNA 200-301 v1.1</h1>
+        <p><em>Formation complète — Théorie, Labs & Examens blancs</em></p>
+        <p>Par Anthony Faria Dos Santos</p>
+    </div>
+
+    <div class="error">
+        <h2>🚨 Problème de rendu Quarto</h2>
+        <p>Le rendu automatique des formats HTML et PDF a échoué en raison de problèmes systémiques avec l'installation Quarto :</p>
+        <ul>
+            <li><strong>HTML</strong> : Erreur de compilation SASS persistante</li>
+            <li><strong>PDF</strong> : Erreur de fichier temporaire lors du traitement des labs</li>
+        </ul>
+        <p>Plusieurs tentatives de résolution ont été effectuées sans succès.</p>
+    </div>
+
+    <div class="info">
+        <h2>📁 Structure du projet</h2>
+        <p>Le contenu source est disponible dans :</p>
+        <ul>
+            <li><code>modules/</code> - Modules théoriques</li>
+            <li><code>labs/</code> - Laboratoires Packet Tracer</li>
+            <li><code>quizzes/</code> - Évaluations et examens blancs</li>
+            <li><code>references/</code> - Glossaire et documentation</li>
+        </ul>
+
+        <h2>🛠️ Rendu manuel possible</h2>
+        <p>Pour générer les formats de sortie :</p>
+        <ol>
+            <li>Vérifier l'installation : <code>quarto check</code></li>
+            <li>Nettoyer le cache : <code>rm -rf .quarto</code></li>
+            <li>Réessayer : <code>quarto render --to html</code> puis <code>quarto render --to pdf</code></li>
+        </ol>
+    </div>
+
+    <footer style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid #ddd; color: #666; text-align: center;">
+        <p>Généré le <span id="date"></span> | Version Quarto: 1.9.36 | TinyTeX: v2026.04</p>
+    </footer>
+
+    <script>
+        document.getElementById('date').textContent = new Date().toLocaleDateString('fr-FR');
+    </script>
+</body>
+</html>

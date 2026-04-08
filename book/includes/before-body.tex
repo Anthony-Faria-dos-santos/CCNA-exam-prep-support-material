@@ -1,0 +1,62 @@
+% =============================================================================
+% Page de garde — Guide CCNA 200-301
+% =============================================================================
+
+\begin{titlepage}
+  \begin{center}
+
+    \vspace*{2cm}
+
+    % --- Logo placeholder ---
+    \IfFileExists{assets/images/cover-logo.png}{%
+      \includegraphics[width=5cm]{assets/images/cover-logo.png}\\[1.5cm]
+    }{%
+      \vspace{3cm}
+    }
+
+    % --- Cadre titre ---
+    \begin{tcolorbox}[
+      colback=navy!3,
+      colframe=navy,
+      arc=4mm,
+      boxrule=1.5pt,
+      width=0.85\textwidth,
+      halign=center,
+      top=15mm,
+      bottom=15mm
+    ]
+      {\fontsize{28}{34}\selectfont\bfseries\textcolor{navy}{Guide CCNA 200-301 v1.1}}\\[0.8cm]
+      {\Large\textcolor{ciscoblue}{Formation complète — Théorie, Labs \& Examens blancs}}
+    \end{tcolorbox}
+
+    \vspace{2cm}
+
+    % --- Auteur ---
+    {\Large\textbf{Anthony Faria Dos Santos}}\\[0.4cm]
+    {\large\textcolor{ciscoblue}{\today}}
+
+    \vspace{1.5cm}
+
+    % --- Version ---
+    \begin{tcolorbox}[
+      colback=ciscoblue!5,
+      colframe=ciscoblue,
+      arc=2mm,
+      boxrule=0.6pt,
+      width=0.45\textwidth,
+      halign=center,
+      top=3mm,
+      bottom=3mm
+    ]
+      {\small Version 1.1 — Aligné exam topics Cisco 200-301}
+    \end{tcolorbox}
+
+    \vfill
+
+    {\small\textcolor{gray}{Ce guide couvre l'intégralité du programme CCNA 200-301 v1.1}}\\
+    {\small\textcolor{gray}{Théorie $\bullet$ Labs Packet Tracer $\bullet$ Exercices $\bullet$ Exam blanc}}
+
+  \end{center}
+\end{titlepage}
+
+\newpage

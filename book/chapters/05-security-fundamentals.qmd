@@ -1,0 +1,2835 @@
+---
+title: 'Security Fundamentals'
+description: 'Module 5 — Menaces, ACLs, port security, DHCP snooping, DAI, AAA, VPN, securite wireless'
+---
+
+## Objectif du module {#sec-topic-5-obj}
+
+A l'issue de ce module, vous serez capable de :
+
+- Identifier les menaces, vulnerabilites et vecteurs d'attaque courants dans un reseau d'entreprise
+- Configurer le controle d'acces aux equipements (mots de passe, SSH, AAA)
+- Rediger et appliquer des ACLs standard et etendues avec maitrise des wildcard masks
+- Deployer les mecanismes de securite Layer 2 (port security, DHCP snooping, DAI)
+- Decrire les protocoles de securite Wi-Fi et les principes du ML applique a la securite reseau
+
+## 5.1 — Concepts fondamentaux de securite {#sec-topic-5-1}
+
+> **Exam topic 5.1** : _Define_ — Key security concepts (threats, vulnerabilities, exploits, and mitigation techniques)
+> **Niveau** : Define
+
+### Contexte
+
+Chaque reseau d'entreprise est une cible. Que ce soit un hopital, une PME ou un data center cloud, les attaquants cherchent le maillon faible — un serveur non patche, un mot de passe par defaut, un port ouvert oublie. Avant de configurer quoi que ce soit, il faut parler le meme langage que les professionnels de la securite.
+
+### Theorie
+
+#### La triade CIA
+
+La securite reseau repose sur trois piliers, souvent appeles **triade CIA** :
+
+| Pilier | Anglais | Objectif | Exemple concret |
+|--------|---------|----------|-----------------|
+| **Confidentialite** | Confidentiality | Seules les personnes autorisees accedent aux donnees | Chiffrement VPN entre deux sites |
+| **Integrite** | Integrity | Les donnees ne sont pas alterees en transit ou au repos | Hachage MD5/SHA pour verifier un fichier IOS |
+| **Disponibilite** | Availability | Les services restent accessibles aux utilisateurs legitimes | Redondance HSRP, liens EtherChannel |
+
+Pensez a un coffre-fort dans une banque : la **confidentialite**, c'est la serrure qui empeche les non-autorises d'ouvrir le coffre. L'**integrite**, c'est le scelle qui prouve que personne n'a touche au contenu. La **disponibilite**, c'est le fait que la banque ouvre bien ses portes aux heures prevues.
+
+#### Menaces, vulnerabilites, exploits
+
+Ces trois termes forment une chaine logique (@fig-m5-threat-chain) :
+
+```{.text title="Topologie"}
+  Vulnerabilite              Exploit                 Menace realisee
+  (faille existante)  --->  (outil/technique   --->  (impact sur le
+                             qui l'utilise)            reseau)
+
+  Exemple :
+  Telnet transmet         Un sniffer capture       L'attaquant obtient
+  en clair (vuln.)        les credentials          l'acces admin au routeur
+                          (exploit)                (menace)
+```
+
+### Chaine menace - vulnerabilite - exploit
+
+```{mermaid}
+%%| label: fig-m5-threat-chain
+%%| fig-cap: "Chaine logique reliant une vulnerabilite, un exploit et une menace concretisee"
+flowchart LR
+    V["Vulnerabilite<br/>(faille existante)"] --> E["Exploit<br/>(outil ou technique)"]
+    E --> M["Menace realisee<br/>(impact CIA)"]
+    V -.->|"ex : Telnet en clair"| V2["Port 23 ouvert"]
+    E -.->|"ex : sniffer Wireshark"| E2["Capture credentials"]
+    M -.->|"ex : compromission"| M2["Acces admin vole"]
+```
+
+Legende : la vulnerabilite est passive, l'exploit est actif, la menace est le resultat. Cette chaine est testee regulierement a l'examen (@sec-topic-5-1).
+
+**Menace (Threat)** — Tout evenement potentiel susceptible de compromettre la CIA. Les menaces peuvent etre :
+
+- **Internes** : un employe mecontent qui copie la base clients
+- **Externes** : un groupe de hackers qui lance un ransomware
+- **Environnementales** : une inondation qui detruit la salle serveur
+
+**Vulnerabilite (Vulnerability)** — Une faiblesse dans un systeme, un protocole ou une configuration qu'un attaquant peut exploiter. Quelques exemples reseau :
+
+- Un switch avec le mot de passe console par defaut
+- Un serveur web sans mise a jour de securite depuis 6 mois
+- Les community strings SNMP `public`/`private` en SNMPv1 (voir Module 4, section 4.4)
+- Un reseau Wi-Fi ouvert sans chiffrement
+
+**Exploit** — Le mecanisme concret qui tire parti d'une vulnerabilite. Un exploit peut etre un logiciel, un script, ou meme une manipulation sociale (phishing).
+
+#### Types d'attaques courantes
+
+| Categorie | Attaque | Description | Cible CIA |
+|-----------|---------|-------------|-----------|
+| Reconnaissance | Scan de ports (nmap) | Cartographie des services ouverts | Prepare une attaque |
+| Acces | Brute force | Test systematique de mots de passe | Confidentialite |
+| Acces | Phishing | E-mail frauduleux pour voler des identifiants | Confidentialite |
+| Man-in-the-Middle | ARP spoofing | L'attaquant se fait passer pour la passerelle | Confidentialite, Integrite |
+| Man-in-the-Middle | DHCP rogue server | Faux serveur DHCP distribue une fausse passerelle | Confidentialite |
+| DoS/DDoS | SYN flood | Saturation de la table de connexions TCP | Disponibilite |
+| DoS/DDoS | DHCP starvation | Epuisement du pool DHCP | Disponibilite |
+| Malware | Ransomware | Chiffrement des donnees et demande de rancon | Disponibilite, Confidentialite |
+| Social Engineering | Pretexting | Usurpation d'identite par telephone | Confidentialite |
+
+#### Techniques de mitigation
+
+La securite ne repose jamais sur un seul mecanisme — on parle de **defense en profondeur** (defense in depth). Chaque couche ajoute un obstacle supplementaire :
+
+| Couche | Mecanisme | Exemple |
+|--------|-----------|---------|
+| Physique | Controle d'acces, cameras | Badge pour entrer en salle serveur |
+| Reseau | Firewalls, ACLs, IPS | ACL bloquant le trafic non autorise (@sec-topic-5-6) |
+| Hote | Antivirus, patching, hardening | Desactiver les services inutiles sur un routeur |
+| Application | WAF, input validation | Filtrage des requetes SQL malveillantes |
+| Donnees | Chiffrement, backup | VPN IPsec pour les donnees en transit (@sec-topic-5-5) |
+| Politique | Formation, procedures | Sensibilisation au phishing (@sec-topic-5-2) |
+
+### Mise en pratique CLI
+
+Sur un routeur Cisco, la premiere mesure de securite consiste a verifier les services actifs inutiles :
+
+```{.cisco filename="R1"}
+R1# show control-plane host open-ports
+Active internet connections (servers and established)
+Prot        Local Address       Foreign Address        Service    State
+ tcp                 *:22                  *:0           SSH-Server  LISTEN
+ tcp                 *:23                  *:0           Telnet      LISTEN
+ udp                 *:161                 *:0           SNMP        LISTEN
+ udp                 *:67                  *:0           DHCPD       LISTEN
+```
+
+**Interpretation** : Telnet (port 23) est actif — c'est une vulnerabilite puisque les identifiants transitent en clair. SNMP ecoute sur le port 161, potentiellement avec les community strings par defaut. Ces deux services devraient etre securises ou desactives.
+
+```{.cisco filename="R1"}
+R1(config)# no ip http server
+R1(config)# line vty 0 4
+R1(config-line)# transport input ssh
+R1(config-line)# exit
+```
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : Ne confondez pas **menace** et **vulnerabilite**. Un serveur non patche est une *vulnerabilite* ; un hacker qui cible ce serveur est une *menace*. L'examen teste souvent cette distinction avec des scenarios ou il faut classifier correctement.
+
+**A retenir** : La triade CIA est le fondement de toute question de securite. Si on vous demande "quel est l'impact d'une attaque DDoS ?", la reponse touche la **disponibilite** — pas la confidentialite.
+:::
+
+### Exercice 5.1 — Classification des scenarios de securite
+
+**Contexte** : L'entreprise NetCorp subit plusieurs incidents de securite. Le RSSI vous demande de classifier chaque scenario.
+
+**Consigne** : Pour chaque situation, indiquez s'il s'agit d'une menace, d'une vulnerabilite ou d'un exploit, et precisez quel pilier de la CIA est vise.
+
+1. Le firmware du switch n'a pas ete mis a jour depuis 2 ans
+2. Un employe recoit un e-mail qui imite la page de connexion Office 365
+3. Un scanner nmap identifie le port 23 (Telnet) ouvert sur le routeur edge
+4. Un attaquant utilise Hydra pour tester 10 000 mots de passe sur le VPN
+5. Le mot de passe enable est `cisco123`
+6. Une coupure de courant rend le data center inaccessible pendant 4 heures
+7. Un ver reseau se propage via une faille SMBv1 non patchee
+8. L'acces Wi-Fi visiteur utilise WEP
+9. Un technicien copie la base de donnees clients sur une cle USB personnelle
+10. Un script Python envoie 50 000 requetes DHCP Discover en boucle
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+Une vulnerabilite est une faiblesse passive (elle existe meme sans attaquant). Un exploit est l'action qui utilise cette faiblesse. Une menace est la consequence potentielle ou l'acteur malveillant.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+| # | Type | Pilier CIA | Explication |
+|---|------|-----------|-------------|
+| 1 | Vulnerabilite | — (pas encore exploitee) | Firmware obsolete = faille potentielle |
+| 2 | Exploit (phishing) | Confidentialite | Technique active pour voler des identifiants |
+| 3 | Vulnerabilite | Confidentialite (potentielle) | Le port ouvert est la faiblesse, le scan est de la reconnaissance |
+| 4 | Exploit (brute force) | Confidentialite | Attaque active contre le mecanisme d'authentification |
+| 5 | Vulnerabilite | Confidentialite | Mot de passe faible = faiblesse de configuration |
+| 6 | Menace (environnementale) | Disponibilite | Evenement qui impacte l'acces aux services |
+| 7 | Exploit + menace | Disponibilite, Integrite | Le ver exploite la faille SMBv1 |
+| 8 | Vulnerabilite | Confidentialite | WEP est casse depuis 2004 — chiffrement inefficace |
+| 9 | Menace (interne) | Confidentialite | Exfiltration de donnees par un insider |
+| 10 | Exploit (DHCP starvation) | Disponibilite | Epuisement volontaire du pool DHCP |
+
+:::
+
+### Voir aussi
+
+- @sec-topic-4-4 (SNMP community strings = vulnerabilite courante)
+- @sec-topic-4-5 (Syslog pour la detection d'incidents)
+- @sec-topic-5-7 dans ce module (mitigation des attaques L2 : DHCP snooping, DAI)
+
+## 5.2 — Programmes de securite {#sec-topic-5-2}
+
+> **Exam topic 5.2** : _Describe_ — Security program elements (user awareness, training, and physical access control)
+> **Niveau** : Describe
+
+### Contexte
+
+La technologie seule ne suffit pas. Le pare-feu le plus sophistique n'empechera pas un employe de cliquer sur un lien de phishing ou de coller son mot de passe sur un Post-it. Un programme de securite efficace combine des mesures techniques, organisationnelles et humaines.
+
+### Theorie
+
+#### Les trois piliers d'un programme de securite
+
+Un programme de securite d'entreprise s'articule autour de trois axes complementaires :
+
+**1. Sensibilisation des utilisateurs (User Awareness)**
+
+La majorite des incidents de securite commencent par une erreur humaine. La sensibilisation vise a transformer chaque employe en premiere ligne de defense :
+
+- Campagnes de phishing simule (envoyer de faux e-mails et mesurer le taux de clic)
+- Affichage de bonnes pratiques (verrouiller son poste, ne pas brancher de cles USB inconnues)
+- Procedure de signalement des incidents (a qui ecrire si on recoit un e-mail suspect ?)
+
+L'analogie est celle d'un immeuble : meme avec un digicode a l'entree, si un resident tient la porte ouverte a un inconnu, toute la securite s'effondre.
+
+**2. Formation (Training)**
+
+Plus ciblee que la sensibilisation, la formation s'adresse a des roles specifiques :
+
+- Les administrateurs reseau apprennent a durcir les configurations (hardening)
+- Les developpeurs suivent des formations sur le codage securise (OWASP Top 10)
+- Les equipes SOC s'entrainent sur des simulations d'incidents (tabletop exercises)
+
+La formation doit etre continue — pas un evenement ponctuel annuel — car les menaces evoluent constamment.
+
+**3. Controle d'acces physique (Physical Access Control)**
+
+Le controle physique empeche un attaquant d'acceder directement aux equipements :
+
+| Mesure | Description | Exemples |
+|--------|-------------|----------|
+| **Perimetre** | Premiere barriere physique | Clotures, portail avec badge, gardien |
+| **Batiment** | Controle d'entree du batiment | Badge RFID, interphone, sas de securite |
+| **Salle serveur** | Acces restreint aux personnels autorises | Serrure biometrique, camera, journal d'acces |
+| **Equipement** | Protection individuelle des appareils | Verrou sur le rack, cable antivol, port console protege |
+| **Environnemental** | Protection contre les sinistres | Climatisation, detecteur incendie, onduleur (UPS) |
+
+#### Politiques et procedures
+
+Un programme de securite formalise inclut plusieurs documents :
+
+- **Politique de securite (Security Policy)** : document de haut niveau definissant les regles, les responsabilites et les sanctions
+- **Politique d'utilisation acceptable (AUP)** : ce que les employes peuvent et ne peuvent pas faire avec les ressources IT
+- **Plan de reponse aux incidents (IRP)** : qui fait quoi quand un incident survient (detection → confinement → eradication → restauration → lecons apprises)
+- **Plan de reprise d'activite (DRP/BCP)** : comment maintenir les operations critiques apres un sinistre majeur
+
+### Mise en pratique CLI
+
+La securite physique du port console d'un routeur est souvent negligee. Voici comment la renforcer :
+
+```{.cisco filename="R1"}
+R1(config)# line console 0
+R1(config-line)# password S3cur3C0ns0l3!
+R1(config-line)# login
+R1(config-line)# exec-timeout 5 0
+R1(config-line)# logging synchronous
+R1(config-line)# exit
+```
+
+```{.cisco filename="R1"}
+R1# show line console 0
+   Tty Typ     Tx/Rx    A Modem  Roty AccO AccI   Uses   Noise  Overruns  Int
+     0 CTY                  -      -    -    -        3       0     0/0       -
+
+Line 0, Location: "", Type: ""
+Length: 24 lines, Width: 80 columns
+Baud rate (TX/RX) is 9600/9600
+  ...
+  Timeout: 00:05:00
+  ...
+  Allowed input transports are none.
+  Allowed output transports are pad telnet rlogin lapb-ta mop v120 ssh.
+```
+
+**Interpretation** : Le timeout est bien regle a 5 minutes. Si un administrateur oublie de se deconnecter de la console, la session expire automatiquement — une mesure qui limite le risque d'acces non autorise par quelqu'un qui passerait physiquement devant l'equipement.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : L'examen peut proposer une question ou toutes les reponses sont des mesures techniques (firewall, ACL, IPS, chiffrement). Si la question porte sur un "security program element", cherchez la reponse non technique : sensibilisation, formation ou controle d'acces physique.
+
+**A retenir** : Les trois elements d'un programme de securite sont : **user awareness**, **training** et **physical access control**. Pas de firewall ni d'ACL dans cette liste.
+:::
+
+### Exercice 5.2 — Mini-politique de securite
+
+**Contexte** : Vous etes consultant pour la PME AlphaLogistics (45 employes, 2 sites relies par VPN). Le directeur vous demande de rediger les grandes lignes d'un programme de securite.
+
+**Consigne** : Pour chaque axe (sensibilisation, formation, acces physique), proposez au moins deux mesures concretes adaptees a une PME avec un budget limite.
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+Une PME n'a pas les moyens d'un SOC 24/7. Pensez a des mesures simples et peu couteuses : campagnes e-mail internes, tutoriels video, badges d'acces, verrouillage automatique des postes.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+**Sensibilisation :**
+
+- Campagne trimestrielle de phishing simule avec un outil gratuit (GoPhish)
+- Newsletter securite mensuelle (2 pages max) avec les menaces recentes et les bonnes pratiques
+- Affichage dans les espaces communs : "Verrouillez votre poste (Win+L)", "Ne branchez pas de cles USB inconnues"
+
+**Formation :**
+
+- Session annuelle de 2h pour tous les employes (reconnaitre un phishing, signaler un incident)
+- Formation technique semestrielle pour l'equipe IT (hardening Cisco, gestion des patches)
+- Documentation de procedure de reponse aux incidents (meme simplifiee : qui appeler, quoi isoler)
+
+**Acces physique :**
+
+- Badge RFID pour l'acces au batiment et a la salle serveur (investissement unique ~500EUR)
+- Journal d'acces a la salle serveur (registre papier ou badge electronique)
+- Cables antivol sur les laptops des bureaux ouverts
+- Verrouillage automatique des postes apres 5 minutes d'inactivite (GPO Windows)
+
+:::
+
+### Voir aussi
+
+- @sec-topic-5-4 dans ce module (politiques de mots de passe — composante d'un programme de securite)
+- @sec-topic-5-8 dans ce module (AAA — controle d'acces logique)
+
+## 5.3 — Controle d'acces par mots de passe locaux {#sec-topic-5-3}
+
+> **Exam topic 5.3** : _Configure and verify_ — Device access control using local passwords
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Un routeur ou un switch Cisco fraichement deballe n'a aucune protection. N'importe qui avec un cable console peut prendre le controle total de l'equipement. La premiere action d'un administrateur reseau, avant meme de configurer une adresse IP, c'est de verrouiller les acces.
+
+### Theorie
+
+#### Les points d'acces a securiser
+
+Un equipement Cisco possede plusieurs "portes d'entree" :
+
+```{.text title="Topologie"}
+                          +----------------------+
+   Console (port serie) --|                      |
+                          |     Routeur/Switch    |
+   VTY (SSH/Telnet)    --|     Cisco IOS         |
+                          |                      |
+   AUX (modem dial-up) --|                      |
+                          |   Mode enable        |
+   HTTP/HTTPS (GUI)    --|   (privilege 15)      |
+                          +----------------------+
+```
+
+Chaque point d'acces doit etre protege independamment.
+
+#### Hierarchie des mots de passe
+
+Cisco IOS propose plusieurs types de mots de passe, avec des niveaux de securite differents :
+
+| Commande | Protege | Stockage | Securite |
+|----------|---------|----------|----------|
+| `enable password` | Acces au mode enable | Clair dans `running-config` | Faible (obsolete) |
+| `enable secret` | Acces au mode enable | Hache MD5 ou SHA-256 | Forte |
+| `line console 0` → `password` | Acces console | Clair (ou `service password-encryption`) | Moyenne |
+| `line vty 0 4` → `password` | Acces distant (Telnet/SSH) | Clair (ou `service password-encryption`) | Moyenne |
+| `username X secret Y` | Authentification locale nommee | Hache MD5/SHA-256 | Forte |
+
+Si `enable password` et `enable secret` coexistent, **`enable secret` prend toujours le dessus**. Cisco recommande de n'utiliser que `enable secret`.
+
+#### `service password-encryption`
+
+Cette commande applique un chiffrement de type 7 (algorithme Vigenere reversible) a tous les mots de passe en clair dans la configuration. C'est mieux que rien, mais c'est facilement cassable — des dizaines d'outils en ligne dechiffrent un mot de passe type 7 en une seconde. Son role principal : empecher la lecture par-dessus l'epaule (shoulder surfing) quand on affiche la running-config.
+
+#### Utilisateurs locaux
+
+Plutot que de partager un mot de passe unique sur les lignes VTY (qui ne permet pas de savoir *qui* s'est connecte), on cree des comptes utilisateurs locaux :
+
+```{.cisco filename="R1"}
+R1(config)# username admin privilege 15 secret Str0ngP@ss2026!
+R1(config)# username technicien privilege 1 secret Tech$upport1
+```
+
+Le niveau de privilege (0 a 15) determine les commandes accessibles :
+
+- **Privilege 0** : logout, enable, disable, help, exit
+- **Privilege 1** : mode utilisateur standard (show basiques)
+- **Privilege 15** : acces complet (mode enable)
+
+### Mise en pratique CLI
+
+Configuration complete de la securite d'acces sur un routeur :
+
+```{.cisco filename="R1"}
+! Etape 1 : Mot de passe enable (hache)
+R1(config)# enable secret C1sc0SecretP@ss!
+
+! Etape 2 : Securiser la console
+R1(config)# line console 0
+R1(config-line)# login local
+R1(config-line)# exec-timeout 5 0
+R1(config-line)# logging synchronous
+R1(config-line)# exit
+
+! Etape 3 : Securiser les lignes VTY
+R1(config)# line vty 0 4
+R1(config-line)# login local
+R1(config-line)# transport input ssh
+R1(config-line)# exec-timeout 10 0
+R1(config-line)# exit
+
+! Etape 4 : Creer les utilisateurs locaux
+R1(config)# username admin privilege 15 secret @dminP@ss2026
+R1(config)# username operator privilege 1 secret 0pR3ad0nly!
+
+! Etape 5 : Chiffrement cosmetique des mots de passe restants
+R1(config)# service password-encryption
+
+! Etape 6 : Banniere d'avertissement legale
+R1(config)# banner motd #
+*** ACCES RESERVE AU PERSONNEL AUTORISE ***
+*** Toute tentative d'acces non autorise sera poursuivie ***
+#
+```
+
+**Verification :**
+
+```{.cisco filename="R1"}
+R1# show running-config | section line
+line con 0
+ exec-timeout 5 0
+ logging synchronous
+ login local
+line aux 0
+line vty 0 4
+ exec-timeout 10 0
+ login local
+ transport input ssh
+```
+
+```{.cisco filename="R1"}
+R1# show running-config | include username
+username admin privilege 15 secret 9 $14$WxKz$...(hache)...
+username operator privilege 1 secret 9 $14$RtPm$...(hache)...
+```
+
+**Interpretation** : Les mots de passe `secret` apparaissent sous forme hachee (type 9 = SHA-256 sur les IOS recents, type 5 = MD5 sur les anciens). La ligne `login local` sur console et VTY signifie que l'authentification utilise la base locale de usernames. `transport input ssh` bloque Telnet sur les lignes VTY.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : Si une question vous montre une config avec `enable password cisco` ET `enable secret class`, le mot de passe pour acceder au mode enable est **class** (enable secret gagne toujours). L'examen teste regulierement cette priorite.
+
+**A retenir** : `login` seul = utilise le mot de passe de la ligne (`password`). `login local` = utilise la base de donnees `username`. Ne confondez pas les deux — c'est une erreur classique.
+:::
+
+### Exercice 5.3 — Securisation d'un routeur neuf
+
+**Contexte** : Le routeur R-Branch vient d'etre installe dans la succursale de Lyon. Il est encore en configuration usine. Vous devez le securiser avant de le mettre en production.
+
+**Consigne** :
+
+1. Configurez un enable secret `Ly0nBr@nch2026`
+2. Creez deux utilisateurs : `admin` (privilege 15, secret `@dminLy0n!`) et `helpdesk` (privilege 1, secret `H3lpD3sk$`)
+3. Securisez la console avec `login local` et un timeout de 3 minutes
+4. Securisez les VTY (0 a 4) en SSH uniquement avec `login local` et un timeout de 10 minutes
+5. Activez le chiffrement des mots de passe
+6. Ajoutez une banniere MOTD d'avertissement
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+N'oubliez pas que `transport input ssh` necessite au prealable un hostname, un domain-name et une cle RSA (voir Module 4, section 4.8). Pour cet exercice, concentrez-vous sur les commandes de securite d'acces.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+```{.cisco filename="R-Branch"}
+R-Branch(config)# enable secret Ly0nBr@nch2026
+R-Branch(config)# username admin privilege 15 secret @dminLy0n!
+R-Branch(config)# username helpdesk privilege 1 secret H3lpD3sk$
+R-Branch(config)# line console 0
+R-Branch(config-line)# login local
+R-Branch(config-line)# exec-timeout 3 0
+R-Branch(config-line)# logging synchronous
+R-Branch(config-line)# exit
+R-Branch(config)# line vty 0 4
+R-Branch(config-line)# login local
+R-Branch(config-line)# transport input ssh
+R-Branch(config-line)# exec-timeout 10 0
+R-Branch(config-line)# exit
+R-Branch(config)# service password-encryption
+R-Branch(config)# banner motd #
+*** ACCES RESERVE - Succursale Lyon ***
+*** Les acces non autorises sont interdits et traces ***
+#
+```
+
+**Explication** : `login local` sur les deux lignes force l'authentification par username/password. Le timeout console a 3 minutes est plus court que le VTY (10 min) car l'acces physique a la console implique qu'on se trouve dans la salle serveur — une session oubliee y est plus risquee. La banniere MOTD a un role juridique : elle avertit que l'acces est restreint, ce qui est requis dans certaines juridictions pour poursuivre un intrus.
+
+:::
+
+### Voir aussi
+
+- @sec-topic-4-8 (configuration complete de SSH — prerequis pour `transport input ssh`)
+- @sec-topic-5-4 dans ce module (politiques de complexite des mots de passe)
+- @sec-topic-5-8 dans ce module (AAA — alternative plus scalable a l'authentification locale)
+
+## 5.4 — Politiques de mots de passe et alternatives {#sec-topic-5-4}
+
+> **Exam topic 5.4** : _Describe_ — Security password policies elements (management, complexity, password alternatives — MFA, certificates, biometrics)
+> **Niveau** : Describe
+
+### Contexte
+
+Un mot de passe `admin123` protege autant qu'une porte en carton. Mais imposer des mots de passe de 25 caracteres changes tous les 15 jours pousse les utilisateurs a les ecrire sur des Post-it. Une bonne politique de mots de passe trouve l'equilibre entre securite et utilisabilite.
+
+### Theorie
+
+#### Elements d'une politique de mots de passe
+
+| Element | Recommandation | Justification |
+|---------|---------------|---------------|
+| **Longueur minimale** | 12 caracteres (NIST SP 800-63B) | Resistance au brute force |
+| **Complexite** | Melange majuscules, minuscules, chiffres, symboles | Augmente l'espace de recherche |
+| **Rotation** | Uniquement en cas de compromission (NIST 2024) | Le changement force regulier encourage les mots de passe faibles |
+| **Historique** | Interdire la reutilisation des 5-10 derniers | Empeche le recyclage |
+| **Verrouillage** | Apres 5 tentatives, verrouillage temporaire (15-30 min) | Anti-brute force |
+| **Stockage** | Hachage avec sel (bcrypt, SHA-256) | Protege la base en cas de vol |
+
+Sur un equipement Cisco, la longueur minimale se configure avec :
+
+```{.cisco filename="R1"}
+R1(config)# security passwords min-length 10
+```
+
+Cette commande refuse tout mot de passe de moins de 10 caracteres lors de la prochaine configuration.
+
+#### Gestion des mots de passe (Management)
+
+La gestion couvre le cycle de vie complet :
+
+- **Creation** : respect des regles de complexite
+- **Distribution** : ne jamais envoyer un mot de passe en clair par e-mail
+- **Stockage** : gestionnaire de mots de passe (pas un fichier Excel)
+- **Rotation** : changement immediat si compromission suspectee
+- **Revocation** : desactiver les comptes des employes qui quittent l'entreprise
+
+#### Alternatives aux mots de passe
+
+Les mots de passe seuls sont de plus en plus insuffisants. Trois alternatives majeures les completent ou les remplacent :
+
+**MFA — Multi-Factor Authentication**
+
+L'authentification multifacteur combine au moins deux facteurs parmi trois categories :
+
+| Facteur | "Ce que..." | Exemples |
+|---------|------------|----------|
+| **Connaissance** | ...vous savez | Mot de passe, PIN, reponse secrete |
+| **Possession** | ...vous avez | Smartphone (appli TOTP), token materiel (YubiKey), badge |
+| **Inherence** | ...vous etes | Empreinte digitale, reconnaissance faciale, iris |
+
+Le principe : meme si un attaquant vole votre mot de passe (facteur connaissance), il lui faut aussi votre telephone (facteur possession) pour s'authentifier. C'est la meme logique qu'un distributeur de billets qui exige la carte *et* le code PIN.
+
+**Certificats numeriques**
+
+Un certificat X.509 est une piece d'identite numerique emise par une autorite de certification (CA). Il contient :
+
+- L'identite du titulaire
+- Sa cle publique
+- La signature de la CA
+- La periode de validite
+
+Les certificats sont utilises pour l'authentification VPN (IPsec), le 802.1X sur les reseaux filaires et Wi-Fi, et le HTTPS. Leur avantage : pas de mot de passe a memoriser ni a transmettre.
+
+**Biometrie**
+
+La biometrie utilise des caracteristiques physiques uniques :
+
+- Empreinte digitale (le plus courant, rapport cout/fiabilite)
+- Reconnaissance faciale (de plus en plus repandue sur les smartphones)
+- Scan retinien/iris (haute securite, cout eleve)
+
+Limitation importante : contrairement a un mot de passe, une empreinte digitale ne peut pas etre changee si elle est compromise. La biometrie est donc toujours combinee avec un autre facteur.
+
+### Mise en pratique CLI
+
+Configuration de la longueur minimale et d'un mecanisme anti-brute force sur les lignes VTY :
+
+```{.cisco filename="R1"}
+R1(config)# security passwords min-length 10
+R1(config)# login block-for 120 attempts 3 within 60
+```
+
+**Verification :**
+
+```{.cisco filename="R1"}
+R1# show login
+  A login delay of 1 second is applied.
+  Quiet-Mode access list is not configured.
+
+  Router enabled to watch for login Attacks.
+  If more than 3 login failures occur in 60 seconds or less,
+  further login attempts will be blocked for 120 seconds.
+
+  Router presently in Normal-Mode.
+  Current Watch Window
+    Time remaining: 42 seconds.
+    Login failures for current window: 0.
+```
+
+**Interpretation** : Si quelqu'un echoue 3 fois en moins de 60 secondes, les lignes VTY se verrouillent pendant 2 minutes. C'est une protection efficace contre le brute force, sans necessiter de serveur AAA externe.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : L'examen peut demander combien de facteurs MFA sont utilises dans un scenario donne. Un mot de passe + un code PIN = **un seul facteur** (connaissance x 2). Un mot de passe + un code TOTP sur smartphone = **deux facteurs** (connaissance + possession). C'est le *type* de facteur qui compte, pas le nombre d'elements.
+
+**A retenir** : Les trois categories MFA sont : quelque chose que vous **savez**, quelque chose que vous **avez**, quelque chose que vous **etes**. Deux elements de la meme categorie ne font pas du MFA.
+:::
+
+### Exercice 5.4 — Comparaison des methodes d'authentification
+
+**Contexte** : Le DSI de MedTech (clinique de 200 employes) souhaite renforcer l'acces au reseau interne et aux dossiers patients.
+
+**Consigne** : Completez le tableau suivant en indiquant les avantages et inconvenients de chaque methode, puis recommandez une solution pour chaque cas d'usage.
+
+| Methode | Avantage principal | Inconvenient principal | Cas d'usage recommande |
+|---------|-------------------|----------------------|----------------------|
+| Mot de passe seul | | | |
+| MFA (mot de passe + TOTP) | | | |
+| Certificat X.509 | | | |
+| Biometrie + PIN | | | |
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+Pensez au contexte medical : les medecins changent souvent de poste de travail, le temps d'authentification doit etre court, et les donnees patients sont soumises a des reglementations strictes.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+| Methode | Avantage principal | Inconvenient principal | Cas d'usage recommande |
+|---------|-------------------|----------------------|----------------------|
+| Mot de passe seul | Simple, pas de materiel supplementaire | Vulnerable au phishing et brute force | Wi-Fi visiteur (reseau isole, donnees non sensibles) |
+| MFA (mot de passe + TOTP) | Resistant au vol de mot de passe | Necessite un smartphone ou token | VPN d'acces distant pour le teletravail |
+| Certificat X.509 | Pas de mot de passe a memoriser, fort | Gestion complexe (PKI, revocation, renouvellement) | Authentification 802.1X des postes fixes |
+| Biometrie + PIN | Rapide et difficile a usurper | Couteux, empreinte non revocable | Acces physique a la salle des dossiers patients |
+
+**Explication** : Dans un contexte medical, le MFA est indispensable pour l'acces distant aux dossiers patients. Les certificats conviennent aux postes fixes car ils s'installent une fois. La biometrie est adaptee aux acces physiques critiques. Le mot de passe seul ne devrait etre reserve qu'aux ressources non sensibles.
+
+:::
+
+### Voir aussi
+
+- @sec-topic-5-3 dans ce module (configuration pratique des mots de passe Cisco)
+- @sec-topic-5-8 dans ce module (AAA — centralisation de l'authentification)
+- @sec-topic-5-9 dans ce module (WPA2-Enterprise utilise 802.1X avec certificats ou MFA)
+
+## 5.5 — VPNs IPsec {#sec-topic-5-5}
+
+> **Exam topic 5.5** : _Describe_ — IPsec remote access and site-to-site VPNs
+> **Niveau** : Describe
+
+### Contexte
+
+Quand une entreprise connecte ses bureaux via Internet ou permet a ses employes de travailler depuis chez eux, les donnees traversent un reseau public non fiable. Le VPN (Virtual Private Network) cree un "tunnel" chiffre a travers Internet — comme un tube opaque au milieu d'une piece transparente. IPsec est le standard de l'industrie pour ces tunnels.
+
+### Theorie
+
+#### Deux architectures VPN
+
+```{.text title="Topologie"}
+  Site-to-Site VPN                        Remote Access VPN
+
+  +------+   Tunnel IPsec   +------+     +----------+
+  | Site |===================| Site |     | Employe  |   Tunnel
+  |  A   |   (permanent)    |  B   |     | distant  |=========+
+  | R1   |                  | R2   |     | (laptop) |       ||
+  +--+---+                  +--+---+     +----------+       ||
+     |                         |                         +--++---+
+  +--+---+                  +--+---+                     | HQ   |
+  | LAN  |                  | LAN  |                     | R1   |
+  | A    |                  | B    |                     +--+---+
+  +------+                  +------+                     +--+---+
+                                                         | LAN  |
+                                                         +------+
+```
+
+| Caracteristique | Site-to-Site | Remote Access |
+|----------------|-------------|---------------|
+| **Endpoints** | Routeur <-> Routeur (ou firewall) | Client logiciel <-> Routeur/Firewall |
+| **Initiation** | Permanent ou on-demand | A la demande (l'utilisateur se connecte) |
+| **Usage** | Relier deux sites d'entreprise | Teletravail, employes mobiles |
+| **Authentification** | Pre-shared key (PSK) ou certificats | Username/password + certificat ou MFA |
+| **Exemple** | Siege Paris <-> Succursale Lyon via Internet | Commercial en deplacement → reseau d'entreprise |
+| **Protocole typique** | IPsec (IKEv2) | IPsec, SSL/TLS (AnyConnect) |
+
+#### Les composants d'IPsec
+
+IPsec n'est pas un protocole unique mais une **suite de protocoles** qui travaillent ensemble :
+
+### Negociation IKE Phase 1 et Phase 2
+
+```{mermaid}
+%%| label: fig-m5-ipsec-phases
+%%| fig-cap: "Sequence complete IKE Phase 1 (ISAKMP SA) puis Phase 2 (IPsec SA) entre deux pairs VPN"
+sequenceDiagram
+    participant R1 as R1<br/>198.51.100.1
+    participant R2 as R2<br/>203.0.113.1
+    Note over R1,R2: IKE Phase 1 (UDP 500) - ISAKMP SA
+    R1->>R2: Proposition (AES-256, SHA-256, DH14, PSK)
+    R2->>R1: Acceptation des parametres
+    R1->>R2: Echange Diffie-Hellman (cles publiques)
+    R2->>R1: Echange Diffie-Hellman (cles publiques)
+    Note over R1,R2: Canal securise etabli
+    R1->>R2: Authentification (PSK ou cert)
+    R2->>R1: Authentification mutuelle validee
+    Note over R1,R2: IKE Phase 2 - IPsec SA
+    R1->>R2: Quick Mode (proxy IDs, ESP AES-256)
+    R2->>R1: Quick Mode ACK
+    Note over R1,R2: Tunnel ESP actif - trafic chiffre
+    R1->>R2: Paquet ESP (donnees LAN chiffrees)
+```
+
+Legende : Phase 1 negocie le canal de controle (ISAKMP SA), Phase 2 negocie le tunnel de donnees (IPsec SA). L'etat `QM_IDLE` dans `show crypto isakmp sa` indique Phase 1 operationnelle.
+
+**IKE (Internet Key Exchange)** — Phase de negociation
+
+- **IKE Phase 1** : les deux pairs s'authentifient mutuellement et negocient un canal securise (ISAKMP SA). Ils se mettent d'accord sur les algorithmes de chiffrement, de hachage, la methode d'authentification et le groupe Diffie-Hellman.
+- **IKE Phase 2** : a l'interieur du canal securise de Phase 1, les pairs negocient les parametres du tunnel de donnees (IPsec SA). Ils definissent quel trafic sera protege (via des ACLs crypto) et les algorithmes utilises.
+
+**Protocoles de protection des donnees :**
+
+| Protocole | Fonction | Chiffrement | Integrite | IP Protocol # |
+|-----------|----------|-------------|-----------|---------------|
+| **AH** (Authentication Header) | Integrite + authentification | Non | Oui | 51 |
+| **ESP** (Encapsulating Security Payload) | Chiffrement + integrite + authentification | Oui | Oui | 50 |
+
+Dans la pratique, **ESP est quasi toujours utilise** car il fournit le chiffrement. AH ne chiffre pas les donnees — il garantit seulement qu'elles n'ont pas ete modifiees.
+
+**Modes de fonctionnement :**
+
+| Mode | Chiffre quoi ? | Usage |
+|------|---------------|-------|
+| **Transport** | Seulement le payload IP (pas l'en-tete) | Communication hote-a-hote |
+| **Tunnel** | Le paquet IP entier (nouvel en-tete IP ajoute) | Site-to-site (le plus courant) |
+
+#### Algorithmes utilises
+
+| Fonction | Algorithmes courants | Notes CCNA |
+|----------|---------------------|------------|
+| Chiffrement | AES-128, AES-256, 3DES (obsolete) | AES-256 = recommande |
+| Hachage/Integrite | SHA-256, SHA-384, MD5 (obsolete) | SHA-256 = recommande |
+| Authentification | PSK, certificats RSA | PSK = plus simple, certificats = plus sur |
+| Echange de cles | DH Group 14 (2048 bits), DH Group 19 (ECP 256) | Plus le groupe est eleve, plus c'est sur (et lent) |
+
+#### GRE over IPsec
+
+IPsec seul ne transporte que du trafic unicast IP. Pour du multicast (OSPF, EIGRP) ou du trafic non-IP, on encapsule d'abord dans un tunnel GRE, puis on chiffre avec IPsec :
+
+```{.text title="Topologie"}
+  Paquet OSPF -> GRE encapsule -> IPsec chiffre -> Internet -> IPsec dechiffre -> GRE decapsule -> OSPF
+```
+
+C'est la combinaison standard pour les VPN site-to-site qui doivent transporter du trafic de routage dynamique.
+
+### Mise en pratique CLI
+
+L'examen CCNA ne demande pas de *configurer* IPsec, mais vous devez comprendre les concepts. Voici un `show` typique pour illustrer :
+
+```{.cisco filename="R1"}
+R1# show crypto isakmp sa
+IPv4 Crypto ISAKMP SA
+dst             src             state          conn-id status
+203.0.113.1     198.51.100.1    QM_IDLE           1001 ACTIVE
+
+R1# show crypto ipsec sa
+
+interface: GigabitEthernet0/0
+    Crypto map tag: VPN-MAP, local addr 198.51.100.1
+
+   protected vrf: (none)
+   local  ident (addr/mask/prot/port): (192.168.1.0/255.255.255.0/0/0)
+   remote ident (addr/mask/prot/port): (10.1.1.0/255.255.255.0/0/0)
+   current_peer 203.0.113.1 port 500
+     PERMIT, flags={origin_is_acl,}
+    #pkts encaps: 1842, #pkts encrypt: 1842, #pkts digest: 1842
+    #pkts decaps: 1756, #pkts decrypt: 1756, #pkts verify: 1756
+    #pkts compressed: 0, #pkts decompressed: 0
+    #pkts not compressed: 0, #pkts compr. failed: 0
+
+     inbound esp sas:
+      spi: 0xA3B2C1D4(2746679764)
+        transform: esp-aes 256 esp-sha256-hmac ,
+        in use settings ={Tunnel, }
+```
+
+**Interpretation** :
+
+- **ISAKMP SA** : Phase 1 etablie entre 203.0.113.1 et 198.51.100.1, etat `QM_IDLE` = tunnel actif, pret a transmettre
+- **IPsec SA** : Le trafic entre 192.168.1.0/24 (local) et 10.1.1.0/24 (distant) est protege
+- **Compteurs** : 1842 paquets chiffres envoyes, 1756 recus — le tunnel fonctionne
+- **Transform** : `esp-aes 256 esp-sha256-hmac` = chiffrement AES-256 + integrite SHA-256, mode Tunnel
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : On vous demande la difference entre AH et ESP. AH fournit uniquement l'integrite et l'authentification — **pas de chiffrement**. ESP fournit les trois (chiffrement + integrite + authentification). Si la question mentionne la confidentialite, la reponse est ESP.
+
+**A retenir** : IPsec utilise **IKE Phase 1** (negociation du canal securise) et **IKE Phase 2** (negociation du tunnel de donnees). Le mode **Tunnel** encapsule le paquet entier (site-to-site), le mode **Transport** ne chiffre que le payload (hote-a-hote).
+:::
+
+### Exercice 5.5 — Identification des composants IPsec
+
+**Contexte** : L'entreprise DuoTech relie son siege (Paris, 198.51.100.0/24) a sa succursale (Lyon, 203.0.113.0/24) via un VPN site-to-site IPsec sur Internet.
+
+**Consigne** : Sur le schema ci-dessous, identifiez :
+
+1. Les deux endpoints du tunnel
+2. Le type de VPN (site-to-site ou remote access)
+3. Le protocole IPsec probable (AH ou ESP) et pourquoi
+4. Le mode IPsec probable (tunnel ou transport) et pourquoi
+5. Quel trafic sera protege par le tunnel
+
+```{.text title="Topologie"}
+  [LAN Paris]--[R-Paris]====Internet====[R-Lyon]--[LAN Lyon]
+  198.51.100.0/24                              203.0.113.0/24
+```
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+Entre deux routeurs via Internet, on veut chiffrer ET authentifier. Le paquet IP entier doit etre encapsule car les adresses privees ne sont pas routables sur Internet.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+1. **Endpoints** : R-Paris et R-Lyon (leurs interfaces publiques respectives)
+2. **Type** : Site-to-site (deux routeurs relies de facon permanente)
+3. **Protocole** : ESP — car on a besoin de chiffrement (confidentialite) en plus de l'integrite. AH ne chiffre pas.
+4. **Mode** : Tunnel — le paquet IP entier (y compris les adresses sources/destination privees) est encapsule dans un nouveau paquet IP avec les adresses publiques des routeurs. Indispensable car les adresses 198.51.100.x et 203.0.113.x ne sont pas routables directement via Internet dans un scenario reel avec RFC 1918.
+5. **Trafic protege** : Tout le trafic entre 198.51.100.0/24 et 203.0.113.0/24 (defini par une ACL crypto sur chaque routeur)
+
+:::
+
+### Voir aussi
+
+- @sec-topic-1-5 (TCP vs UDP — IPsec utilise UDP 500 pour IKE et UDP 4500 pour NAT-T)
+- @sec-topic-4-1 (NAT — NAT-Traversal est necessaire quand IPsec traverse du NAT)
+- @sec-topic-5-9 dans ce module (WPA2-Enterprise peut utiliser un tunnel TLS)
+
+## 5.6 — Listes de controle d'acces (ACLs) {#sec-topic-5-6}
+
+> **Exam topic 5.6** : _Configure and verify_ — Access control lists
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Les ACLs sont les gardes-barrieres du reseau. Elles decident, paquet par paquet, qui peut entrer et qui doit rester dehors. C'est l'un des sujets les plus testes du CCNA : vous devez non seulement comprendre la logique, mais aussi ecrire des ACLs correctes avec les bons wildcard masks, les placer sur la bonne interface et dans la bonne direction.
+
+### Theorie
+
+#### Qu'est-ce qu'une ACL ?
+
+Une ACL est une liste ordonnee de regles (ACE — Access Control Entries) que le routeur consulte sequentiellement pour chaque paquet. Chaque regle dit soit `permit` (autoriser) soit `deny` (refuser). Le routeur parcourt la liste de haut en bas et s'arrete a la premiere correspondance (algorithme detaille @fig-m5-acl-processing). La difference standard vs etendue est illustree en @fig-m5-acl-std-vs-ext, et les regles de placement en @fig-m5-acl-placement.
+
+```{.text title="Topologie"}
+  Paquet arrive sur l'interface
+         |
+         v
+  +--- ACE 1 ---+    Match ?
+  | permit 10.x |---- Oui --> PERMIT (paquet transmis)
+  +--------------+
+         | Non
+         v
+  +--- ACE 2 ---+    Match ?
+  | deny 172.x  |---- Oui --> DENY (paquet jete)
+  +--------------+
+         | Non
+         v
+  +--- ACE 3 ---+    Match ?
+  | permit any  |---- Oui --> PERMIT
+  +--------------+
+         | Non
+         v
+  +- Implicit  -+
+  | deny any    |-----------> DENY (paquet jete silencieusement)
+  +-------------+
+```
+
+### Traitement sequentiel d'une ACL
+
+```{mermaid}
+%%| label: fig-m5-acl-processing
+%%| fig-cap: "Algorithme de traitement sequentiel d'une ACL avec deny implicite final"
+flowchart TD
+    P[Paquet entrant] --> A1{ACE 1<br/>match ?}
+    A1 -->|Oui permit| PF[PERMIT<br/>Transmis]
+    A1 -->|Oui deny| DF[DENY<br/>Dropped]
+    A1 -->|Non| A2{ACE 2<br/>match ?}
+    A2 -->|Oui permit| PF
+    A2 -->|Oui deny| DF
+    A2 -->|Non| A3{ACE N<br/>match ?}
+    A3 -->|Oui permit| PF
+    A3 -->|Oui deny| DF
+    A3 -->|Non| IMP[Deny implicite<br/>final]
+    IMP --> DF
+```
+
+Legende : le routeur evalue les ACEs de haut en bas et s'arrete a la premiere correspondance. Si aucune ne matche, le deny implicite silencieux supprime le paquet.
+
+Deux regles fondamentales a ne jamais oublier :
+
+1. **Traitement sequentiel** : la premiere regle qui correspond est appliquee, les suivantes sont ignorees
+2. **Deny implicite** : a la fin de toute ACL, il y a un `deny any` invisible. Si aucune regle ne correspond, le paquet est supprime
+
+#### ACL Standard vs Extended
+
+| Caracteristique | ACL Standard | ACL Extended |
+|----------------|-------------|-------------|
+| **Critere de filtrage** | Adresse IP source uniquement | Source, destination, protocole, port |
+| **Numeros** | 1-99 et 1300-1999 | 100-199 et 2000-2699 |
+| **Placement** | Proche de la **destination** | Proche de la **source** |
+| **Granularite** | Grossiere (tout ou rien par source) | Fine (filtrage par service) |
+| **Syntaxe** | `access-list {1-99} {permit|deny} {source} {wildcard}` | `access-list {100-199} {permit|deny} {proto} {src} {wc} {dst} {wc} [eq port]` |
+
+### Comparaison Standard vs Extended
+
+```{mermaid}
+%%| label: fig-m5-acl-std-vs-ext
+%%| fig-cap: "Comparaison cote a cote des ACLs standard et extended : criteres, plages, placement"
+flowchart LR
+    subgraph STD["ACL Standard"]
+        direction TB
+        S1[Filtre : source IP]
+        S2["Plages : 1-99<br/>1300-1999"]
+        S3[Placement : proche<br/>destination]
+        S4[Granularite : grossiere]
+        S5["Ex : access-list 10<br/>permit 192.168.1.0 0.0.0.255"]
+    end
+    subgraph EXT["ACL Extended"]
+        direction TB
+        E1[Filtre : src + dst<br/>+ proto + port]
+        E2["Plages : 100-199<br/>2000-2699"]
+        E3[Placement : proche<br/>source]
+        E4[Granularite : fine]
+        E5["Ex : access-list 100<br/>permit tcp src dst eq 80"]
+    end
+```
+
+Legende : les ACLs standard filtrent uniquement par source IP, les extended ajoutent destination, protocole et ports. La granularite dicte le placement optimal.
+
+### Placement optimal : standard vs extended
+
+```{mermaid}
+%%| label: fig-m5-acl-placement
+%%| fig-cap: "Placement recommande d'une ACL standard (pres destination) et extended (pres source)"
+graph LR
+    SRC["Source<br/>192.168.1.0/24"] --> R1(("R1<br/>Gi0/0"))
+    R1 -->|"10.1.1.0/30"| R2(("R2"))
+    R2 -->|"10.2.2.0/30"| R3(("R3<br/>Gi0/2"))
+    R3 --> DST["Destination<br/>10.0.0.0/24"]
+    R1 -.->|"ACL EXT<br/>in Gi0/0"| EX[Extended<br/>pres source]
+    R3 -.->|"ACL STD<br/>out Gi0/2"| ST[Standard<br/>pres destination]
+```
+
+Legende : une extended placee pres de la source economise la bande passante. Une standard placee pres de la destination evite de bloquer des flux legitimes de la meme source.
+
+Pourquoi ce placement ? Une ACL standard ne voit que la source. Si on la place proche de la source, on bloque *tout* le trafic de cette source — meme vers des destinations legitimes. En la placant proche de la destination, on ne bloque que le flux specifique qu'on cible.
+
+Une ACL extended, en revanche, peut filtrer par source *et* destination *et* port. On peut donc la placer proche de la source pour bloquer precisement le flux indesirable sans impacter les autres, ce qui economise de la bande passante en evitant au trafic inutile de traverser tout le reseau.
+
+#### Les wildcard masks en detail
+
+Le wildcard mask est le concept qui fait trebucher le plus de candidats au CCNA. Il fonctionne a l'inverse du masque de sous-reseau :
+
+- **Bit 0** dans le wildcard = ce bit **doit correspondre** (on verifie)
+- **Bit 1** dans le wildcard = ce bit est **ignore** (on ne verifie pas)
+
+Pour convertir un masque de sous-reseau en wildcard mask, soustrayez chaque octet de 255 :
+
+```{.default}
+  Masque sous-reseau :   255.255.255.0
+  Wildcard mask :        0  . 0 . 0 .255
+
+  Calcul par octet :     255 - 255 = 0
+                         255 - 255 = 0
+                         255 - 255 = 0
+                         255 -   0 = 255
+```
+
+Voici les conversions les plus courantes :
+
+| Masque sous-reseau | Prefixe | Wildcard mask | Signification |
+|-------------------|---------|---------------|---------------|
+| 255.255.255.255 | /32 | 0.0.0.0 | Un seul hote exact |
+| 255.255.255.0 | /24 | 0.0.0.255 | Tout un reseau /24 |
+| 255.255.0.0 | /16 | 0.0.255.255 | Tout un reseau /16 |
+| 255.0.0.0 | /8 | 0.255.255.255 | Tout un reseau /8 |
+| 255.255.255.252 | /30 | 0.0.0.3 | Un lien point-to-point (/30) |
+| 255.255.255.240 | /28 | 0.0.0.15 | Un sous-reseau de 16 adresses |
+| 255.255.255.128 | /25 | 0.0.0.127 | Un demi-reseau /25 |
+
+**Raccourcis syntaxiques importants :**
+
+- `host 10.1.1.5` equivaut a `10.1.1.5 0.0.0.0` (un seul hote, wildcard tout a zero)
+- `any` equivaut a `0.0.0.0 255.255.255.255` (n'importe quelle adresse)
+
+#### Wildcard masks non contigues — attention !
+
+Bien que techniquement possible, un wildcard mask non contigu (comme `0.0.0.254` qui verifie uniquement le dernier bit de chaque octet) est rarement utilise et **n'apparait pas au CCNA**. Concentrez-vous sur les wildcard masks contigues issus de la conversion directe du masque de sous-reseau.
+
+#### Exercice mental : quel reseau correspond ?
+
+Quand vous voyez `192.168.10.0 0.0.0.255` dans une ACL :
+
+1. Prenez l'adresse : `192.168.10.0`
+2. Regardez le wildcard : `0.0.0.255` → les trois premiers octets sont fixes, le dernier varie
+3. Conclusion : toutes les adresses de `192.168.10.0` a `192.168.10.255` (le reseau 192.168.10.0/24)
+
+Quand vous voyez `172.16.4.0 0.0.3.255` :
+
+1. Adresse : `172.16.4.0`
+2. Wildcard : `0.0.3.255` → les deux premiers octets sont fixes, le troisieme varie sur 2 bits (3 = 00000011), le quatrieme varie librement
+3. Conclusion : adresses de `172.16.4.0` a `172.16.7.255` (le reseau 172.16.4.0/22)
+
+#### ACLs numerotees — Standard
+
+```{.cisco filename="R1"}
+! Autoriser le reseau 192.168.1.0/24
+R1(config)# access-list 10 permit 192.168.1.0 0.0.0.255
+! Autoriser un hote specifique
+R1(config)# access-list 10 permit host 10.0.0.5
+! Deny implicite a la fin — pas besoin de l'ecrire
+! Mais pour la visibilite dans les logs :
+R1(config)# access-list 10 deny any log
+```
+
+#### ACLs numerotees — Extended
+
+```{.cisco filename="R1"}
+! Autoriser le trafic HTTP du reseau 192.168.1.0/24 vers le serveur web 10.0.0.100
+R1(config)# access-list 100 permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.100 eq 80
+! Autoriser HTTPS aussi
+R1(config)# access-list 100 permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.100 eq 443
+! Autoriser DNS (UDP et TCP)
+R1(config)# access-list 100 permit udp any host 10.0.0.53 eq 53
+R1(config)# access-list 100 permit tcp any host 10.0.0.53 eq 53
+! Autoriser les reponses ICMP (ping)
+R1(config)# access-list 100 permit icmp any any echo-reply
+! Deny implicite pour tout le reste
+R1(config)# access-list 100 deny ip any any log
+```
+
+La syntaxe complete d'une ACE extended :
+
+```{.default}
+access-list {num} {permit|deny} {protocole} {src} {wildcard-src} {dst} {wildcard-dst} [operateur port]
+```
+
+Operateurs de port : `eq` (egal), `gt` (superieur), `lt` (inferieur), `neq` (different), `range` (plage).
+
+#### ACLs nommees (Named ACLs)
+
+Les ACLs nommees offrent deux avantages majeurs :
+
+1. Un nom descriptif au lieu d'un numero (meilleure lisibilite)
+2. La possibilite de supprimer ou inserer des ACEs individuellement (avec les numeros de sequence)
+
+```{.cisco filename="R1"}
+R1(config)# ip access-list standard ALLOW-MGMT
+R1(config-std-nacl)# permit 192.168.100.0 0.0.0.255
+R1(config-std-nacl)# permit host 10.0.0.5
+R1(config-std-nacl)# deny any log
+R1(config-std-nacl)# exit
+
+R1(config)# ip access-list extended WEB-FILTER
+R1(config-ext-nacl)# permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.100 eq 80
+R1(config-ext-nacl)# permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.100 eq 443
+R1(config-ext-nacl)# deny ip any any log
+R1(config-ext-nacl)# exit
+```
+
+#### Modification d'une ACL nommee
+
+Pour inserer une regle entre deux ACEs existantes :
+
+```{.cisco filename="R1"}
+R1# show access-lists WEB-FILTER
+Extended IP access list WEB-FILTER
+    10 permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.100 eq www
+    20 permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.100 eq 443
+    30 deny ip any any log
+
+R1(config)# ip access-list extended WEB-FILTER
+R1(config-ext-nacl)# 15 permit tcp 192.168.1.0 0.0.0.255 host 10.0.0.100 eq 8080
+R1(config-ext-nacl)# exit
+```
+
+Le numero `15` insere la regle entre les sequences 10 et 20. Cela evite de recreer toute l'ACL.
+
+#### Application d'une ACL sur une interface
+
+Une ACL seule ne fait rien tant qu'elle n'est pas appliquee. L'application se fait sur une interface, dans une direction :
+
+```{.cisco filename="R1"}
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# ip access-group WEB-FILTER in
+R1(config-if)# exit
+
+R1(config)# interface GigabitEthernet0/1
+R1(config-if)# ip access-group ALLOW-MGMT in
+R1(config-if)# exit
+```
+
+**Regles d'application :**
+
+- **in** = le paquet est verifie *en entrant* sur l'interface (avant le routage)
+- **out** = le paquet est verifie *en sortant* de l'interface (apres le routage)
+- Maximum **une ACL par interface, par direction, par protocole** (une ACL IPv4 in + une ACL IPv4 out = OK)
+
+```{.text title="Topologie"}
+  Direction "in"                    Direction "out"
+
+  Paquet >>> [ACL?] >>> Routage >>> [ACL?] >>> Paquet sort
+  entre sur              du                      de
+  l'interface            routeur                 l'interface
+```
+
+#### ACL sur les lignes VTY
+
+Les ACLs peuvent aussi controler l'acces distant aux lignes VTY (SSH/Telnet) :
+
+```{.cisco filename="R1"}
+R1(config)# access-list 5 permit 192.168.100.0 0.0.0.255
+R1(config)# access-list 5 deny any log
+R1(config)# line vty 0 4
+R1(config-line)# access-class 5 in
+R1(config-line)# exit
+```
+
+Notez la commande `access-class` (et non `access-group`) sur les lignes VTY.
+
+### Mise en pratique CLI
+
+Scenario complet : le reseau 192.168.10.0/24 (VLAN employes) doit pouvoir acceder au serveur web 10.0.0.100 (HTTP/HTTPS) et au serveur DNS 10.0.0.53, mais rien d'autre. Le reseau 192.168.20.0/24 (VLAN serveurs) doit etre accessible uniquement sur ces ports.
+
+```{.cisco filename="R1"}
+R1(config)# ip access-list extended EMPLOYEE-TO-SERVERS
+R1(config-ext-nacl)# 10 permit tcp 192.168.10.0 0.0.0.255 host 10.0.0.100 eq 80
+R1(config-ext-nacl)# 20 permit tcp 192.168.10.0 0.0.0.255 host 10.0.0.100 eq 443
+R1(config-ext-nacl)# 30 permit udp 192.168.10.0 0.0.0.255 host 10.0.0.53 eq 53
+R1(config-ext-nacl)# 40 permit icmp 192.168.10.0 0.0.0.255 10.0.0.0 0.0.0.255
+R1(config-ext-nacl)# 50 deny ip any any log
+R1(config-ext-nacl)# exit
+
+R1(config)# interface GigabitEthernet0/0.10
+R1(config-subif)# description VLAN 10 - Employes
+R1(config-subif)# ip access-group EMPLOYEE-TO-SERVERS in
+R1(config-subif)# exit
+```
+
+**Verification :**
+
+```{.cisco filename="R1"}
+R1# show access-lists EMPLOYEE-TO-SERVERS
+Extended IP access list EMPLOYEE-TO-SERVERS
+    10 permit tcp 192.168.10.0 0.0.0.255 host 10.0.0.100 eq www (287 matches)
+    20 permit tcp 192.168.10.0 0.0.0.255 host 10.0.0.100 eq 443 (142 matches)
+    30 permit udp 192.168.10.0 0.0.0.255 host 10.0.0.53 eq domain (1053 matches)
+    40 permit icmp 192.168.10.0 0.0.0.255 10.0.0.0 0.0.0.255 (38 matches)
+    50 deny ip any any log (12 matches)
+```
+
+**Interpretation** :
+
+- Les compteurs `matches` confirment que l'ACL est active et que du trafic la traverse
+- Le DNS (ligne 30) genere beaucoup de hits — c'est normal, chaque requete web declenche d'abord une resolution DNS
+- La ligne 50 (deny) a 12 matches = 12 paquets bloques. Le mot-cle `log` enverra un message syslog pour chacun, utile pour l'audit
+
+```{.cisco filename="R1"}
+R1# show ip interface GigabitEthernet0/0.10
+GigabitEthernet0/0.10 is up, line protocol is up
+  ...
+  Inbound  access list is EMPLOYEE-TO-SERVERS
+  Outgoing access list is not set
+  ...
+```
+
+**Interpretation** : L'ACL est bien appliquee en direction `inbound` sur la sous-interface Gi0/0.10. Aucune ACL en sortie.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : L'oubli du **deny implicite**. Si votre ACL ne contient que des `deny`, elle bloque tout car le deny implicite final bloque aussi tout le reste. Il faut *au moins un* `permit` pour que du trafic passe. Inversement, si vous n'ecrivez que des `permit`, le deny implicite bloque tout ce qui n'est pas explicitement autorise.
+
+**A retenir** :
+
+- ACL standard → proche de la **destination** | ACL extended → proche de la **source**
+- `access-group` = interface | `access-class` = ligne VTY
+- Le wildcard mask est l'inverse du masque de sous-reseau (255 - chaque octet)
+- Numerotation : 1-99 = standard, 100-199 = extended
+- Maximum 1 ACL par interface, par direction, par protocole
+:::
+
+### Exercice 5.6a — ACL Standard
+
+**Contexte** : L'entreprise DataFlow a trois reseaux :
+
+- 192.168.1.0/24 — Reseau Administration
+- 192.168.2.0/24 — Reseau Employes
+- 192.168.3.0/24 — Reseau Serveurs
+
+Le reseau Employes ne doit PAS pouvoir acceder au reseau Serveurs. L'Administration doit pouvoir acceder partout.
+
+**Consigne** : Ecrivez une ACL standard nommee `BLOCK-EMPLOYEES` et appliquez-la sur l'interface appropriee de R1 (l'interface Gi0/2 est connectee au reseau Serveurs).
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+Une ACL standard ne filtre que la source. Placez-la proche de la destination (interface vers les serveurs). N'oubliez pas d'autoriser explicitement le trafic que vous voulez laisser passer, car le deny implicite bloquera tout le reste.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+```{.cisco filename="R1"}
+R1(config)# ip access-list standard BLOCK-EMPLOYEES
+R1(config-std-nacl)# deny 192.168.2.0 0.0.0.255
+R1(config-std-nacl)# permit any
+R1(config-std-nacl)# exit
+R1(config)# interface GigabitEthernet0/2
+R1(config-if)# ip access-group BLOCK-EMPLOYEES out
+R1(config-if)# exit
+```
+
+**Explication** : L'ACL refuse tout trafic provenant de 192.168.2.0/24 (employes), puis autorise tout le reste avec `permit any` (ce qui inclut le reseau Administration). L'application se fait en `out` sur Gi0/2 (vers les serveurs) car c'est une ACL standard — on la place proche de la destination. Le `permit any` est indispensable pour ne pas bloquer l'Administration via le deny implicite.
+
+:::
+
+### Exercice 5.6b — ACL Extended avec wildcard masks
+
+**Contexte** : L'entreprise WebCorp a la topologie suivante :
+
+```{.text title="Topologie"}
+  [VLAN 10: 172.16.10.0/24]--+
+                               +--[R1]--[Internet]
+  [VLAN 20: 172.16.20.0/24]--+    |
+                                    |
+                              [DMZ: 10.0.1.0/24]
+                              - Web: 10.0.1.10
+                              - DNS: 10.0.1.53
+                              - Mail: 10.0.1.25
+```
+
+Politique de securite :
+
+- VLAN 10 (developpeurs) : HTTP/HTTPS vers le serveur Web, DNS, SSH vers tous les serveurs DMZ
+- VLAN 20 (marketing) : HTTP/HTTPS vers le serveur Web, DNS uniquement
+- Personne ne doit pouvoir faire de ping vers la DMZ
+- Tout autre trafic vers la DMZ est interdit
+
+**Consigne** : Ecrivez une ACL extended nommee et appliquez-la sur l'interface appropriee. Justifiez le placement.
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+Une ACL extended peut filtrer source, destination et port. Placez-la proche de la source pour economiser la bande passante. Attention a l'ordre des ACEs : traitez d'abord les cas specifiques avant les regles generales.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+```{.cisco filename="R1"}
+! ACL pour VLAN 10 (developpeurs)
+R1(config)# ip access-list extended DEV-TO-DMZ
+R1(config-ext-nacl)# 10 permit tcp 172.16.10.0 0.0.0.255 host 10.0.1.10 eq 80
+R1(config-ext-nacl)# 20 permit tcp 172.16.10.0 0.0.0.255 host 10.0.1.10 eq 443
+R1(config-ext-nacl)# 30 permit udp 172.16.10.0 0.0.0.255 host 10.0.1.53 eq 53
+R1(config-ext-nacl)# 40 permit tcp 172.16.10.0 0.0.0.255 10.0.1.0 0.0.0.255 eq 22
+R1(config-ext-nacl)# 50 deny icmp 172.16.10.0 0.0.0.255 10.0.1.0 0.0.0.255
+R1(config-ext-nacl)# 60 deny ip any any log
+R1(config-ext-nacl)# exit
+
+! ACL pour VLAN 20 (marketing)
+R1(config)# ip access-list extended MKT-TO-DMZ
+R1(config-ext-nacl)# 10 permit tcp 172.16.20.0 0.0.0.255 host 10.0.1.10 eq 80
+R1(config-ext-nacl)# 20 permit tcp 172.16.20.0 0.0.0.255 host 10.0.1.10 eq 443
+R1(config-ext-nacl)# 30 permit udp 172.16.20.0 0.0.0.255 host 10.0.1.53 eq 53
+R1(config-ext-nacl)# 40 deny icmp 172.16.20.0 0.0.0.255 10.0.1.0 0.0.0.255
+R1(config-ext-nacl)# 50 deny ip any any log
+R1(config-ext-nacl)# exit
+
+! Application proche de la source (ACL extended)
+R1(config)# interface GigabitEthernet0/0.10
+R1(config-subif)# ip access-group DEV-TO-DMZ in
+R1(config-subif)# exit
+R1(config)# interface GigabitEthernet0/0.20
+R1(config-subif)# ip access-group MKT-TO-DMZ in
+R1(config-subif)# exit
+```
+
+**Explication** :
+
+- Deux ACLs separees car les droits different entre VLAN 10 et VLAN 20
+- Placement en `in` sur les sous-interfaces source (ACL extended = proche de la source)
+- La ligne 40 de DEV-TO-DMZ autorise SSH (port 22) vers *tout* le reseau DMZ (wildcard 0.0.0.255)
+- Le deny ICMP explicite n'est pas strictement necessaire (le deny implicite le bloquerait aussi), mais il documente clairement la politique
+- Le `log` sur le deny final aide a l'audit et au troubleshooting
+
+:::
+
+### Voir aussi
+
+- @sec-topic-1-6 (subnetting et calcul de masques — base pour les wildcard masks)
+- @sec-topic-4-1 (les ACLs NAT utilisent la meme syntaxe wildcard)
+- @sec-topic-5-7 dans ce module (DHCP snooping et DAI — securite L2 complementaire aux ACLs L3)
+
+## 5.7 — Securite Layer 2 {#sec-topic-5-7}
+
+> **Exam topic 5.7** : _Configure and verify_ — Layer 2 security features (DHCP snooping, dynamic ARP inspection, and port security)
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Les ACLs protegent au niveau IP (Layer 3), mais de nombreuses attaques se produisent au niveau Ethernet (Layer 2) — la ou un switch fait confiance aveuglement a toute trame qui arrive. Un attaquant sur le meme VLAN peut usurper des adresses MAC, monter un faux serveur DHCP ou empoisonner la table ARP. Les mecanismes de securite L2 du switch sont la parade.
+
+### Theorie
+
+#### Port Security
+
+Port security limite le nombre d'adresses MAC autorisees sur un port de switch. Si un port est configure pour n'accepter qu'une seule MAC et qu'une deuxieme apparait, le switch reagit.
+
+**Pourquoi c'est utile** : empeche un attaquant de brancher un hub ou un mini-switch pour connecter plusieurs machines, ou de faire du MAC flooding (envoi massif de fausses trames pour saturer la table MAC et forcer le switch a fonctionner en hub).
+
+**Modes d'apprentissage des MAC :**
+
+| Mode | Comportement | Persistance |
+|------|-------------|-------------|
+| **Static** | MAC configuree manuellement par l'admin | Sauvegardee dans running-config |
+| **Dynamic** | MAC apprise automatiquement (par defaut) | Perdue au reboot |
+| **Sticky** | MAC apprise automatiquement ET ajoutee a la running-config | Persistante si `copy run start` |
+
+**Actions en cas de violation :**
+
+| Mode | Trafic | Compteur | Syslog | Etat du port |
+|------|--------|----------|--------|-------------|
+| **Shutdown** (defaut) | Bloque | Oui | Oui | err-disabled |
+| **Restrict** | Bloque (MAC non autorisee) | Oui | Oui | Up |
+| **Protect** | Bloque (MAC non autorisee) | Non | Non | Up |
+
+Le mode `shutdown` est le plus sur — le port passe en `err-disabled` et necessite une intervention manuelle (`shutdown` puis `no shutdown`) pour etre reactive.
+
+### Decision port security en cas de violation
+
+```{mermaid}
+%%| label: fig-m5-port-security-violations
+%%| fig-cap: "Arbre de decision des trois modes de violation port security : protect, restrict, shutdown"
+flowchart TD
+    V[MAC non autorisee<br/>detectee sur port] --> M{Mode de<br/>violation ?}
+    M -->|protect| P1[Drop trafic<br/>MAC invalide]
+    P1 --> P2[Port reste UP<br/>Pas de log<br/>Pas de compteur]
+    M -->|restrict| R1[Drop trafic<br/>MAC invalide]
+    R1 --> R2[Port reste UP<br/>Log + syslog<br/>Compteur increment]
+    M -->|shutdown<br/>defaut| S1[Drop tout<br/>le trafic]
+    S1 --> S2[Port err-disabled<br/>Log + SNMP trap<br/>shutdown/no shutdown<br/>pour reactiver]
+```
+
+Legende : `shutdown` est le mode par defaut et le plus strict. `protect` est silencieux et rarement utilise en production car il ne trace rien.
+
+#### DHCP Snooping
+
+DHCP snooping protege contre deux attaques :
+
+- **Rogue DHCP server** : un attaquant branche un serveur DHCP non autorise qui distribue de fausses adresses (fausse passerelle → man-in-the-middle)
+- **DHCP starvation** : un attaquant envoie des milliers de DHCP Discover avec des MAC aleatoires pour epuiser le pool
+
+Le mecanisme repose sur la classification des ports en **trusted** (vers le serveur DHCP legitime) et **untrusted** (tous les autres) :
+
+```{.text title="Topologie"}
+                    +------------------+
+  [Serveur DHCP] ---| Port TRUSTED     |
+                    |                  |
+  [PC legitime] ---| Port untrust     |   Switch avec
+                    |                  |   DHCP Snooping
+  [PC legitime] ---| Port untrust     |
+                    |                  |
+  [Attaquant]   ---| Port untrust     |
+                    +------------------+
+```
+
+**Comportement :**
+
+- Sur un port **untrusted** : le switch bloque les messages DHCP *serveur* (OFFER, ACK) — seul un vrai serveur peut envoyer ces messages, et il est sur un port trusted
+- Sur un port **trusted** : tous les messages DHCP passent
+- Le switch construit une **DHCP snooping binding table** qui associe chaque adresse IP a une adresse MAC, un port et un VLAN
+
+Cette binding table est precieuse : elle sert aussi de base a **Dynamic ARP Inspection** (DAI).
+
+### Trust boundary DHCP snooping
+
+```{mermaid}
+%%| label: fig-m5-dhcp-snooping-trust
+%%| fig-cap: "Delimitation des ports trusted (serveur DHCP) et untrusted (clients) sur un switch avec DHCP snooping"
+graph LR
+    DHCP["Serveur DHCP<br/>192.168.10.254"] -->|"Gi0/24<br/>TRUSTED"| SW["SW1<br/>ip dhcp snooping<br/>vlan 10"]
+    SW -->|"Gi0/1<br/>untrusted"| PC1["PC1<br/>DHCP client"]
+    SW -->|"Gi0/2<br/>untrusted"| PC2["PC2<br/>DHCP client"]
+    SW -->|"Gi0/3<br/>untrusted"| ATK["Attaquant<br/>rogue DHCP<br/>OFFER bloque"]
+    SW -.->|"binding table"| BT["MAC-IP-VLAN-Port<br/>utilisee par DAI"]
+```
+
+Legende : seul le port Gi0/24 laisse passer les messages DHCP serveur (OFFER, ACK). Un rogue DHCP sur un port untrusted voit ses reponses bloquees par le switch.
+
+#### Dynamic ARP Inspection (DAI)
+
+ARP est un protocole sans authentification — n'importe qui peut envoyer une reponse ARP gratuite (gratuitous ARP) pour associer son adresse MAC a l'adresse IP de la passerelle. C'est l'attaque **ARP spoofing** (ou ARP poisoning).
+
+DAI verifie chaque paquet ARP recu sur un port untrusted en le comparant a la **DHCP snooping binding table** :
+
+- Si l'association IP-MAC du paquet ARP correspond a la table → le paquet est transmis
+- Sinon → le paquet est supprime et un log est genere
+
+DAI necessite que DHCP snooping soit active au prealable (pour construire la binding table).
+
+### Inspection d'un paquet ARP par DAI
+
+```{mermaid}
+%%| label: fig-m5-dai-flow
+%%| fig-cap: "Verification d'un paquet ARP par DAI contre la DHCP snooping binding table"
+sequenceDiagram
+    participant PC as Attaquant
+    participant SW as SW1 (DAI)
+    participant BT as Binding table
+    participant GW as Gateway<br/>192.168.10.1
+    PC->>SW: Gratuitous ARP<br/>(192.168.10.1 = MAC attaquant)
+    SW->>BT: Verifier IP-MAC-Port
+    BT-->>SW: Non trouve<br/>(pas dans la table)
+    SW->>SW: DROP + log syslog
+    Note over SW: ARP spoofing bloque
+    PC->>SW: ARP legitime<br/>(192.168.10.101 = MAC PC1)
+    SW->>BT: Verifier
+    BT-->>SW: Match OK
+    SW->>GW: Forward ARP
+```
+
+Legende : DAI compare chaque paquet ARP a la binding table batie par DHCP snooping. Tout ARP incoherent est supprime et trace dans les stats (`show ip arp inspection statistics`).
+
+### Mise en pratique CLI
+
+#### Configuration de Port Security
+
+```{.cisco filename="SW1"}
+SW1(config)# interface GigabitEthernet0/1
+SW1(config-if)# switchport mode access
+SW1(config-if)# switchport port-security
+SW1(config-if)# switchport port-security maximum 2
+SW1(config-if)# switchport port-security mac-address sticky
+SW1(config-if)# switchport port-security violation restrict
+SW1(config-if)# exit
+```
+
+**Verification :**
+
+```{.cisco filename="SW1"}
+SW1# show port-security interface GigabitEthernet0/1
+Port Security              : Enabled
+Port Status                : Secure-up
+Violation Mode             : Restrict
+Aging Time                 : 0 mins
+Aging Type                 : Absolute
+SecureStatic Address Aging : Disabled
+Maximum MAC Addresses      : 2
+Total MAC Addresses        : 1
+Configured MAC Addresses   : 0
+Sticky MAC Addresses       : 1
+Last Source Address:Vlan   : 00ab.cd12.3456:10
+Security Violation Count   : 0
+```
+
+**Interpretation** : Le port est actif (`Secure-up`), une MAC a ete apprise en sticky. Le maximum est de 2 — une deuxieme MAC est encore acceptee. En cas de violation, le mode `Restrict` bloque le trafic de la MAC non autorisee sans desactiver le port.
+
+#### Configuration de DHCP Snooping
+
+```{.cisco filename="SW1"}
+! Activer DHCP snooping globalement
+SW1(config)# ip dhcp snooping
+! Activer sur le VLAN 10
+SW1(config)# ip dhcp snooping vlan 10
+! Desactiver l'insertion du champ Option 82 (recommande avec un serveur DHCP externe)
+SW1(config)# no ip dhcp snooping information option
+
+! Configurer le port du serveur DHCP comme trusted
+SW1(config)# interface GigabitEthernet0/24
+SW1(config-if)# ip dhcp snooping trust
+SW1(config-if)# exit
+
+! Les ports clients restent untrusted (par defaut)
+! Optionnel : limiter le debit DHCP par port (anti-starvation)
+SW1(config)# interface range GigabitEthernet0/1-23
+SW1(config-if-range)# ip dhcp snooping limit rate 10
+SW1(config-if-range)# exit
+```
+
+**Verification :**
+
+```{.cisco filename="SW1"}
+SW1# show ip dhcp snooping
+Switch DHCP snooping is enabled
+DHCP snooping is configured on following VLANs:
+10
+DHCP snooping is operational on following VLANs:
+10
+Insertion of option 82 is disabled
+Interface                  Trusted    Allow number   Rate limit
+-----------------------    -------    ------------   ----------
+GigabitEthernet0/24        yes        unlimited      unlimited
+GigabitEthernet0/1         no         1              10
+GigabitEthernet0/2         no         1              10
+...
+```
+
+```{.cisco filename="SW1"}
+SW1# show ip dhcp snooping binding
+MacAddress          IpAddress       Lease(sec)  Type           VLAN  Interface
+------------------  --------------- ----------  -------------- ----  ---------
+00:AB:CD:12:34:56   192.168.10.101  86326       dhcp-snooping  10   Gi0/1
+00:AB:CD:12:34:78   192.168.10.102  85142       dhcp-snooping  10   Gi0/2
+00:AB:CD:12:34:9A   192.168.10.103  84891       dhcp-snooping  10   Gi0/3
+```
+
+**Interpretation** : La binding table montre trois associations MAC-IP-VLAN-port apprises dynamiquement. Le port Gi0/24 est trusted (serveur DHCP). Les autres sont limites a 10 paquets DHCP par seconde — un client normal en envoie 4 maximum par cycle (DORA).
+
+#### Configuration de DAI
+
+```{.cisco filename="SW1"}
+! Activer DAI sur le VLAN 10
+SW1(config)# ip arp inspection vlan 10
+
+! Le port trunk ou uplink vers le routeur/serveur doit etre trusted
+SW1(config)# interface GigabitEthernet0/24
+SW1(config-if)# ip arp inspection trust
+SW1(config-if)# exit
+```
+
+**Verification :**
+
+```{.cisco filename="SW1"}
+SW1# show ip arp inspection vlan 10
+ Source Mac Validation      : Disabled
+ Destination Mac Validation : Disabled
+ IP Address Validation      : Disabled
+
+ Vlan  Configuration  Operation  ACL Match          Static ACL
+ ----  -------------  ---------  ---------          ----------
+   10  Enabled        Active
+
+ Vlan  ACL Logging   DHCP Logging  Probe Logging
+ ----  -----------   ------------  -------------
+   10  Deny          Deny          Off
+
+SW1# show ip arp inspection statistics vlan 10
+ Vlan  Forwarded  Dropped  DHCP Drops  ACL Drops
+ ----  ---------  -------  ----------  ---------
+   10       1247        3           3          0
+```
+
+**Interpretation** : DAI est actif sur le VLAN 10. Trois paquets ARP ont ete rejetes car ils ne correspondaient pas a la binding table DHCP snooping — possiblement une tentative d'ARP spoofing ou un poste avec une IP statique non enregistree.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : DHCP snooping doit etre active **avant** DAI. DAI depend de la binding table construite par DHCP snooping. L'examen peut proposer un scenario ou DAI est configure mais DHCP snooping ne l'est pas — resultat : DAI ne fonctionne pas correctement.
+
+**A retenir** :
+
+- Port security necessite que le port soit en mode `access` (pas trunk)
+- Par defaut, tous les ports sont **untrusted** pour DHCP snooping et DAI
+- Un port err-disabled par port security necessite `shutdown` puis `no shutdown` pour etre reactive
+- `access-class` sur VTY ≠ port security sur un port physique — ce sont deux mecanismes differents
+:::
+
+### Exercice 5.7 — Securisation d'un switch d'acces
+
+**Contexte** : Le switch SW-Access dessert 20 postes de travail (ports Gi0/1 a Gi0/20) et est connecte au switch de distribution via le port Gi0/24 (trunk). Le serveur DHCP est derriere le switch de distribution.
+
+**Consigne** :
+
+1. Activez port security sur les ports Gi0/1 a Gi0/20 : maximum 1 MAC, mode sticky, violation shutdown
+2. Activez DHCP snooping sur le VLAN 10 avec le port Gi0/24 en trusted
+3. Limitez le debit DHCP a 5 paquets/seconde sur les ports d'acces
+4. Activez DAI sur le VLAN 10 avec le port Gi0/24 en trusted
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+Pour port security, les ports doivent d'abord etre en mode access. Pensez a utiliser `interface range` pour configurer les 20 ports en une fois. N'oubliez pas `no ip dhcp snooping information option` si le serveur DHCP est sur un autre switch.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+```{.cisco filename="SW-Access"}
+! Port security sur les ports d'acces
+SW-Access(config)# interface range GigabitEthernet0/1-20
+SW-Access(config-if-range)# switchport mode access
+SW-Access(config-if-range)# switchport access vlan 10
+SW-Access(config-if-range)# switchport port-security
+SW-Access(config-if-range)# switchport port-security maximum 1
+SW-Access(config-if-range)# switchport port-security mac-address sticky
+SW-Access(config-if-range)# switchport port-security violation shutdown
+SW-Access(config-if-range)# exit
+
+! DHCP Snooping
+SW-Access(config)# ip dhcp snooping
+SW-Access(config)# ip dhcp snooping vlan 10
+SW-Access(config)# no ip dhcp snooping information option
+SW-Access(config)# interface GigabitEthernet0/24
+SW-Access(config-if)# ip dhcp snooping trust
+SW-Access(config-if)# exit
+SW-Access(config)# interface range GigabitEthernet0/1-20
+SW-Access(config-if-range)# ip dhcp snooping limit rate 5
+SW-Access(config-if-range)# exit
+
+! DAI
+SW-Access(config)# ip arp inspection vlan 10
+SW-Access(config)# interface GigabitEthernet0/24
+SW-Access(config-if)# ip arp inspection trust
+SW-Access(config-if)# exit
+```
+
+**Explication** : La combinaison port security + DHCP snooping + DAI forme un trio defensif complet au niveau L2. Port security empeche le MAC flooding et les connexions non autorisees. DHCP snooping bloque les rogue DHCP servers et construit la binding table. DAI utilise cette binding table pour empecher l'ARP spoofing. Le port Gi0/24 (uplink) est trusted pour les trois mecanismes car le trafic legitime (DHCP replies, ARP du routeur) arrive par la.
+
+:::
+
+### Voir aussi
+
+- @sec-topic-4-3 et @sec-topic-4-6 (fonctionnement DHCP — DORA, relay)
+- @sec-topic-2-1 (VLANs — DHCP snooping est active par VLAN)
+- @sec-topic-5-6 dans ce module (ACLs — securite L3 complementaire a la securite L2)
+
+## 5.8 — AAA : Authentication, Authorization, Accounting {#sec-topic-5-8}
+
+> **Exam topic 5.8** : _Compare_ — Authentication, authorization, and accounting concepts
+> **Niveau** : Compare
+
+### Contexte
+
+Avec 5 routeurs et 3 switches, gerer les mots de passe localement reste faisable. Mais quand le reseau grossit a 200 equipements et 50 administrateurs, mettre a jour les mots de passe un par un devient un cauchemar. AAA centralise la gestion des acces — un seul serveur controle qui peut se connecter, ce qu'il peut faire, et ce qu'il a fait.
+
+### Theorie
+
+#### Les trois A
+
+| Composant | Question | Fonction | Exemple concret |
+|-----------|----------|----------|-----------------|
+| **Authentication** | Qui etes-vous ? | Verifier l'identite de l'utilisateur | Login/password, certificat, biometrie |
+| **Authorization** | Qu'avez-vous le droit de faire ? | Definir les permissions apres authentification | Privilege 15 vs lecture seule, commandes autorisees |
+| **Accounting** | Qu'avez-vous fait ? | Enregistrer les actions pour audit et facturation | Heure de connexion, commandes executees, duree de session |
+
+L'analogie est celle d'un aeroport : au controle d'identite, on verifie votre passeport (**authentication**). Votre carte d'embarquement determine quelle zone vous pouvez acceder (**authorization**). Les cameras et journaux enregistrent vos deplacements (**accounting**).
+
+#### TACACS+ vs RADIUS
+
+Deux protocoles permettent la communication entre l'equipement reseau (NAS — Network Access Server) et le serveur AAA :
+
+| Caracteristique | TACACS+ | RADIUS |
+|----------------|---------|--------|
+| **Developpe par** | Cisco (proprietaire) | IETF (standard ouvert) |
+| **Transport** | TCP port 49 | UDP ports 1645/1646 ou 1812/1813 |
+| **Chiffrement** | Paquet entier chiffre | Seulement le mot de passe chiffre |
+| **Separation AAA** | Oui (Authentication, Authorization et Accounting sont separes) | Non (Authentication et Authorization combines) |
+| **Granularite authorization** | Par commande (ex: autoriser `show` mais pas `configure terminal`) | Par service (ex: acces Shell, acces VPN) |
+| **Usage typique** | Administration des equipements reseau (CLI) | Acces reseau utilisateur (Wi-Fi, VPN, 802.1X) |
+| **Multiprotocole** | Non (IP uniquement) | Oui (PPP, 802.1X, etc.) |
+
+**Quand choisir lequel ?**
+
+- **TACACS+** pour l'administration des routeurs et switches : la separation AAA et le controle par commande sont essentiels pour les audits de conformite
+- **RADIUS** pour l'authentification des utilisateurs reseau : le support multi-protocole est indispensable pour le Wi-Fi (802.1X) et le VPN
+
+```{.text title="Topologie"}
+  +----------------+          TACACS+ (TCP 49)         +-----------------+
+  | Routeur R1     |-------- (admin CLI) --------------|                 |
+  |                |                                    |  Serveur AAA    |
+  | Switch SW1     |-------- (admin CLI) --------------|  (ISE/ACS)      |
+  |                |                                    |                 |
+  | WLC            |-------- RADIUS (UDP 1812/1813) ---|                 |
+  |                |          (Wi-Fi users 802.1X)      |                 |
+  +----------------+                                    +-----------------+
+```
+
+### Flux AAA avec TACACS+ / RADIUS
+
+```{mermaid}
+%%| label: fig-m5-aaa-flow
+%%| fig-cap: "Echange AAA complet entre un admin, le NAS (routeur) et le serveur TACACS+ avec accounting"
+sequenceDiagram
+    participant U as Admin (SSH)
+    participant R1 as R1 NAS<br/>10.0.0.1
+    participant T as TACACS+<br/>10.0.0.50:49
+    U->>R1: SSH login (admin)
+    R1->>T: Authentication Request<br/>(paquet entier chiffre)
+    T-->>R1: Auth OK
+    R1->>U: Password ?
+    U->>R1: ********
+    R1->>T: Verify password
+    T-->>R1: Accept
+    R1->>T: Authorization exec<br/>(privilege 15 ?)
+    T-->>R1: Authorized, priv 15
+    R1->>U: R1#
+    R1->>T: Accounting start<br/>(session ID)
+    U->>R1: show run
+    R1->>T: Accounting cmd<br/>(log commande)
+    U->>R1: exit
+    R1->>T: Accounting stop<br/>(duree session)
+```
+
+Legende : TACACS+ separe les trois A en messages distincts. Avec RADIUS, Authentication et Authorization sont combinees (Access-Accept contient les attributs d'autorisation).
+
+#### AAA local vs serveur
+
+| Aspect | AAA Local | AAA Serveur (TACACS+/RADIUS) |
+|--------|----------|------------------------------|
+| Base de donnees | Sur chaque equipement (`username ... secret`) | Centralisee sur le serveur AAA |
+| Scalabilite | Faible (N equipements x M utilisateurs) | Forte (un seul point de gestion) |
+| Fallback | Toujours disponible | Necessite un fallback local en cas de panne serveur |
+| Audit | Limite (syslog local) | Centralise (accounting detaille) |
+| Cout | Gratuit | Serveur dedie (Cisco ISE, FreeRADIUS) |
+
+En production, on configure generalement le serveur AAA comme methode primaire et l'authentification locale comme **fallback** en cas d'inaccessibilite du serveur :
+
+```{.cisco filename="R1"}
+R1(config)# aaa new-model
+R1(config)# aaa authentication login default group tacacs+ local
+```
+
+Cette ligne signifie : essayer TACACS+ d'abord ; si le serveur est injoignable, utiliser la base locale.
+
+### Mise en pratique CLI
+
+Configuration AAA avec TACACS+ et fallback local :
+
+```{.cisco filename="R1"}
+R1(config)# aaa new-model
+R1(config)# tacacs server ISE-SERVER
+R1(config-server-tacacs)# address ipv4 10.0.0.50
+R1(config-server-tacacs)# key T@c@csK3y!
+R1(config-server-tacacs)# exit
+R1(config)# aaa authentication login default group tacacs+ local
+R1(config)# aaa authorization exec default group tacacs+ local
+R1(config)# aaa accounting exec default start-stop group tacacs+
+```
+
+**Verification :**
+
+```{.cisco filename="R1"}
+R1# show aaa servers
+
+TACACS+ Server Group: (default)
+    Server: ISE-SERVER
+        Address: 10.0.0.50/49
+        Status: ALIVE
+        Authen: request 47, timeouts 0, failover 0, retransmission 0
+                Response: accept 42, reject 5, error 0
+        Author: request 42, timeouts 0, failover 0, retransmission 0
+                Response: accept 42, reject 0, error 0
+        Acct:   request 42, timeouts 0, failover 0, retransmission 0
+                Response: success 42, error 0
+```
+
+**Interpretation** : Le serveur TACACS+ est `ALIVE` et repond. Sur 47 tentatives d'authentification, 42 ont ete acceptees et 5 rejetees (probablement des mots de passe incorrects). Zero timeout = la connectivite est bonne.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : L'examen demande souvent "quel protocole AAA chiffre le paquet entier ?". La reponse est **TACACS+**. RADIUS ne chiffre que le mot de passe — le reste du paquet (username, attributs d'authorization) est en clair.
+
+**A retenir** :
+
+- TACACS+ = **TCP 49**, paquet entier chiffre, AAA **separes**, controle **par commande** → administration reseau
+- RADIUS = **UDP 1812/1813**, mot de passe seul chiffre, Auth+Authz **combines** → acces utilisateur (Wi-Fi, VPN)
+- `aaa new-model` est obligatoire pour activer AAA sur un equipement Cisco
+:::
+
+### Exercice 5.8 — Association AAA et protocoles
+
+**Contexte** : L'entreprise SecureNet deploie un serveur Cisco ISE pour centraliser la gestion des acces.
+
+**Consigne** : Pour chaque scenario, indiquez le protocole recommande (TACACS+ ou RADIUS) et justifiez.
+
+| Scenario | Protocole | Justification |
+|----------|-----------|--------------|
+| Les admins reseau se connectent en SSH aux routeurs | | |
+| Les employes s'authentifient sur le Wi-Fi WPA2-Enterprise | | |
+| On veut journaliser chaque commande tapee par un admin | | |
+| Les consultants externes se connectent au VPN AnyConnect | | |
+| On veut autoriser uniquement `show` (pas `configure`) pour les juniors | | |
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+TACACS+ excelle pour le controle granulaire des administrateurs (par commande). RADIUS est le standard pour l'acces reseau des utilisateurs (Wi-Fi, VPN, 802.1X).
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+| Scenario | Protocole | Justification |
+|----------|-----------|--------------|
+| Admins SSH vers routeurs | **TACACS+** | Controle granulaire des commandes, chiffrement total du paquet, separation AAA |
+| Wi-Fi WPA2-Enterprise | **RADIUS** | Seul protocole supporte par le standard 802.1X |
+| Journalisation commandes admin | **TACACS+** | Accounting separe et granulaire (par commande executee, pas juste la session) |
+| VPN AnyConnect | **RADIUS** | Standard pour l'authentification d'acces reseau, supporte les attributs VPN |
+| Autoriser uniquement `show` pour les juniors | **TACACS+** | Authorization par commande = exactement ce qu'il faut pour ce scenario |
+
+:::
+
+### Voir aussi
+
+- @sec-topic-5-3 dans ce module (mots de passe locaux — le "fallback" quand le serveur AAA est indisponible)
+- @sec-topic-2-8 (TACACS+/RADIUS mentionnes parmi les methodes de gestion)
+- @sec-topic-5-10 dans ce module (WPA2-Enterprise utilise RADIUS pour le 802.1X)
+
+## 5.9 — Securite Wi-Fi : WPA, WPA2, WPA3 {#sec-topic-5-9}
+
+> **Exam topic 5.9** : _Describe_ — Wireless security protocols (WPA, WPA2, and WPA3)
+> **Niveau** : Describe
+
+### Contexte
+
+Le Wi-Fi diffuse les donnees dans les airs — litteralement. Contrairement a un cable Ethernet enferme dans un faux plancher, un signal radio traverse les murs et peut etre capte depuis le parking de l'entreprise. Le chiffrement wireless n'est pas une option : c'est une necessite absolue.
+
+### Theorie
+
+#### Evolution des protocoles de securite Wi-Fi
+
+| Protocole | Annee | Chiffrement | Taille cle | Authentification | Statut |
+|-----------|-------|-------------|-----------|------------------|--------|
+| **WEP** | 1999 | RC4 | 64/128 bits | Cle partagee | Casse (2004) — **ne jamais utiliser** |
+
+::: {.callout-warning title="⚠️ Attention : WEP et WPA sont interdits"}
+WEP est cassable en quelques minutes avec `aircrack-ng` et WPA (TKIP) est vulnerable a l'attaque Beck-Tews. Toute infrastructure de production doit utiliser **WPA2-AES** au minimum, ideallement **WPA3**. De nombreuses normes (PCI-DSS, HIPAA) interdisent explicitement WEP et WPA.
+:::
+
+| **WPA** | 2003 | TKIP (RC4 ameliore) | 128 bits | PSK ou 802.1X | Obsolete — vulnerable |
+| **WPA2** | 2004 | AES-CCMP | 128 bits | PSK ou 802.1X | Standard actuel |
+| **WPA3** | 2018 | AES-GCMP | 128/256 bits | SAE ou 802.1X | Recommande |
+
+### Evolution historique des protocoles Wi-Fi
+
+```{mermaid}
+%%| label: fig-m5-wifi-evolution
+%%| fig-cap: "Chronologie et evolution cryptographique WEP to WPA to WPA2 to WPA3"
+flowchart LR
+    WEP["WEP 1999<br/>RC4 64/128b<br/>Casse 2004"] --> WPA["WPA 2003<br/>TKIP RC4+<br/>Transitoire"]
+    WPA --> WPA2["WPA2 2004<br/>AES-CCMP<br/>4-way HS<br/>Standard"]
+    WPA2 --> WPA3["WPA3 2018<br/>AES-GCMP<br/>SAE + PMF<br/>Recommande"]
+    WEP -.-> X1[Cle statique<br/>IV 24 bits]
+    WPA -.-> X2[Cles dynamiques<br/>MIC]
+    WPA2 -.-> X3[PSK ou 802.1X<br/>Forte securite]
+    WPA3 -.-> X4[Anti-dictionnaire<br/>Forward secrecy]
+```
+
+Legende : chaque generation corrige les faiblesses cryptographiques de la precedente. WPA3 impose PMF (Protected Management Frames) pour bloquer les attaques de deauthentification.
+
+#### WPA2 — Le standard dominant
+
+WPA2 existe en deux modes :
+
+**WPA2-Personal (PSK — Pre-Shared Key)**
+
+- Un mot de passe partage (8-63 caracteres) est configure sur l'AP et connu de tous les utilisateurs
+- Le mot de passe sert a deriver une cle de chiffrement via un echange a 4 etapes (4-way handshake)
+- Adapte aux petites structures et au reseau invite
+- Faiblesse : si le PSK est compromis, tout le monde est affecte
+
+**WPA2-Enterprise (802.1X)**
+
+- Chaque utilisateur s'authentifie avec ses propres identifiants (login/password, certificat)
+- Un serveur RADIUS verifie l'identite et fournit une cle unique par session
+- Adapte aux entreprises (chaque employe a ses identifiants, revocables individuellement)
+- Plus complexe a deployer (necessite un serveur RADIUS comme Cisco ISE)
+
+```{.text title="Topologie"}
+  WPA2-Personal                      WPA2-Enterprise
+
+  [Client] <--PSK partage--> [AP]   [Client] <--EAP--> [AP] <--RADIUS--> [ISE]
+                                                          |
+                                             Cle unique par session
+```
+
+#### WPA3 — Les ameliorations
+
+WPA3 corrige les faiblesses connues de WPA2 :
+
+| Amelioration | WPA2 | WPA3 | Benefice |
+|-------------|------|------|----------|
+| **Echange de cles** | 4-way handshake (PSK) | SAE (Simultaneous Authentication of Equals) | Resiste aux attaques de dictionnaire offline |
+| **Forward secrecy** | Non | Oui (Perfect Forward Secrecy) | Meme si le PSK est compromis plus tard, le trafic passe reste chiffre |
+| **Protection cadres mgmt** | Non (optionnel PMF) | Oui (PMF obligatoire) | Empeche les attaques de deauthentication |
+| **Chiffrement ouvert** | Reseau ouvert = pas de chiffrement | OWE (Opportunistic Wireless Encryption) | Meme un reseau "ouvert" (cafe, aeroport) est chiffre |
+| **Suite cryptographique Enterprise** | AES-CCMP 128 bits | AES-GCMP 192 bits (mode 192-bit) | Securite renforcee pour les organisations sensibles |
+
+**SAE (Simultaneous Authentication of Equals)** remplace le 4-way handshake de WPA2-Personal. Avec WPA2, un attaquant pouvait capturer le handshake et tenter un brute force *offline* (avec un dictionnaire de mots de passe). SAE utilise un echange Diffie-Hellman qui empeche cette attaque — meme en capturant l'echange, l'attaquant ne peut pas tester de mots de passe offline.
+
+**PMF (Protected Management Frames)** protege les trames de gestion Wi-Fi (deauthentication, disassociation). Sans PMF, un attaquant peut envoyer de fausses trames de deconnexion pour forcer un client a se reauthentifier — et capturer le handshake au passage.
+
+### Authentification 802.1X (WPA2/WPA3-Enterprise)
+
+```{mermaid}
+%%| label: fig-m5-dot1x-eapol
+%%| fig-cap: "Echange 802.1X avec EAPOL entre supplicant, authenticator (AP/switch) et serveur RADIUS"
+sequenceDiagram
+    participant S as Supplicant<br/>(client Wi-Fi)
+    participant A as Authenticator<br/>(AP/WLC)
+    participant R as RADIUS<br/>(Cisco ISE)
+    S->>A: EAPOL-Start
+    A->>S: EAP-Request Identity
+    S->>A: EAP-Response (username)
+    A->>R: RADIUS Access-Request
+    R->>A: RADIUS Access-Challenge
+    A->>S: EAP-Request (methode : PEAP/EAP-TLS)
+    S->>A: EAP-Response (credentials/cert)
+    A->>R: RADIUS Access-Request
+    R-->>R: Verifier identite
+    R->>A: RADIUS Access-Accept + MSK
+    A->>S: EAP-Success
+    Note over S,A: Derivation PMK puis 4-way handshake
+```
+
+Legende : l'authenticator (AP/WLC) joue un role de relais EAP entre le supplicant et le serveur RADIUS. La Master Session Key (MSK) renvoyee par RADIUS sert a deriver la PMK puis les cles de session via le 4-way handshake.
+
+### 4-way handshake WPA2-Personal
+
+```{mermaid}
+%%| label: fig-m5-wpa2-4way
+%%| fig-cap: "Les 4 messages du handshake WPA2-PSK qui derivent la PTK a partir du PMK et des nonces"
+sequenceDiagram
+    participant C as Client<br/>(Supplicant)
+    participant AP as AP<br/>(Authenticator)
+    Note over C,AP: PMK deja derive du PSK (PBKDF2)
+    AP->>C: Msg 1 : ANonce
+    Note over C: Genere SNonce<br/>Calcule PTK
+    C->>AP: Msg 2 : SNonce + MIC
+    Note over AP: Calcule PTK<br/>Verifie MIC
+    AP->>C: Msg 3 : GTK + MIC<br/>(install PTK)
+    C->>AP: Msg 4 : ACK + MIC
+    Note over C,AP: PTK installee<br/>Trafic chiffre AES-CCMP
+```
+
+Legende : le 4-way handshake n'envoie jamais le PSK en clair. Un attaquant capturant les 4 messages peut cependant tenter un brute force offline — c'est ce que WPA3-SAE corrige.
+
+### Mise en pratique CLI
+
+La configuration Wi-Fi se fait generalement sur le WLC (GUI), mais voici comment verifier la securite d'un SSID :
+
+```{.cisco filename="WLC"}
+WLC# show wlan summary
+Number of WLANs: 3
+
+WLAN ID  WLAN Profile Name       Status    Interface Name
+-------  ----------------------  --------  ----------------
+1        CORP-WIFI               Enabled   management
+2        GUEST-WIFI              Enabled   guest-vlan
+3        IOT-DEVICES             Enabled   iot-vlan
+
+WLC# show wlan 1
+WLAN Identifier.................. 1
+Profile Name..................... CORP-WIFI
+Network Name (SSID).............. CORP-WIFI
+Status........................... Enabled
+...
+Security
+  802.11 Authentication............ Open System
+  FT Support...................... Enabled
+  ...
+  WPA/WPA2/WPA3 Parameters
+    WPA2.......................... Enabled
+    WPA3.......................... Enabled
+    Auth Key Management
+      802.1X...................... Enabled
+      PSK......................... Disabled
+      SAE......................... Enabled
+    Encryption
+      AES-CCMP128................. Enabled
+      AES-GCMP256................. Enabled
+...
+```
+
+**Interpretation** : Le SSID `CORP-WIFI` utilise WPA2 et WPA3 simultanement (mode transitoire pour compatibilite). L'authentification est 802.1X (Enterprise) avec SAE active. Le PSK est desactive — conforme a une politique d'entreprise. Les deux chiffrements (CCMP pour WPA2, GCMP pour WPA3) sont actifs.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : WPA utilise **TKIP** (base sur RC4), WPA2 utilise **AES-CCMP**, WPA3 utilise **AES-GCMP**. L'examen peut melanger les associations protocole/chiffrement — ne confondez pas.
+
+**A retenir** :
+
+- WEP = casse = jamais. WPA = TKIP = obsolete. WPA2 = AES-CCMP = standard. WPA3 = AES-GCMP + SAE = recommande
+- PSK = meme mot de passe pour tout le monde | 802.1X = identifiants individuels via RADIUS
+- WPA3-Personal utilise **SAE** au lieu du 4-way handshake (anti-dictionnaire offline)
+- WPA3 impose **PMF** (Protected Management Frames) obligatoire
+:::
+
+### Exercice 5.9 — Comparaison des protocoles Wi-Fi
+
+**Contexte** : L'ecole TechAcademy a trois besoins Wi-Fi :
+
+- Reseau administratif (secretariat, direction) — donnees sensibles
+- Reseau pedagogique (salles de cours) — acces etudiant controle
+- Reseau invite (hall d'accueil) — acces Internet libre
+
+**Consigne** : Pour chaque reseau, recommandez le protocole de securite Wi-Fi le plus adapte (WPA2-Personal, WPA2-Enterprise, WPA3-Personal, WPA3-Enterprise, ou reseau ouvert avec OWE). Justifiez chaque choix.
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+Considerez la sensibilite des donnees, le nombre d'utilisateurs, la facilite de gestion (un PSK partage est-il acceptable pour 500 etudiants ?), et la compatibilite des equipements.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+| Reseau | Protocole recommande | Justification |
+|--------|---------------------|---------------|
+| Administratif | **WPA3-Enterprise** (ou WPA2-Enterprise si incompatibilite materielle) | Donnees sensibles (dossiers eleves, paie). Chaque membre du personnel a ses identifiants — revocables si quelqu'un quitte l'etablissement. AES-GCMP 192 bits pour la confidentialite maximale. |
+| Pedagogique | **WPA2-Enterprise** (802.1X) | 500 etudiants — un PSK serait partage et diffuse en quelques jours. Avec 802.1X, chaque etudiant a son compte (lie au LDAP de l'ecole), et l'acces est automatiquement revoque en fin d'annee. WPA3 serait ideal mais les appareils etudiants ne le supportent pas tous. |
+| Invite | **WPA3-OWE** (ou portail captif sur reseau ouvert) | L'acces doit etre simple (pas de mot de passe a communiquer). OWE chiffre le trafic sans demander de mot de passe — invisible pour l'utilisateur. Si les appareils ne supportent pas OWE, un portail captif avec conditions d'utilisation suffit. |
+
+:::
+
+### Voir aussi
+
+- @sec-topic-5-8 dans ce module (RADIUS — necessaire pour WPA2/WPA3-Enterprise)
+- @sec-topic-2-6 (architectures wireless et modes AP)
+- @sec-topic-5-10 dans ce module (configuration concrete WPA2-PSK via GUI)
+- @sec-topic-1-11 (principes wireless — canaux, SSID, RF, chiffrement)
+
+## 5.10 — Configuration WLAN WPA2 PSK via GUI {#sec-topic-5-10}
+
+> **Exam topic 5.10** : _Configure and verify_ — WLAN within the GUI using WPA2 PSK
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Cisco attend des candidats CCNA qu'ils sachent configurer un SSID sur un WLC (Wireless LAN Controller) via l'interface graphique. Cette section decrit les etapes concretes, ecran par ecran, pour creer un reseau Wi-Fi WPA2-Personal fonctionnel.
+
+### Theorie
+
+#### Prerequis
+
+Avant de creer un WLAN sur le WLC, verifiez :
+
+- Le WLC est operationnel et les APs sont associes
+- Les VLANs et interfaces dynamiques sont configures (un VLAN par SSID)
+- Le serveur DHCP est fonctionnel pour le VLAN cible
+
+#### Etapes de configuration sur le WLC GUI
+
+**Etape 1 : Creer le WLAN**
+
+- Menu : **WLANs** → **Create New** → **Go**
+- Renseigner :
+  - **Profile Name** : `OFFICE-WIFI` (nom interne d'administration)
+  - **SSID** : `OFFICE-WIFI` (nom visible par les clients)
+  - **ID** : numero unique (1-512)
+
+**Etape 2 : Parametres generaux**
+
+- Onglet **General** :
+  - **Status** : Enabled
+  - **Interface/Interface Group** : selectionner l'interface VLAN associee (ex: `vlan-office`)
+  - **Broadcast SSID** : Enabled (desactiver ne renforce pas reellement la securite)
+
+**Etape 3 : Configurer la securite**
+
+- Onglet **Security** → sous-onglet **Layer 2** :
+  - **Layer 2 Security** : `WPA+WPA2`
+  - **WPA2 Policy** : coche
+  - **WPA2 Encryption** : `AES`
+  - **Auth Key Mgmt** : `PSK`
+  - **PSK Format** : `ASCII`
+  - **Pre-Shared Key** : entrer le mot de passe (8-63 caracteres)
+
+**Etape 4 : Parametres avances (optionnels)**
+
+- Onglet **Advanced** :
+  - **FlexConnect Local Switching** : activer si les APs sont en mode FlexConnect
+  - **Session Timeout** : duree maximale d'une session (1800 sec = 30 min par defaut)
+  - **Client Exclusion** : activer pour bloquer temporairement les clients qui echouent l'authentification
+
+**Etape 5 : Appliquer et verifier**
+
+- Cliquer **Apply**
+- Verifier dans **WLANs** que le nouveau SSID apparait avec le statut **Enabled**
+- Verifier dans **Monitor** → **Clients** qu'un client parvient a s'associer
+
+#### Representation des ecrans WLC
+
+```{.text title="Topologie"}
++-----------------------------------------------------------+
+|  Cisco WLC -- WLANs > Edit 'OFFICE-WIFI'                  |
++-----------------------------------------------------------+
+|  General | Security | QoS | Policy | Advanced              |
++-----------------------------------------------------------+
+|                                                             |
+|  Profile Name:    [OFFICE-WIFI          ]                   |
+|  SSID:            [OFFICE-WIFI          ]                   |
+|  Status:          [* Enabled            ]                   |
+|  Interface:       [vlan-office     v    ]                   |
+|  Broadcast SSID:  [* Enabled            ]                   |
+|                                                             |
++-----------------------------------------------------------+
+|  Security > Layer 2                                         |
++-----------------------------------------------------------+
+|                                                             |
+|  Layer 2 Security: [WPA+WPA2       v    ]                   |
+|                                                             |
+|  WPA2 Parameters:                                           |
+|    [x] WPA2 Policy                                          |
+|    Encryption:     [AES            v    ]                    |
+|                                                             |
+|  Auth Key Mgmt:    [PSK            v    ]                   |
+|  PSK Format:       [ASCII          v    ]                   |
+|  Pre-Shared Key:   [................    ]                    |
+|                                                             |
+|                            [ Apply ]  [ Cancel ]            |
++-----------------------------------------------------------+
+```
+
+### Mise en pratique CLI
+
+Meme si la configuration se fait via GUI, la verification CLI est indispensable :
+
+```{.cisco filename="WLC"}
+WLC# show wlan 4
+
+WLAN Identifier.................. 4
+Profile Name..................... OFFICE-WIFI
+Network Name (SSID).............. OFFICE-WIFI
+Status........................... Enabled
+MAC Filtering.................... Disabled
+Broadcast SSID................... Enabled
+...
+Interface........................ vlan-office
+...
+Security
+  802.11 Authentication........... Open System
+  Static WEP Keys................. Disabled
+  Wi-Fi Protected Access (WPA/WPA2)
+    WPA (SSN IE).................. Disabled
+    WPA2 (RSN IE)................. Enabled
+      TKIP Cipher................. Disabled
+      AES-CCMP128 Cipher.......... Enabled
+  Auth Key Management
+    802.1x........................ Disabled
+    PSK........................... Enabled
+    CCKM.......................... Disabled
+...
+Number of Active Clients......... 14
+```
+
+**Interpretation** :
+
+- WPA2 avec AES-CCMP active, TKIP desactive (conforme aux bonnes pratiques)
+- Authentification PSK (pas 802.1X) — c'est bien du WPA2-Personal
+- 14 clients actifs — le SSID fonctionne
+- Le SSID est broadcaste (visible par les clients qui scannent)
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : L'examen peut montrer une capture d'ecran du WLC GUI ou WPA et WPA2 sont tous les deux coches. C'est un mode de compatibilite (transition). Mais si la question demande "quel est le protocole de securite le plus fort configure ?", la reponse est **WPA2** (pas WPA). WPA seul avec TKIP est insuffisant.
+
+**A retenir** :
+
+- WPA2-PSK necessite un mot de passe de **8 a 63 caracteres** ASCII
+- Le chiffrement doit etre **AES** (pas TKIP pour WPA2)
+- Le SSID est associe a une **interface VLAN** sur le WLC
+- Chaque WLAN a un **ID unique** et un **profile name**
+:::
+
+### Exercice 5.10 — Configuration WLAN sur captures GUI
+
+**Contexte** : Le WLC de l'hotel GrandStay doit etre configure avec un SSID invite `GUEST-STAY` en WPA2-PSK avec le mot de passe `Welcome2Hotel!`, associe a l'interface VLAN `guest-vlan`.
+
+**Consigne** : Listez dans l'ordre les parametres a configurer dans chaque onglet du WLC GUI (General, Security).
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+Suivez les 5 etapes decrites dans la theorie. L'onglet QoS peut rester a `Silver` (best effort) pour un reseau invite.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+**Onglet General :**
+
+- Profile Name : `GUEST-STAY`
+- SSID : `GUEST-STAY`
+- Status : Enabled
+- Interface : `guest-vlan`
+- Broadcast SSID : Enabled
+
+**Onglet Security > Layer 2 :**
+
+- Layer 2 Security : `WPA+WPA2`
+- WPA2 Policy : coche
+- WPA2 Encryption : `AES`
+- Auth Key Mgmt : `PSK`
+- PSK Format : `ASCII`
+- Pre-Shared Key : `Welcome2Hotel!`
+
+**Onglet QoS :**
+
+- Quality of Service : `Silver` (best effort — adapte aux invites)
+
+**Onglet Advanced :**
+
+- Session Timeout : `3600` (1 heure — limite raisonnable pour un invite)
+- FlexConnect Local Switching : selon l'architecture de l'hotel
+
+**Verification :** se connecter depuis un smartphone au SSID `GUEST-STAY` avec le mot de passe, confirmer l'obtention d'une adresse IP et la connectivite Internet.
+
+:::
+
+### Voir aussi
+
+- @sec-topic-5-9 dans ce module (theorie WPA/WPA2/WPA3 — pourquoi ces choix)
+- @sec-topic-2-9 (interpretation de la GUI WLC — WLAN creation, QoS profiles)
+- @sec-topic-2-7 (connexions physiques des composants WLAN)
+
+## 5.11 — Machine Learning pour la securite reseau {#sec-topic-5-11}
+
+> **Exam topic 5.11** : _Describe_ — The use of Machine Learning for network security *(NOUVEAU v1.1)*
+> **Niveau** : Describe
+
+### Contexte
+
+Les reseaux modernes generent des millions d'evenements par jour — logs, alertes, flux de trafic. Aucun humain ne peut tout analyser en temps reel. Le Machine Learning (ML) et l'intelligence artificielle (IA) permettent aux systemes de securite de detecter des schemas anormaux que les regles statiques (ACLs, signatures) ne peuvent pas reperer.
+
+### Theorie
+
+#### Pourquoi le ML en securite reseau ?
+
+La securite traditionnelle repose sur des **signatures** : des patterns connus d'attaques. Un IPS classique compare le trafic a une base de signatures (comme un antivirus compare les fichiers a une base de virus connus). Le probleme : les attaques inedites (zero-day) n'ont pas de signature.
+
+Le ML apporte une approche complementaire basee sur le **comportement** :
+
+- Il apprend ce qui est "normal" pour un reseau (volumes de trafic, horaires d'activite, protocoles utilises)
+- Il detecte les **anomalies** — des ecarts significatifs par rapport a la baseline
+- Il peut identifier des menaces inconnues que les signatures ne couvrent pas
+
+L'analogie : un agent de securite dans un centre commercial. L'approche par signatures, c'est avoir une liste de visages de voleurs connus. L'approche ML, c'est observer les comportements suspects — quelqu'un qui fait des allers-retours devant les caisses sans rien acheter n'est sur aucune liste, mais son comportement sort de la norme.
+
+#### Applications concretes du ML en securite reseau
+
+| Application | Fonctionnement | Exemple produit Cisco |
+|-------------|---------------|----------------------|
+| **Detection d'anomalies de trafic** | Le ML etablit une baseline du trafic normal et alerte sur les ecarts (pic de trafic inhabituel, protocole rare) | Cisco Stealthwatch / Secure Network Analytics |
+| **Analyse comportementale des utilisateurs (UEBA)** | Detecte les comportements anormaux d'un utilisateur (connexion a 3h du matin, acces a des ressources inhabituelles) | Cisco ISE avec pxGrid |
+| **Analyse de malware** | Classification automatique des fichiers suspects sans signature connue (analyse du comportement en sandbox) | Cisco Secure Malware Analytics (ex-Threat Grid) |
+| **Detection de menaces chiffrees (ETA)** | Analyse les metadonnees du trafic chiffre (TLS) pour detecter du malware sans le dechiffrer | Cisco ETA (Encrypted Traffic Analytics) |
+| **Securite DNS** | Identifie les domaines malveillants (DGA, C2, phishing) en analysant les patterns de requetes DNS | Cisco Umbrella |
+
+#### Encrypted Traffic Analytics (ETA) — Un exemple concret
+
+Un cas d'usage parlant de ML en reseau : 70% du trafic Internet est aujourd'hui chiffre (HTTPS). Le chiffrement protege la vie privee, mais il empeche aussi les IPS traditionnels d'inspecter le contenu. Les attaquants exploitent cela pour cacher leur trafic malveillant dans du HTTPS.
+
+L'ETA de Cisco analyse le trafic chiffre **sans le dechiffrer** en examinant :
+
+- La taille et le timing des paquets (un C2 beacon a un pattern regulier, different de la navigation web)
+- Les metadonnees TLS (version, cipher suite, extensions)
+- Le certificat du serveur (certificats autosignes, duree de vie courte, emetteur inconnu)
+- Les sequences de paquets (le "rythme" de la communication)
+
+Le modele ML est entraine sur des millions de flux connus (legitimes vs malveillants) et peut classer un nouveau flux avec un taux de precision superieur a 99%.
+
+#### Types de ML utilises
+
+| Type | Fonctionnement | Usage en securite |
+|------|---------------|-------------------|
+| **Supervise** | Apprend a partir d'exemples etiquetes (trafic bon vs trafic mauvais) | Classification de malware, detection de phishing |
+| **Non supervise** | Cherche des patterns sans exemples prealables | Detection d'anomalies, clustering de comportements |
+| **Renforcement** | Apprend par essai-erreur et feedback | Reponse automatisee aux incidents (orchestration) |
+
+#### Limites et defis
+
+Le ML n'est pas une solution miracle :
+
+- **Faux positifs** : le ML peut signaler un comportement legitime comme suspect (un administrateur qui travaille tard)
+- **Donnees d'entrainement** : la qualite du modele depend de la qualite et de la quantite des donnees historiques
+- **Attaques adversariales** : des attaquants sophistiques peuvent adapter leur comportement pour rester dans la "norme" detectee par le ML
+- **Interpretabilite** : un modele ML peut detecter une anomalie sans pouvoir expliquer clairement pourquoi (probleme de la "boite noire")
+- **Cout computationnel** : l'entrainement et l'inference necessitent des ressources significatives
+
+### Mise en pratique CLI
+
+L'ETA (Encrypted Traffic Analytics) s'active sur les routeurs et switches Cisco qui exportent les metadonnees NetFlow vers un collecteur Stealthwatch :
+
+```{.cisco filename="R1"}
+R1# show flow monitor ETA-MONITOR cache
+  Cache type:                            Normal
+  Cache size:                            4096
+  Current entries:                       247
+  ...
+  Flows added:                           18432
+  Flows aged:                            18185
+
+R1# show et-analytics
+ET-Analytics is ENABLED on the following interfaces:
+  GigabitEthernet0/0 (input/output)
+  GigabitEthernet0/1 (input/output)
+
+ET-Analytics destination address: 10.0.0.50
+ET-Analytics destination port: 2055
+Inactive timer: 15
+```
+
+**Interpretation** : ETA est actif sur deux interfaces. Les metadonnees de flux sont exportees vers le collecteur a l'adresse 10.0.0.50 (Stealthwatch). 18 432 flux ont ete analyses. Le collecteur applique les modeles ML pour classifier chaque flux comme benin ou potentiellement malveillant.
+
+::: {.callout-tip title="🎯 Point exam"}
+**Piege courant** : Le ML complete la securite traditionnelle — il ne la remplace pas. L'examen peut proposer "ML remplace les firewalls et ACLs" comme mauvaise reponse. Le ML detecte les anomalies, mais ce sont toujours les mecanismes traditionnels (ACLs, IPS, firewalls) qui bloquent effectivement le trafic malveillant.
+
+**A retenir** :
+
+- Le ML detecte les **anomalies** et les menaces **inconnues** (zero-day) que les signatures ne couvrent pas
+- L'ETA (Encrypted Traffic Analytics) analyse le trafic chiffre **sans le dechiffrer** — via les metadonnees
+- Le ML necessite une **baseline** du comportement normal pour detecter les ecarts
+- Cisco Stealthwatch (Secure Network Analytics) et Cisco Umbrella sont des produits Cisco qui utilisent le ML
+:::
+
+### Exercice 5.11 — Scenarios ML vs traditionnel
+
+**Contexte** : L'equipe SOC de GlobalCorp recoit les alertes suivantes. Pour chacune, indiquez si la detection est mieux assuree par une approche traditionnelle (signatures/ACLs) ou par le ML.
+
+| Alerte | Approche recommandee | Justification |
+|--------|---------------------|---------------|
+| Un poste telecharge le malware WannaCry (signature connue) | | |
+| Le serveur de paie communique avec une IP en Russie pour la premiere fois | | |
+| Un employe se connecte au VPN a 3h du matin tous les jours depuis une semaine | | |
+| Un scan de ports nmap est detecte depuis l'exterieur | | |
+| Du trafic HTTPS sortant presente un pattern de beacon regulier toutes les 30 secondes | | |
+
+::: {.callout-note collapse="true" title="💡 Indice"}
+Les menaces connues (signatures existantes) sont mieux gerees par les approches traditionnelles. Les comportements anormaux et les menaces inconnues sont le domaine du ML.
+:::
+
+::: {.callout-note collapse="true" title="🔬 Solution"}
+
+| Alerte | Approche | Justification |
+|--------|----------|---------------|
+| WannaCry | **Traditionnelle (IPS/signature)** | Signature connue et largement documentee — l'IPS la detecte instantanement |
+| Communication vers IP russe | **ML (anomalie comportementale)** | Pas de signature pour "premiere communication vers un pays". Le ML detecte l'ecart par rapport au comportement normal du serveur |
+| VPN a 3h du matin | **ML (UEBA)** | Le pattern de connexion est inhabituel pour cet utilisateur. Pas de regle statique possible car l'acces VPN est legitime en soi |
+| Scan nmap | **Traditionnelle (IPS/ACL)** | Les patterns de scan sont bien connus. Un IPS avec signature ou un firewall detecte facilement les sequences de SYN vers des ports differents |
+| Beacon HTTPS regulier | **ML (ETA)** | Trafic chiffre — pas d'inspection possible par un IPS classique. L'ETA analyse le timing et la taille des paquets pour identifier le pattern de C2 beacon |
+
+:::
+
+### Voir aussi
+
+- @sec-topic-5-1 dans ce module (menaces et techniques de mitigation — le ML est une technique de mitigation avancee)
+- @sec-topic-1-1 (next-gen firewalls et IPS — les plateformes qui integrent le ML)
+- @sec-topic-6-1 (automatisation reseau — le ML s'inscrit dans la tendance d'automatisation)
+
+## Labs Module 5 {#sec-topic-5-labs}
+
+### Lab 5.1 — ACL Standard et Extended
+
+**Topologie :**
+
+```{.text title="Topologie"}
+                         +---------------------------+
+                         |                           |
+  [PC-Admin]             |         R1                 |            [Web-SRV]
+  192.168.1.10/24 ---[Gi0/0]                  [Gi0/2]--- 10.0.0.100/24
+                         |                           |
+  [PC-User]              |                           |            [DNS-SRV]
+  192.168.2.10/24 ---[Gi0/1]                         |       --- 10.0.0.53/24
+                         |                           |
+                         +---------------------------+
+
+  Gi0/0 = 192.168.1.1/24  (VLAN Admin)
+  Gi0/1 = 192.168.2.1/24  (VLAN Users)
+  Gi0/2 = 10.0.0.1/24     (VLAN Servers)
+```
+
+**Tableau d'adressage :**
+
+| Equipement | Interface | Adresse IP | Masque | Passerelle |
+|------------|-----------|-----------|--------|------------|
+| R1 | Gi0/0 | 192.168.1.1 | 255.255.255.0 | — |
+| R1 | Gi0/1 | 192.168.2.1 | 255.255.255.0 | — |
+| R1 | Gi0/2 | 10.0.0.1 | 255.255.255.0 | — |
+| PC-Admin | NIC | 192.168.1.10 | 255.255.255.0 | 192.168.1.1 |
+| PC-User | NIC | 192.168.2.10 | 255.255.255.0 | 192.168.2.1 |
+| Web-SRV | NIC | 10.0.0.100 | 255.255.255.0 | 10.0.0.1 |
+| DNS-SRV | NIC | 10.0.0.53 | 255.255.255.0 | 10.0.0.1 |
+
+**Objectifs :**
+
+1. Configurer une ACL standard nommee pour restreindre l'acces VTY
+2. Configurer une ACL extended nommee pour filtrer le trafic vers les serveurs
+3. Verifier le bon fonctionnement avec `show access-lists` et des tests de connectivite
+
+**Configuration de depart :**
+
+```{.cisco filename="R1"}
+! Router R1
+hostname R1
+no ip domain-lookup
+!
+interface GigabitEthernet0/0
+ description VLAN Admin
+ ip address 192.168.1.1 255.255.255.0
+ no shutdown
+!
+interface GigabitEthernet0/1
+ description VLAN Users
+ ip address 192.168.2.1 255.255.255.0
+ no shutdown
+!
+interface GigabitEthernet0/2
+ description VLAN Servers
+ ip address 10.0.0.1 255.255.255.0
+ no shutdown
+!
+enable secret LabP@ss2026
+username admin privilege 15 secret @dminL@b!
+line vty 0 4
+ login local
+ transport input ssh
+```
+
+**Etapes :**
+
+1. **ACL standard — Restreindre l'acces SSH au routeur**
+   - Seul le reseau Admin (192.168.1.0/24) peut se connecter en SSH a R1
+   - Creer l'ACL : `ip access-list standard VTY-ACCESS`
+   - Autoriser : `permit 192.168.1.0 0.0.0.255`
+   - Appliquer sur les VTY : `access-class VTY-ACCESS in`
+   - Verification : `show access-lists VTY-ACCESS`
+   - Test : depuis PC-Admin, `ssh -l admin 192.168.1.1` → doit reussir
+   - Test : depuis PC-User, `ssh -l admin 192.168.2.1` → doit echouer
+
+2. **ACL extended — Filtrer le trafic vers les serveurs**
+   - Politique : PC-User peut acceder au Web (HTTP/HTTPS) et au DNS, mais rien d'autre
+   - Politique : PC-Admin peut acceder a tout
+   - Creer l'ACL : `ip access-list extended USER-TO-SERVERS`
+   - Autoriser HTTP : `permit tcp 192.168.2.0 0.0.0.255 host 10.0.0.100 eq 80`
+   - Autoriser HTTPS : `permit tcp 192.168.2.0 0.0.0.255 host 10.0.0.100 eq 443`
+   - Autoriser DNS : `permit udp 192.168.2.0 0.0.0.255 host 10.0.0.53 eq 53`
+   - Autoriser ICMP (pour le troubleshooting) : `permit icmp 192.168.2.0 0.0.0.255 10.0.0.0 0.0.0.255`
+   - Bloquer le reste : `deny ip any any log`
+   - Appliquer sur Gi0/1 en direction `in`
+   - Test depuis PC-User : `ping 10.0.0.100` → doit reussir (ICMP autorise)
+   - Test depuis PC-User : naviguer vers `http://10.0.0.100` → doit reussir
+   - Test depuis PC-User : `ssh 10.0.0.100` → doit echouer (SSH non autorise)
+
+3. **Verification et interpretation**
+   - `show access-lists` → verifier les compteurs de matches
+   - `show ip interface Gi0/1` → verifier que l'ACL est appliquee en inbound
+
+**Verification finale :**
+
+```{.cisco filename="R1"}
+R1# show access-lists
+Standard IP access list VTY-ACCESS
+    10 permit 192.168.1.0, wildcard bits 0.0.0.255 (12 matches)
+Extended IP access list USER-TO-SERVERS
+    10 permit tcp 192.168.2.0 0.0.0.255 host 10.0.0.100 eq www (8 matches)
+    20 permit tcp 192.168.2.0 0.0.0.255 host 10.0.0.100 eq 443 (4 matches)
+    30 permit udp 192.168.2.0 0.0.0.255 host 10.0.0.53 eq domain (15 matches)
+    40 permit icmp 192.168.2.0 0.0.0.255 10.0.0.0 0.0.0.255 (5 matches)
+    50 deny ip any any log (3 matches)
+```
+
+**Questions de validation :**
+
+1. Pourquoi l'ACL VTY-ACCESS est-elle appliquee avec `access-class` et non `access-group` ?
+2. Que se passerait-il si on oubliait la ligne `permit icmp` dans l'ACL USER-TO-SERVERS ?
+3. Si l'on deplacait l'ACL USER-TO-SERVERS sur Gi0/2 en direction `out` au lieu de Gi0/1 `in`, le filtrage fonctionnerait-il de la meme facon ?
+
+### Lab 5.2 — Port Security et DHCP Snooping
+
+**Topologie :**
+
+```{.text title="Topologie"}
+                    +------------------------------------+
+  [PC1]             |           SW1                      |       [DHCP Server]
+  (legitime) --[Gi0/1]                           [Gi0/24]---- 192.168.10.254/24
+                    |                                    |
+  [PC2]             |                                    |
+  (legitime) --[Gi0/2]                                  |
+                    |                                    |
+  [Attaquant]       |                                    |
+  (rogue DHCP) -[Gi0/3]                                 |
+                    |                                    |
+  [PC4]             |                                    |
+  (MAC flood) --[Gi0/4]                                 |
+                    +------------------------------------+
+
+  VLAN 10 -- Reseau : 192.168.10.0/24
+  DHCP Pool : 192.168.10.100 a 192.168.10.200
+```
+
+**Tableau d'adressage :**
+
+| Equipement | Interface | Adresse IP | Masque | Source |
+|------------|-----------|-----------|--------|--------|
+| SW1 | VLAN 10 | 192.168.10.1 | 255.255.255.0 | Statique |
+| DHCP Server | NIC | 192.168.10.254 | 255.255.255.0 | Statique |
+| PC1 | NIC | 192.168.10.10x | 255.255.255.0 | DHCP |
+| PC2 | NIC | 192.168.10.10x | 255.255.255.0 | DHCP |
+| Attaquant | NIC | 192.168.10.250 | 255.255.255.0 | Statique (rogue DHCP) |
+| PC4 | NIC | — | — | Outil MAC flooding |
+
+**Objectifs :**
+
+1. Configurer port security pour limiter les adresses MAC
+2. Configurer DHCP snooping pour bloquer le rogue DHCP
+3. Configurer DAI pour empecher l'ARP spoofing
+4. Tester et verifier chaque mecanisme
+
+**Etapes :**
+
+1. **Port Security sur tous les ports d'acces**
+   - Configurer Gi0/1-4 en mode access, VLAN 10
+   - Activer port security : maximum 1 MAC, sticky, violation shutdown
+   - Commande : `show port-security`
+   - Test : brancher un mini-switch sur Gi0/4 → le port doit passer en err-disabled
+
+2. **DHCP Snooping**
+   - Activer globalement et sur VLAN 10
+   - Port Gi0/24 en trusted (serveur DHCP legitime)
+   - Rate limit 10 sur les ports d'acces
+   - Verification : `show ip dhcp snooping`, `show ip dhcp snooping binding`
+   - Test : l'attaquant sur Gi0/3 tente d'envoyer des DHCP Offer → bloque (port untrusted)
+
+3. **DAI**
+   - Activer sur VLAN 10
+   - Port Gi0/24 en trusted pour l'ARP inspection
+   - Verification : `show ip arp inspection vlan 10`
+   - Test : l'attaquant envoie un gratuitous ARP avec l'IP de la passerelle → bloque
+
+4. **Recuperation d'un port err-disabled**
+   - Le port Gi0/4 est en err-disabled apres la violation port security
+   - Commande : `shutdown` puis `no shutdown` sur Gi0/4
+   - Ou configurer la recuperation automatique : `errdisable recovery cause psecure-violation`
+
+**Verification finale :**
+
+```{.cisco filename="SW1"}
+SW1# show port-security
+Secure Port  MaxSecureAddr  CurrentAddr  SecurityViolation  Security Action
+-----------  -------------  -----------  -----------------  ---------------
+     Gi0/1              1            1                  0         Shutdown
+     Gi0/2              1            1                  0         Shutdown
+     Gi0/3              1            1                  0         Shutdown
+     Gi0/4              1            1                  1         Shutdown
+
+SW1# show ip dhcp snooping binding
+MacAddress          IpAddress       Lease(sec)  Type           VLAN  Interface
+------------------  --------------- ----------  -------------- ----  ---------
+00:AB:CD:11:22:33   192.168.10.101  86400       dhcp-snooping  10   Gi0/1
+00:AB:CD:44:55:66   192.168.10.102  86400       dhcp-snooping  10   Gi0/2
+```
+
+**Questions de validation :**
+
+1. Pourquoi le port Gi0/24 doit-il etre trusted a la fois pour DHCP snooping ET pour DAI ?
+2. Si un employe legitime branche un telephone IP (qui genere une deuxieme MAC sur le port), que se passe-t-il avec port security configure a maximum 1 ?
+3. Un poste avec une IP statique (pas obtenue via DHCP) peut-il fonctionner avec DAI active ? Pourquoi ?
+
+### Lab 5.3 — SSH et securisation d'acces
+
+**Topologie :**
+
+```{.text title="Topologie"}
+  [PC-Admin] ------- [SW1] ------- [R1]
+  192.168.100.10/24          192.168.100.1/24
+                    VLAN 100 (Management)
+```
+
+**Tableau d'adressage :**
+
+| Equipement | Interface | Adresse IP | Masque | Passerelle |
+|------------|-----------|-----------|--------|------------|
+| R1 | Gi0/0 | 192.168.100.1 | 255.255.255.0 | — |
+| SW1 | VLAN 100 | 192.168.100.2 | 255.255.255.0 | 192.168.100.1 |
+| PC-Admin | NIC | 192.168.100.10 | 255.255.255.0 | 192.168.100.1 |
+
+**Objectifs :**
+
+1. Securiser l'acces console et VTY du routeur R1
+2. Configurer SSH v2 et desactiver Telnet
+3. Appliquer une ACL pour limiter l'acces SSH au reseau management
+4. Configurer une banniere et un mecanisme anti-brute force
+
+**Etapes :**
+
+1. **Securisation de base de R1**
+   - Configurer hostname, domain-name, enable secret
+   - Creer les utilisateurs locaux (admin, operator)
+   - Generer la cle RSA 2048 bits
+   - Configurer SSH version 2
+
+2. **Securiser la console**
+   - `login local`, timeout 5 min, `logging synchronous`
+
+3. **Securiser les VTY**
+   - `login local`, `transport input ssh`, timeout 10 min
+   - ACL standard pour restreindre au reseau 192.168.100.0/24
+
+4. **Anti-brute force**
+   - `login block-for 120 attempts 3 within 60`
+   - `security passwords min-length 10`
+
+5. **Banniere MOTD**
+   - Avertissement legal
+
+6. **Verification**
+   - `show ip ssh` → confirmer version 2 et algorithme RSA
+   - `show ssh` → voir les sessions actives
+   - Tester la connexion SSH depuis PC-Admin
+   - Tenter une connexion Telnet → doit echouer
+
+**Verification finale :**
+
+```{.cisco filename="R1"}
+R1# show ip ssh
+SSH Enabled - version 2.0
+Authentication methods: publickey, keyboard-interactive, password
+Authentication Publickey Algorithms: x509v3-ssh-rsa,ssh-rsa
+Hostkey Algorithms: x509v3-ssh-rsa,ssh-rsa
+Encryption Algorithms: aes128-ctr,aes192-ctr,aes256-ctr
+MAC Algorithms: hmac-sha2-256,hmac-sha2-512,hmac-sha1
+Authentication timeout: 120 secs; Authentication retries: 3
+Minimum expected Diffie Hellman key size: 2048 bits
+IOS Keys in SECSH format(ssh-rsa, 2048 bits):
+```
+
+**Questions de validation :**
+
+1. Pourquoi la cle RSA doit-elle etre d'au moins 768 bits pour SSH v2 ? (2048 bits est la recommandation actuelle)
+2. Quelle commande permet de voir qui est actuellement connecte en SSH au routeur ?
+3. Si le serveur TACACS+ est injoignable et que `login local` est configure en fallback, que se passe-t-il lors de la connexion ?
+
+## Quiz Module 5 — 15 questions {#sec-topic-5-quiz}
+
+**Q1.** Quelle est la principale difference entre une menace et une vulnerabilite ? _(Topic 5.1)_
+
+- A) Une menace est interne, une vulnerabilite est externe
+- B) Une vulnerabilite est une faiblesse ; une menace est un danger potentiel qui pourrait l'exploiter
+- C) Une menace est technique, une vulnerabilite est humaine
+- D) Il n'y a pas de difference, ce sont des synonymes
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**B** — Une vulnerabilite est une faiblesse dans un systeme (port ouvert, firmware obsolete, mot de passe faible). Une menace est tout evenement ou acteur susceptible d'exploiter cette vulnerabilite pour causer un dommage. A est faux car les deux peuvent etre internes ou externes. C est faux car les deux peuvent etre techniques ou humains. D est evidemment faux.
+
+:::
+
+**Q2.** Quels sont les trois elements d'un programme de securite selon le topic CCNA ? _(Topic 5.2)_
+
+- A) Firewall, IPS, chiffrement
+- B) User awareness, training, physical access control
+- C) Authentication, authorization, accounting
+- D) Confidentialite, integrite, disponibilite
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**B** — Les trois elements d'un security program sont la sensibilisation (user awareness), la formation (training) et le controle d'acces physique (physical access control). A decrit des outils techniques, pas un programme. C decrit AAA (topic 5.8). D decrit la triade CIA (topic 5.1).
+
+:::
+
+**Q3.** Un routeur a les deux commandes suivantes dans sa configuration :
+
+```{.default}
+enable password cisco
+enable secret class
+```
+
+Quel mot de passe est requis pour acceder au mode enable ? _(Topic 5.3)_
+
+- A) cisco
+- B) class
+- C) Les deux sont requis (MFA)
+- D) Le dernier configure (cisco si `enable password` est apres `enable secret`)
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**B** — Quand `enable password` et `enable secret` coexistent, `enable secret` **prend toujours le dessus**, quel que soit l'ordre de configuration. Le mot de passe est donc `class`. A est le piege classique. C est faux — ce n'est pas du MFA. D est faux — ce n'est pas le dernier configure qui gagne, c'est toujours `enable secret`.
+
+:::
+
+**Q4.** Un utilisateur se connecte a un systeme avec un mot de passe et un code envoye par SMS sur son telephone. Combien de facteurs d'authentification sont utilises ? _(Topic 5.4)_
+
+- A) Un facteur (connaissance)
+- B) Deux facteurs (connaissance + possession)
+- C) Deux facteurs (connaissance + connaissance)
+- D) Trois facteurs (connaissance + possession + inherence)
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**B** — Le mot de passe est un facteur de connaissance (ce que vous savez). Le code SMS necessite la possession du telephone (ce que vous avez). Ce sont deux categories differentes, donc MFA a deux facteurs. C est faux car le SMS prouve la possession du telephone, pas une connaissance. D est faux car il n'y a pas de biometrie.
+
+:::
+
+**Q5.** Quel protocole IPsec fournit le chiffrement des donnees ? _(Topic 5.5)_
+
+- A) AH (Authentication Header)
+- B) ESP (Encapsulating Security Payload)
+- C) IKE (Internet Key Exchange)
+- D) GRE (Generic Routing Encapsulation)
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**B** — ESP fournit le chiffrement + l'integrite + l'authentification. AH ne fournit que l'integrite et l'authentification — pas de chiffrement. IKE est le protocole de negociation (il ne chiffre pas le trafic utilisateur). GRE est un protocole de tunneling qui n'offre aucune securite par lui-meme.
+
+:::
+
+**Q6.** Quel est le wildcard mask correspondant au masque de sous-reseau 255.255.255.240 ? _(Topic 5.6)_
+
+- A) 0.0.0.240
+- B) 0.0.0.16
+- C) 0.0.0.15
+- D) 0.0.0.255
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**C** — Le wildcard mask se calcule en soustrayant chaque octet du masque de 255 : 255-255=0, 255-255=0, 255-255=0, 255-240=15. Le resultat est 0.0.0.15. A est le masque lui-meme inverse de facon incorrecte. B est le nombre d'hotes, pas le wildcard. D correspondrait a un /24.
+
+:::
+
+**Q7.** Ou doit-on placer une ACL extended ? _(Topic 5.6)_
+
+- A) Le plus proche possible de la destination
+- B) Le plus proche possible de la source
+- C) Sur le routeur central (core)
+- D) Sur n'importe quelle interface, la position n'a pas d'importance
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**B** — Une ACL extended peut filtrer par source, destination et port. On la place proche de la source pour bloquer le trafic indesirable le plus tot possible, economisant ainsi la bande passante. A est la regle pour les ACLs **standard** (qui ne filtrent que la source). C et D sont incorrects.
+
+:::
+
+**Q8.** Quelle commande applique une ACL sur une ligne VTY ? _(Topic 5.6)_
+
+- A) `ip access-group ACL-NAME in`
+- B) `ip access-list ACL-NAME in`
+- C) `access-class ACL-NAME in`
+- D) `access-group ACL-NAME in`
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**C** — Sur les lignes VTY, on utilise `access-class` (pas `access-group`). `access-group` s'utilise sur les interfaces physiques ou logiques. A est pour les interfaces. B est la commande de creation d'une ACL nommee, pas d'application. D n'est pas une commande valide dans ce contexte.
+
+:::
+
+**Q9.** Quel mecanisme de securite Layer 2 necessite que DHCP snooping soit active au prealable ? _(Topic 5.7)_
+
+- A) Port security
+- B) 802.1X
+- C) Dynamic ARP Inspection (DAI)
+- D) Storm control
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**C** — DAI utilise la binding table construite par DHCP snooping pour verifier la correspondance IP-MAC des paquets ARP. Sans DHCP snooping, DAI n'a pas de reference pour ses verifications. Port security (A) est independant. 802.1X (B) utilise RADIUS, pas DHCP snooping. Storm control (D) est un mecanisme de protection contre les tempetes de broadcast, independant.
+
+:::
+
+**Q10.** Quel est le mode de violation par defaut de port security ? _(Topic 5.7)_
+
+- A) Protect
+- B) Restrict
+- C) Shutdown
+- D) Alert
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**C** — Le mode par defaut est `shutdown` : le port passe en etat err-disabled et necessite une intervention manuelle pour etre reactive. Protect (A) bloque silencieusement sans log ni compteur. Restrict (B) bloque avec log et compteur mais laisse le port actif. Alert (D) n'est pas un mode valide de port security.
+
+:::
+
+**Q11.** Quel protocole AAA chiffre l'integralite du paquet ? _(Topic 5.8)_
+
+- A) RADIUS
+- B) TACACS+
+- C) Kerberos
+- D) LDAP
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**B** — TACACS+ chiffre le paquet entier. RADIUS (A) ne chiffre que le mot de passe — le reste du paquet (username, attributs) est en clair. Kerberos (C) et LDAP (D) ne sont pas des protocoles AAA au sens Cisco IOS (TACACS+ et RADIUS sont les deux options pour `aaa authentication`).
+
+:::
+
+**Q12.** Quel protocole de securite Wi-Fi utilise SAE (Simultaneous Authentication of Equals) ? _(Topic 5.9)_
+
+- A) WEP
+- B) WPA
+- C) WPA2
+- D) WPA3
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**D** — SAE est l'une des ameliorations majeures de WPA3. Il remplace le 4-way handshake de WPA2-Personal pour resister aux attaques de dictionnaire offline. WEP (A) utilise une cle statique. WPA (B) utilise TKIP. WPA2 (C) utilise le 4-way handshake classique.
+
+:::
+
+**Q13.** Lors de la configuration d'un WLAN en WPA2-PSK sur un WLC, quel chiffrement doit etre selectionne ? _(Topic 5.10)_
+
+- A) WEP 128 bits
+- B) TKIP
+- C) AES
+- D) RC4
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**C** — WPA2 utilise AES-CCMP comme algorithme de chiffrement. TKIP (B) est l'algorithme de WPA (pas WPA2). WEP (A) et RC4 (D) sont obsoletes et casses. L'examen insiste sur l'association WPA2 = AES.
+
+:::
+
+**Q14.** Quel est l'avantage principal du Machine Learning par rapport a la detection par signatures en securite reseau ? _(Topic 5.11)_
+
+- A) Il est moins cher a deployer
+- B) Il peut detecter des menaces inconnues (zero-day) grace a la detection d'anomalies
+- C) Il ne produit jamais de faux positifs
+- D) Il remplace completement les firewalls et les ACLs
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**B** — Le ML detecte des anomalies comportementales, ce qui lui permet d'identifier des menaces qui n'ont pas de signature connue (zero-day, C2 en trafic chiffre, etc.). A est faux — le ML necessite des investissements significatifs. C est faux — les faux positifs sont un probleme courant du ML. D est faux — le ML complete les mecanismes traditionnels, il ne les remplace pas.
+
+:::
+
+**Q15.** Dans une configuration `aaa authentication login default group tacacs+ local`, que se passe-t-il si le serveur TACACS+ est injoignable ? _(Topic 5.8)_
+
+- A) L'authentification echoue pour tout le monde
+- B) Le routeur utilise la base de donnees locale (username/secret)
+- C) Le routeur autorise l'acces sans mot de passe
+- D) Le routeur tente RADIUS automatiquement
+
+::: {.callout-note collapse="true" title="Reponse"}
+
+**B** — Le mot-cle `local` apres `group tacacs+` est le fallback : si le serveur TACACS+ ne repond pas (timeout), le routeur utilise la base locale (`username ... secret`). A serait vrai si `local` n'etait pas specifie. C est le comportement de la methode `none` (dangereuse). D est faux — RADIUS n'est utilise que s'il est explicitement configure dans la liste de methodes.
+
+:::
+
+## Recapitulatif Module 5 {#sec-topic-5-recap}
+
+| Topic | Concept cle | Commande(s) essentielle(s) |
+|-------|------------|---------------------------|
+| 5.1 | Triade CIA, menaces vs vulnerabilites vs exploits | `show control-plane host open-ports` |
+| 5.2 | Awareness, training, physical access control | `exec-timeout`, `logging synchronous` |
+| 5.3 | enable secret > enable password, login local | `enable secret`, `username ... secret`, `login local` |
+| 5.4 | MFA (3 facteurs), complexite, min-length | `security passwords min-length`, `login block-for` |
+| 5.5 | ESP vs AH, IKE Phase 1/2, tunnel vs transport | `show crypto ipsec sa`, `show crypto isakmp sa` |
+| 5.6 | ACLs standard/extended, wildcard masks, placement | `access-list`, `ip access-group`, `access-class` |
+| 5.7 | Port security, DHCP snooping, DAI (binding table) | `switchport port-security`, `ip dhcp snooping`, `ip arp inspection` |
+| 5.8 | TACACS+ (TCP 49, full encrypt) vs RADIUS (UDP 1812/1813) | `aaa new-model`, `aaa authentication login` |
+| 5.9 | WPA=TKIP, WPA2=AES-CCMP, WPA3=AES-GCMP+SAE | `show wlan` |
+| 5.10 | WLC GUI : profil + SSID + interface + WPA2+AES+PSK | `show wlan {id}` |
+| 5.11 | ML detecte anomalies/zero-day, complete les signatures | `show et-analytics` |
+
+**Check-list avant de passer au Module 6 :**
+
+- [ ] Je sais distinguer menace, vulnerabilite et exploit
+- [ ] Je sais configurer enable secret, console et VTY avec login local
+- [ ] Je connais les trois facteurs MFA et je sais identifier le nombre de facteurs dans un scenario
+- [ ] Je sais decrire les composants d'IPsec (ESP, AH, IKE, modes tunnel/transport)
+- [ ] Je maitrise les wildcard masks et je sais les calculer a partir d'un masque de sous-reseau
+- [ ] Je sais ecrire et appliquer des ACLs standard et extended (numerotees et nommees)
+- [ ] Je connais la regle de placement : standard → destination, extended → source
+- [ ] Je sais configurer port security, DHCP snooping et DAI
+- [ ] Je sais comparer TACACS+ et RADIUS sur les 5 criteres cles
+- [ ] Je connais les differences entre WPA, WPA2 et WPA3 (chiffrement, authentification)
+- [ ] Je sais configurer un WLAN WPA2-PSK via le WLC GUI
+- [ ] Je sais decrire le role du ML en securite reseau (anomalies, ETA, zero-day)
+- [ ] J'ai complete les 12 exercices (dont 5.6a et 5.6b)
+- [ ] J'ai realise les 3 labs
+- [ ] J'ai obtenu >70% au quiz

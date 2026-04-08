@@ -1,0 +1,12 @@
+project:
+  type: book
+  output-dir: _output_simple
+
+book:
+  title: 'Guide CCNA 200-301 v1.1'
+  chapters:
+    - index-simple.qmd
+
+format:
+  html:
+    theme: default

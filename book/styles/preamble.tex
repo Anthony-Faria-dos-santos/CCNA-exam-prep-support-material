@@ -1,0 +1,127 @@
+% =============================================================================
+% Preamble LaTeX — Guide CCNA 200-301
+% =============================================================================
+
+% --- Packages ---
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{titlesec}
+% Fix: titlesec "No format for this command" for \paragraph in report class
+\titleformat{\paragraph}[block]{\normalfont\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\paragraph}{0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+\titleformat{\subparagraph}[block]{\normalfont\normalsize\bfseries}{}{0pt}{}
+\titlespacing*{\subparagraph}{0pt}{3.25ex plus 1ex minus .2ex}{1.5ex plus .2ex}
+\usepackage{parskip}
+% Fix: "Too many unprocessed floats" on large documents
+\usepackage{morefloats}
+\extrafloats{200}
+
+% --- Couleurs Cisco ---
+\definecolor{navy}{HTML}{1A2332}
+\definecolor{ciscoblue}{HTML}{049FD9}
+\definecolor{accentorange}{HTML}{FF6B35}
+\definecolor{labgreen}{HTML}{28A745}
+\definecolor{lightgray}{HTML}{F4F6F8}
+\definecolor{codebg}{HTML}{F5F5F5}
+\definecolor{mediumgray}{HTML}{E2E6EA}
+
+% --- Headers / Footers ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{navy}{\leftmark}}
+\fancyhead[R]{\small\textcolor{ciscoblue}{Guide CCNA 200-301}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyfoot[C]{\thepage}
+  \renewcommand{\headrulewidth}{0pt}
+}
+
+% --- Espacement paragraphes ---
+\setlength{\parskip}{0.6em}
+\setlength{\parindent}{0pt}
+
+% --- Callouts (tcolorbox) ---
+\tcbuselibrary{skins, breakable}
+
+\newtcolorbox{exampoint}{
+  colback=ciscoblue!5,
+  colframe=ciscoblue,
+  coltitle=white,
+  fonttitle=\bfseries,
+  title={\faGraduationCap~Point exam},
+  breakable,
+  left=4mm,
+  arc=2mm,
+  boxrule=0.8pt
+}
+
+\newtcolorbox{labbox}{
+  colback=labgreen!5,
+  colframe=labgreen,
+  coltitle=white,
+  fonttitle=\bfseries,
+  title={Lab},
+  breakable,
+  left=4mm,
+  arc=2mm,
+  boxrule=0.8pt
+}
+
+\newtcolorbox{attentionbox}{
+  colback=accentorange!5,
+  colframe=accentorange,
+  coltitle=white,
+  fonttitle=\bfseries,
+  title={Attention},
+  breakable,
+  left=4mm,
+  arc=2mm,
+  boxrule=0.8pt
+}
+
+\newtcolorbox{notebox}{
+  colback=lightgray,
+  colframe=mediumgray,
+  fonttitle=\bfseries,
+  title={Note technique},
+  breakable,
+  left=4mm,
+  arc=2mm,
+  boxrule=0.8pt
+}
+
+% --- Listings Cisco IOS ---
+\lstdefinestyle{cisco}{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=l,
+  framesep=8pt,
+  framerule=2pt,
+  rulecolor=\color{ciscoblue},
+  keywordstyle=\color{ciscoblue}\bfseries,
+  commentstyle=\color{labgreen}\itshape,
+  stringstyle=\color{accentorange},
+  showstringspaces=false,
+  tabsize=2,
+  xleftmargin=12pt,
+  morekeywords={
+    Router, Switch, configure, terminal, interface, ip, address,
+    no, shutdown, enable, hostname, vlan, switchport, mode, access,
+    trunk, router, ospf, network, area, show, running-config,
+    startup-config, copy, write, exit, end, ping, traceroute,
+    access-list, permit, deny, nat, inside, outside, overload,
+    spanning-tree, channel-group, port-channel, line, vty, console,
+    password, login, service, encryption, banner, motd, clock, ntp,
+    snmp-server, community, logging, debug, crypto, isakmp, ipsec
+  }
+}
+
+\lstset{style=cisco}

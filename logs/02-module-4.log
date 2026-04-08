@@ -1,0 +1,28 @@
+Module 4 et handoff générés. Voici le résumé :
+
+**MODULE-4-ip-services.md** -- ~12 500 mots, ~50 pages estimées
+
+### Contenu produit
+
+| Section | Topic | Niveau Bloom | Contenu clé |
+|---------|-------|-------------|-------------|
+| 4.1 | NAT statique/pool/PAT | Configure/Verify | 4 termes NAT, 3 types, configs + outputs |
+| 4.2 | NTP client/serveur | Configure/Verify | Hiérarchie stratum, `ntp server`/`ntp master` |
+| 4.3 | DHCP et DNS | Explain | Processus DORA, hiérarchie DNS, enregistrements |
+| 4.4 | SNMP | Explain | NMS/Agent/MIB, 3 versions, TRAP vs INFORM |
+| 4.5 | Syslog | Describe | 8 niveaux, facilities, anatomie d'un message |
+| 4.6 | DHCP client/relay | Configure/Verify | `ip helper-address`, GIADDR, serveur DHCP IOS |
+| 4.7 | QoS | Explain | 6 mécanismes PHB, DSCP/CoS, policing vs shaping |
+| 4.8 | SSH | Configure | 4 prérequis, config complète, SSH vs Telnet |
+| 4.9 | TFTP/FTP | Describe | Comparaison, commandes `copy`, calcul de débit |
+
+### Chiffres
+
+- **9/9 topics** couverts (4.1-4.9)
+- **9 exercices** avec solutions cachées
+- **2 labs** Packet Tracer (NAT/PAT + DHCP/NTP/Syslog)
+- **15 questions** de quiz format examen avec explications
+- **24 commandes CLI** avec outputs réalistes
+- **9 encadrés "Point exam"**
+- **22 tableaux comparatifs**, **10 schémas ASCII**
+- Cross-references vers Modules 1, 2, 3, 5 et 6

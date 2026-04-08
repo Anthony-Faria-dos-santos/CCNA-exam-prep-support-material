@@ -1,0 +1,27 @@
+Module 3 et handoff generés. Voici le résumé :
+
+**MODULE-3-ip-connectivity.md** — ~16 500 mots, ~66 pages estimées
+
+### Contenu livré
+
+| Élément | Quantité | Requis |
+|---------|----------|--------|
+| Sections (topics 3.1–3.6) | 6/6 | 6 |
+| Exercices avec solutions | 12 | 12 min |
+| Labs Packet Tracer | 4 | 4 min |
+| Quiz OSPF dédié | 8 questions | oui |
+| Quiz module complet | 15 questions | oui |
+| Encadrés "Point exam" | 6 | 6 min |
+| Commandes CLI avec output | 22 | 1/section min |
+| Schémas ASCII | 14 | — |
+| Tableaux comparatifs | 18 | — |
+
+### Points forts du module
+
+- **OSPF (3.4)** : traitement le plus dense — 5 types de paquets, 7 états d'adjacence, élection DR/BDR non-préemptive, calcul de coût, 4 exercices dédiés, 2 labs dédiés, quiz dédié de 8 questions
+- **Longest prefix match (3.2)** : démonstration en binaire + exercice avec 5 routes candidates piégeux (AD vs prefix length)
+- **Floating static (3.3.d)** : outputs avant/après failover
+- **Lab 3.4** : scénario combiné inter-VLAN (Module 2) + OSPF multi-site
+- **Topic 3.6** (nouveau v1.1) : Meraki, DNA Center, ZTP
+
+Le handoff pour le Module 4 est prêt dans `handoffs/HANDOFF-MODULE-3.md`.

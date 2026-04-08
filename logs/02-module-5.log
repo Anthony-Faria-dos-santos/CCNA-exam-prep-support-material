@@ -1,0 +1,23 @@
+Module 5 généré avec succès. Voici le résumé :
+
+**Fichiers créés :**
+- `modules/MODULE-5-security-fundamentals.md` (~14 500 mots, ~58 pages)
+- `handoffs/HANDOFF-MODULE-5.md`
+
+**Contenu :**
+
+| Section | Topic | Points clés |
+|---------|-------|-------------|
+| 5.1 | Concepts sécurité | Triade CIA, menaces/vulnérabilités/exploits, défense en profondeur |
+| 5.2 | Programmes sécurité | Awareness, training, physical access control |
+| 5.3 | Mots de passe locaux | enable secret > enable password, login local, 6 étapes de config |
+| 5.4 | Politiques MDP | MFA (3 facteurs), certificats, biométrie, min-length |
+| 5.5 | VPNs IPsec | ESP vs AH, IKE Phase 1/2, tunnel vs transport, GRE over IPsec |
+| 5.6 | **ACLs** (section lourde) | Wildcard masks détaillés, standard vs extended, named ACLs, placement, 2 exercices |
+| 5.7 | Sécurité L2 | Port security (sticky/shutdown), DHCP snooping (binding table), DAI |
+| 5.8 | AAA | TACACS+ vs RADIUS (7 critères), fallback local |
+| 5.9 | Wi-Fi security | WPA→WPA2→WPA3, SAE, PMF, OWE |
+| 5.10 | WLAN GUI | Config WPA2-PSK pas-à-pas, schéma ASCII du WLC |
+| 5.11 | **ML security** (NOUVEAU v1.1) | Anomalies, ETA, UEBA, limites du ML |
+
+**Métriques :** 11 sections, 12 exercices, 3 labs, 15 questions quiz, 28 tableaux, 14 schémas ASCII, 22 commandes CLI avec output, 11 encadrés "Point exam".

@@ -1,0 +1,2125 @@
+---
+title: 'Examen Blanc CCNA 200-301'
+description: 'Simulation complète — 102 questions couvrant les 6 domaines avec pondération officielle'
+---
+
+> **Questions** : 102 | **Durée** : 120 minutes
+> **Score de passage** : ≥ 825/1000 (≈ 80%)
+> **Règles** : Pas de retour arrière sur les questions répondues (comme le vrai examen)
+
+## Répartition par domain
+
+| Domain | Poids | Questions |
+|--------|-------|-----------|
+| 1 — Network Fundamentals | 20% | Q1–Q20 |
+| 2 — Network Access | 20% | Q21–Q41 |
+| 3 — IP Connectivity | 25% | Q42–Q67 |
+| 4 — IP Services | 10% | Q68–Q78 |
+| 5 — Security Fundamentals | 15% | Q79–Q94 |
+| 6 — Automation and Programmability | 10% | Q95–Q102 |
+
+## Types de questions
+- **MCQ simple** : 1 bonne réponse parmi 4
+- **MCQ multiple** : 2 ou 3 bonnes réponses parmi 5-6 (indiqué "Choisissez X réponses")
+- **Drag-and-drop** : associer des éléments (décrit textuellement)
+- **Scénario** : mise en situation avec topologie et/ou output CLI
+
+## Domain 1 — Network Fundamentals (Q1–Q20) {#sec-exam-domaine-1}
+
+**Q1.** Quel équipement réseau prend des décisions de transfert basées sur les adresses IP de destination et maintient une table de routage ? _(Topic 1.1)_
+
+- A) Switch Layer 2
+- B) Routeur
+- C) Point d'accès sans fil
+- D) Pare-feu de type bridge
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Un routeur opère à la couche 3 du modèle OSI et utilise les adresses IP de destination pour prendre des décisions de transfert. Il maintient une table de routage qui associe des préfixes réseau à des interfaces de sortie ou des next-hops.
+
+- A) ❌ Un switch Layer 2 utilise les adresses MAC, pas les adresses IP
+- B) ✅ Le routeur est l'équipement de couche 3 par excellence, il route les paquets via sa table de routage
+- C) ❌ Un point d'accès sans fil relaie les trames Wi-Fi vers le réseau filaire (couche 2)
+- D) ❌ Un pare-feu bridge filtre le trafic mais ne route pas au sens classique
+
+:::
+
+**Q2.** Une entreprise déploie un NGFW (Next-Generation Firewall). Quelle fonctionnalité distingue un NGFW d'un pare-feu traditionnel de type stateful ? _(Topic 1.1)_
+
+- A) Le filtrage par adresse IP source et destination
+- B) L'inspection applicative (Layer 7) et la détection d'intrusion intégrée
+- C) Le support du NAT
+- D) La capacité à gérer des listes de contrôle d'accès (ACL)
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Un NGFW va au-delà du simple filtrage stateful (couches 3-4) en intégrant l'inspection applicative (DPI Layer 7), l'IPS intégré, le filtrage URL et la reconnaissance des applications. C'est ce qui le différencie fondamentalement d'un firewall classique.
+
+- A) ❌ Le filtrage par IP est une fonctionnalité de base de tout pare-feu stateful
+- B) ✅ L'inspection deep-packet au niveau applicatif et l'IPS intégré sont les caractéristiques distinctives du NGFW
+- C) ❌ Le NAT est supporté par les firewalls traditionnels depuis longtemps
+- D) ❌ Les ACLs sont disponibles sur les routeurs et pare-feux classiques
+
+:::
+
+**Q3.** Un administrateur souhaite alimenter des téléphones IP et des points d'accès Wi-Fi sans câblage électrique dédié. Quelle technologie doit-il déployer sur les switches ? _(Topic 1.1)_
+
+- A) EtherChannel
+- B) PoE (Power over Ethernet)
+- C) QoS
+- D) SPAN (port mirroring)
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Le PoE (Power over Ethernet), défini par les standards IEEE 802.3af/at/bt, permet d'alimenter des équipements réseau (téléphones IP, AP, caméras) directement via le câble Ethernet, éliminant le besoin d'une prise électrique dédiée.
+
+- A) ❌ EtherChannel agrège plusieurs liens physiques en un lien logique pour augmenter la bande passante
+- B) ✅ PoE fournit l'alimentation électrique via les câbles Ethernet (jusqu'à 90W en 802.3bt Type 4)
+- C) ❌ QoS gère la priorité du trafic, pas l'alimentation
+- D) ❌ SPAN copie le trafic vers un port de monitoring pour l'analyse
+
+:::
+
+**Q4.** Dans une architecture réseau three-tier (three-layer), quelle couche est responsable de l'agrégation du trafic provenant de la couche d'accès et de l'application des politiques réseau ? _(Topic 1.2)_
+
+- A) Core layer
+- B) Distribution layer
+- C) Access layer
+- D) Management layer
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Dans le modèle three-tier de Cisco, la couche distribution (ou aggregation) se situe entre l'accès et le core. Elle agrège le trafic des switches d'accès, applique les politiques (ACL, QoS, filtrage), effectue le routage inter-VLAN et contrôle les domaines de broadcast.
+
+- A) ❌ La couche core assure le transfert rapide des données entre les blocs de distribution (pas de politiques)
+- B) ✅ La distribution agrège le trafic, applique les politiques réseau et effectue le routage inter-VLAN
+- C) ❌ La couche d'accès connecte les terminaux au réseau (postes, téléphones, AP)
+- D) ❌ Il n'existe pas de couche "Management" dans le modèle three-tier classique
+
+:::
+
+**Q5.** Quelle architecture data center est conçue pour fournir une latence uniforme et prévisible entre tous les serveurs, quel que soit leur emplacement dans le réseau ? _(Topic 1.2)_
+
+- A) Three-tier (Core/Distribution/Access)
+- B) Spine-leaf
+- C) Hub-and-spoke WAN
+- D) SOHO
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — L'architecture spine-leaf est spécifiquement conçue pour les data centers modernes. Chaque leaf switch est connecté à chaque spine switch, garantissant que tout trafic entre deux serveurs traverse exactement le même nombre de hops (maximum 2 : leaf → spine → leaf), ce qui produit une latence uniforme et prévisible.
+
+- A) ❌ Le modèle three-tier peut introduire des latences variables selon le chemin emprunté
+- B) ✅ Spine-leaf offre une latence uniforme avec exactement 2 hops entre deux leaf switches
+- C) ❌ Hub-and-spoke est une topologie WAN où tout passe par un site central
+- D) ❌ SOHO (Small Office/Home Office) est un type de réseau, pas une architecture data center
+
+:::
+
+**Q6.** Quelle est la distance maximale approximative de transmission pour un câble UTP Cat 6a en Ethernet 10GBASE-T ? _(Topic 1.3)_
+
+- A) 55 mètres
+- B) 100 mètres
+- C) 300 mètres
+- D) 550 mètres
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Le standard 10GBASE-T sur câble UTP Cat 6a supporte une distance maximale de 100 mètres (comme le 1000BASE-T sur Cat 5e/6). Le Cat 6 non-augmenté (sans "a") est limité à 55 mètres en 10 Gbps, ce qui est un piège fréquent à l'examen.
+
+- A) ❌ 55 mètres est la limite du Cat 6 (pas Cat 6a) pour 10GBASE-T
+- B) ✅ Cat 6a supporte 10GBASE-T jusqu'à 100 mètres grâce à son meilleur blindage contre la diaphonie
+- C) ❌ 300 mètres dépasse les spécifications de tout câble cuivre Ethernet
+- D) ❌ 550 mètres correspond à la portée de la fibre multimode OM3 en 10GBASE-SR
+
+:::
+
+**Q7.** Un administrateur observe la sortie suivante sur une interface d'un routeur. Quel est le problème le plus probable ? _(Topic 1.4)_
+
+```{.default}
+Router# show interfaces GigabitEthernet0/1
+GigabitEthernet0/1 is up, line protocol is down
+  Hardware is iGbE, address is a0b1.c2d3.e4f5
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Input queue: 0/75/0/0 (size/max/drops/flushes)
+  5 minute input rate 0 bits/sec, 0 packets/sec
+  5 minute output rate 0 bits/sec, 0 packets/sec
+```
+
+- A) L'interface est administrativement désactivée (shutdown)
+- B) Il y a un problème de couche 1 (câble débranché) empêchant la couche physique de monter
+- C) Il y a un problème de couche 2 (encapsulation, erreur de protocole, ou désaccord de vitesse/duplex)
+- D) L'adresse IP n'est pas configurée sur l'interface
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — Le statut "up/down" (interface up, line protocol down) indique que la couche physique (Layer 1) fonctionne — le signal électrique est détecté — mais que le protocole de couche 2 n'arrive pas à s'établir. Les causes courantes incluent : mismatch d'encapsulation, keepalives non reçus, problème de clocking, ou désaccord de négociation.
+
+- A) ❌ Si l'interface était en shutdown, le statut serait "administratively down/down"
+- B) ❌ Si le câble était débranché, l'interface serait "down/down" (la couche physique ne monterait pas)
+- C) ✅ "up/down" signifie couche 1 OK mais couche 2 en échec (encapsulation, keepalives, clocking)
+- D) ❌ L'absence d'adresse IP n'empêche pas le line protocol de monter
+
+:::
+
+**Q8.** Quel protocole de transport utilise un mécanisme de three-way handshake (SYN, SYN-ACK, ACK) pour établir une connexion fiable ? _(Topic 1.5)_
+
+- A) UDP
+- B) TCP
+- C) ICMP
+- D) ARP
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — TCP (Transmission Control Protocol) utilise le three-way handshake pour établir une connexion fiable avant de transférer des données. Ce processus (SYN → SYN-ACK → ACK) permet aux deux parties de synchroniser leurs numéros de séquence et de confirmer la connectivité bidirectionnelle.
+
+- A) ❌ UDP est un protocole sans connexion (connectionless), il n'utilise pas de handshake
+- B) ✅ TCP utilise le three-way handshake pour garantir une connexion fiable et ordonnée
+- C) ❌ ICMP est un protocole de signalisation (couche 3), pas un protocole de transport
+- D) ❌ ARP résout les adresses IP en adresses MAC (couche 2), ce n'est pas un protocole de transport
+
+:::
+
+**Q9.** Un réseau 172.16.0.0/22 est déployé dans une succursale. Combien d'adresses hôtes utilisables ce sous-réseau fournit-il ? _(Topic 1.6)_
+
+- A) 510
+- B) 1022
+- C) 1024
+- D) 2046
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Un masque /22 signifie 22 bits réseau et 10 bits hôte. Le nombre total d'adresses est 2^10 = 1024. En retirant l'adresse réseau et l'adresse de broadcast, on obtient 1024 - 2 = **1022** adresses hôtes utilisables.
+
+- A) ❌ 510 correspond à un /23 (2^9 - 2 = 510)
+- B) ✅ /22 = 10 bits hôte → 2^10 - 2 = 1022 adresses utilisables
+- C) ❌ 1024 est le nombre total d'adresses (incluant réseau et broadcast)
+- D) ❌ 2046 correspond à un /21 (2^11 - 2 = 2046)
+
+:::
+
+**Q10.** Un administrateur doit diviser le réseau 10.1.0.0/24 en sous-réseaux pouvant accueillir au moins 25 hôtes chacun. Quel masque de sous-réseau doit-il utiliser et combien de sous-réseaux obtiendra-t-il ? _(Topic 1.6)_
+
+- A) /27 — 8 sous-réseaux de 30 hôtes
+- B) /28 — 16 sous-réseaux de 14 hôtes
+- C) /26 — 4 sous-réseaux de 62 hôtes
+- D) /29 — 32 sous-réseaux de 6 hôtes
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A** — Pour accueillir au moins 25 hôtes, il faut au minimum 5 bits hôte (2^5 - 2 = 30 ≥ 25). Avec un /24 initial, passer à /27 emprunte 3 bits au champ hôte pour le réseau, créant 2^3 = 8 sous-réseaux de 30 hôtes chacun.
+
+- A) ✅ /27 = 5 bits hôte → 30 hôtes par sous-réseau (≥ 25), et 8 sous-réseaux depuis un /24
+- B) ❌ /28 = 4 bits hôte → seulement 14 hôtes, insuffisant pour 25
+- C) ❌ /26 fonctionne (62 hôtes) mais gaspille des adresses et ne produit que 4 sous-réseaux — pas optimal
+- D) ❌ /29 = 3 bits hôte → seulement 6 hôtes, largement insuffisant
+
+:::
+
+**Q11.** Quelle est l'adresse de broadcast du sous-réseau auquel appartient l'hôte 192.168.5.137/26 ? _(Topic 1.6)_
+
+- A) 192.168.5.127
+- B) 192.168.5.191
+- C) 192.168.5.159
+- D) 192.168.5.255
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Avec un masque /26, chaque sous-réseau contient 64 adresses (2^6 = 64). Les sous-réseaux de 192.168.5.0/26 sont : .0-.63, .64-.127, .128-.191, .192-.255. L'adresse 192.168.5.137 tombe dans le sous-réseau 192.168.5.128/26 (128 ≤ 137 ≤ 191), donc l'adresse de broadcast est 192.168.5.191.
+
+- A) ❌ 192.168.5.127 est le broadcast du sous-réseau .64-.127
+- B) ✅ 192.168.5.191 est le broadcast du sous-réseau .128-.191 auquel appartient .137
+- C) ❌ 192.168.5.159 n'est pas une adresse de broadcast valide pour un /26
+- D) ❌ 192.168.5.255 est le broadcast du sous-réseau .192-.255 (ou du /24 entier)
+
+:::
+
+**Q12.** Quelle plage d'adresses suivante est une plage d'adresses privées définie par la RFC 1918 ? _(Topic 1.7)_
+
+- A) 169.254.0.0/16
+- B) 172.16.0.0 – 172.31.255.255
+- C) 192.0.2.0/24
+- D) 100.64.0.0/10
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Les trois plages d'adresses privées définies par la RFC 1918 sont : 10.0.0.0/8, 172.16.0.0/12 (172.16.0.0 à 172.31.255.255) et 192.168.0.0/16. Ces adresses ne sont pas routables sur Internet public et nécessitent du NAT pour communiquer vers l'extérieur.
+
+- A) ❌ 169.254.0.0/16 est la plage APIPA (link-local IPv4), pas une adresse privée RFC 1918
+- B) ✅ 172.16.0.0 – 172.31.255.255 (172.16.0.0/12) est l'une des trois plages privées RFC 1918
+- C) ❌ 192.0.2.0/24 est une plage réservée pour la documentation (RFC 5737)
+- D) ❌ 100.64.0.0/10 est la plage CGN (Carrier-Grade NAT, RFC 6598), pas RFC 1918
+
+:::
+
+**Q13.** Quelle est la représentation correcte de l'adresse IPv6 complète 2001:0DB8:0000:0000:0000:0000:0000:0001 après application des règles de compression ? _(Topic 1.8)_
+
+- A) 2001:DB8::1
+- B) 2001:DB8:0:0:0:0:0:1
+- C) 2001:DB8:0::0:1
+- D) Les deux réponses A et B sont valides
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**D** — Les règles de compression IPv6 permettent : (1) supprimer les zéros en tête de chaque groupe, (2) remplacer une suite consécutive de groupes tout-zéro par "::" (une seule fois). La réponse A (2001:DB8::1) utilise les deux règles. La réponse B (2001:DB8:0:0:0:0:0:1) n'utilise que la règle 1. Les deux sont des représentations valides.
+
+- A) ❌ Partiellement correct — c'est une représentation valide mais pas la seule
+- B) ❌ Partiellement correct — c'est une représentation valide mais pas la seule
+- C) ❌ 2001:DB8:0::0:1 est ambigu et ne respecte pas les conventions (le "::" remplace déjà les groupes consécutifs de zéros)
+- D) ✅ A et B sont toutes deux des représentations valides de la même adresse IPv6
+
+:::
+
+**Q14.** Quel type d'adresse IPv6 est automatiquement généré par un hôte à partir du préfixe FE80::/10 et est utilisé uniquement pour la communication sur le lien local ? _(Topic 1.9)_
+
+- A) Global Unicast Address (GUA)
+- B) Unique Local Address (ULA)
+- C) Link-Local Address
+- D) Multicast Address
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — Les adresses link-local IPv6 (préfixe FE80::/10, en pratique FE80::/64) sont automatiquement générées sur chaque interface IPv6 activée. Elles ne sont valides que sur le lien local (non routables) et sont indispensables pour le fonctionnement d'IPv6 (NDP, routage, etc.).
+
+- A) ❌ Les GUA (2000::/3) sont des adresses globalement routables, équivalentes aux IP publiques en IPv4
+- B) ❌ Les ULA (FC00::/7, en pratique FD00::/8) sont l'équivalent des adresses privées RFC 1918, mais routables en interne
+- C) ✅ Les link-local (FE80::/10) sont auto-générées et utilisées uniquement pour la communication sur le lien direct
+- D) ❌ Les adresses multicast (FF00::/8) identifient un groupe de récepteurs
+
+:::
+
+**Q15.** Sur un poste Windows, quelle commande affiche la configuration IP complète incluant l'adresse MAC, le serveur DHCP et les baux actifs ? _(Topic 1.10)_
+
+- A) `ipconfig`
+- B) `ipconfig /all`
+- C) `netstat -a`
+- D) `arp -a`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — La commande `ipconfig /all` sur Windows affiche la configuration IP détaillée de toutes les interfaces : adresse IP, masque, passerelle, adresse MAC (Physical Address), serveur DHCP, dates de bail, serveurs DNS, etc. Sans le `/all`, `ipconfig` n'affiche que les informations de base.
+
+- A) ❌ `ipconfig` seul affiche uniquement l'adresse IP, le masque et la passerelle par défaut
+- B) ✅ `ipconfig /all` affiche toutes les informations détaillées (MAC, DHCP, baux, DNS, etc.)
+- C) ❌ `netstat -a` affiche les connexions réseau actives et les ports en écoute, pas la configuration IP
+- D) ❌ `arp -a` affiche la table ARP (correspondances IP ↔ MAC), pas la configuration de l'interface
+
+:::
+
+**Q16.** Quel standard Wi-Fi 6E opère dans la bande de fréquences 6 GHz et utilise obligatoirement WPA3 ? _(Topic 1.11)_
+
+- A) 802.11ac (Wi-Fi 5)
+- B) 802.11ax (Wi-Fi 6)
+- C) 802.11ax (Wi-Fi 6E)
+- D) 802.11n (Wi-Fi 4)
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — Wi-Fi 6E est une extension de 802.11ax qui ajoute la bande 6 GHz (5925-7125 MHz) aux bandes 2.4 GHz et 5 GHz existantes. L'accès à la bande 6 GHz impose obligatoirement WPA3, offrant davantage de canaux, moins d'interférences et une meilleure sécurité.
+
+- A) ❌ 802.11ac (Wi-Fi 5) opère uniquement en 5 GHz
+- B) ❌ 802.11ax (Wi-Fi 6) opère en 2.4 GHz et 5 GHz, sans la bande 6 GHz
+- C) ✅ Wi-Fi 6E (802.11ax étendu) ajoute la bande 6 GHz avec WPA3 obligatoire
+- D) ❌ 802.11n (Wi-Fi 4) opère en 2.4 GHz et/ou 5 GHz
+
+:::
+
+**Q17.** Quel composant de virtualisation permet à plusieurs machines virtuelles de partager les ressources physiques d'un même serveur tout en les isolant les unes des autres ? _(Topic 1.12)_
+
+- A) Le switch virtuel (vSwitch)
+- B) L'hyperviseur
+- C) Le contrôleur SDN
+- D) Le containeur Docker
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — L'hyperviseur est le logiciel (Type 1 bare-metal ou Type 2 hosted) qui abstrait les ressources physiques (CPU, RAM, stockage, réseau) d'un serveur et les répartit entre les machines virtuelles. Chaque VM est complètement isolée des autres grâce à l'hyperviseur.
+
+- A) ❌ Le vSwitch fournit la connectivité réseau virtuelle entre les VMs, mais ne gère pas l'ensemble des ressources
+- B) ✅ L'hyperviseur (ex: ESXi, KVM, Hyper-V) est le composant central qui partage et isole les ressources entre les VMs
+- C) ❌ Le contrôleur SDN gère le plan de contrôle réseau de manière centralisée, pas la virtualisation des serveurs
+- D) ❌ Un conteneur Docker partage le noyau de l'OS hôte — c'est de la conteneurisation, pas de la virtualisation à proprement parler
+
+:::
+
+**Q18.** Associez chaque méthode de commutation à sa description. _(Topic 1.13)_
+
+| Méthode | → | Description |
+|---------|---|-------------|
+| 1. Store-and-Forward | | a. Le switch lit uniquement l'adresse MAC de destination (6 premiers octets) avant de transférer |
+| 2. Cut-Through | | b. Le switch reçoit la trame entière, vérifie le FCS, puis la transfère |
+| 3. Fragment-Free | | c. Le switch attend les 64 premiers octets avant de transférer pour éviter les fragments de collision |
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+| Méthode | → | Description |
+|---------|---|-------------|
+| 1. Store-and-Forward | → | b. Le switch reçoit la trame entière, vérifie le FCS, puis la transfère |
+| 2. Cut-Through | → | a. Le switch lit uniquement l'adresse MAC de destination (6 premiers octets) avant de transférer |
+| 3. Fragment-Free | → | c. Le switch attend les 64 premiers octets avant de transférer pour éviter les fragments de collision |
+
+**Store-and-Forward** offre la meilleure détection d'erreurs mais la latence la plus élevée. **Cut-Through** offre la latence la plus faible mais ne détecte pas les erreurs FCS. **Fragment-Free** est un compromis : il filtre les runts (trames < 64 octets causées par les collisions) tout en maintenant une latence basse. Les switches Cisco Catalyst modernes utilisent principalement Store-and-Forward.
+
+:::
+
+**Q19.** Un switch reçoit une trame avec une adresse MAC de destination qu'il ne trouve pas dans sa table MAC. Que fait-il ? _(Topic 1.13)_
+
+- A) Il rejette la trame (drop)
+- B) Il envoie la trame à la passerelle par défaut
+- C) Il inonde (flood) la trame sur tous les ports du même VLAN sauf le port source
+- D) Il envoie un message ARP pour résoudre l'adresse
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — Lorsqu'un switch reçoit une trame unicast dont l'adresse MAC de destination est inconnue (unknown unicast), il effectue un flooding : la trame est envoyée sur tous les ports appartenant au même VLAN, sauf le port par lequel elle est arrivée. Quand la destination répondra, le switch apprendra son adresse MAC et le port associé.
+
+- A) ❌ Le switch ne rejette jamais une trame unicast pour cause de MAC inconnue
+- B) ❌ Le switch n'a pas de notion de passerelle par défaut pour le transfert de trames Layer 2
+- C) ✅ L'unknown unicast flooding envoie la trame sur tous les ports du VLAN sauf le port source
+- D) ❌ Le switch ne génère pas de requêtes ARP — c'est le rôle des hôtes et des routeurs
+
+:::
+
+**Q20.** Quel énoncé décrit le mieux comment l'IA générative peut assister un ingénieur réseau dans son travail quotidien ? _(Topic 1.14)_ — **Choisissez 2 réponses**
+
+- A) L'IA générative peut générer automatiquement des configurations réseau à partir de descriptions en langage naturel
+- B) L'IA générative remplace entièrement le besoin de compétences en réseau chez l'ingénieur
+- C) L'IA générative peut analyser des logs et suggérer des causes probables de pannes
+- D) L'IA générative garantit une précision de 100% dans ses recommandations de configuration
+- E) L'IA générative peut traduire des politiques de sécurité en règles ACL
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A, C** — L'IA générative est un outil d'assistance puissant pour les ingénieurs réseau. Elle peut générer des configurations IOS/NX-OS à partir de descriptions textuelles, analyser des sorties de commandes `show` pour identifier des anomalies, et proposer des pistes de diagnostic. Cependant, elle reste un outil : elle peut produire des erreurs et nécessite toujours une validation humaine.
+
+- A) ✅ L'IA peut produire des templates de config à partir de spécifications en langage naturel (toujours à vérifier)
+- B) ❌ L'IA est un complément, pas un remplacement — les compétences fondamentales restent indispensables
+- C) ✅ L'analyse de logs et la suggestion de causes de pannes est un cas d'usage avéré de l'IA générative
+- D) ❌ Aucune IA ne garantit 100% de précision — les hallucinations et erreurs sont possibles
+- E) ❌ Bien que partiellement possible, la traduction directe de politiques en ACL reste sujette à des erreurs critiques de sécurité
+
+:::
+
+## Domain 2 — Network Access (Q21–Q41) {#sec-exam-domaine-2}
+
+**Q21.** Un administrateur configure un port de switch pour un poste de travail qui doit être dans le VLAN 10. Quelle commande place correctement le port en mode accès dans le VLAN 10 ? _(Topic 2.1)_
+
+- A) `switchport mode trunk` puis `switchport trunk allowed vlan 10`
+- B) `switchport mode access` puis `switchport access vlan 10`
+- C) `switchport vlan 10`
+- D) `vlan 10` puis `interface vlan 10`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Pour assigner un port à un VLAN spécifique pour un terminal (PC, imprimante, téléphone), on configure le port en mode accès avec `switchport mode access`, puis on assigne le VLAN avec `switchport access vlan 10`. Le port ne transportera que le trafic non taggé du VLAN 10.
+
+- A) ❌ Le mode trunk est pour les liens inter-switch, pas pour les terminaux
+- B) ✅ `switchport mode access` + `switchport access vlan 10` est la séquence correcte
+- C) ❌ `switchport vlan 10` n'est pas une commande valide
+- D) ❌ `vlan 10` crée le VLAN, `interface vlan 10` crée la SVI — aucun ne configure le port d'accès
+
+:::
+
+**Q22.** Un PC connecté à un switch ne reçoit aucune adresse DHCP. L'administrateur vérifie la configuration du port et constate qu'aucun VLAN n'a été explicitement assigné. Dans quel VLAN le port opère-t-il par défaut ? _(Topic 2.1)_
+
+- A) VLAN 0
+- B) VLAN 1
+- C) VLAN 100
+- D) VLAN 1002
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Sur un switch Cisco, tous les ports appartiennent au VLAN 1 par défaut. C'est le VLAN natif par défaut et le VLAN d'administration. Pour des raisons de sécurité, il est recommandé de changer le VLAN natif et de ne pas utiliser le VLAN 1 pour le trafic utilisateur.
+
+- A) ❌ Le VLAN 0 n'existe pas dans la configuration standard des switches Cisco
+- B) ✅ Le VLAN 1 est le VLAN par défaut sur tous les ports d'un switch Cisco
+- C) ❌ Le VLAN 100 n'est pas un VLAN par défaut, il doit être créé manuellement
+- D) ❌ Le VLAN 1002 est un VLAN réservé pour FDDI (legacy), il ne peut pas être assigné aux ports
+
+:::
+
+**Q23.** Quel scénario illustre le mieux l'utilité du routage inter-VLAN (router-on-a-stick) ? _(Topic 2.1)_
+
+- A) Deux PCs dans le même VLAN ne peuvent pas communiquer
+- B) Un PC dans le VLAN 10 doit communiquer avec un serveur dans le VLAN 20
+- C) Un switch doit apprendre les adresses MAC plus rapidement
+- D) Deux switches doivent synchroniser leurs tables de VLAN
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Le routage inter-VLAN est nécessaire lorsque des hôtes dans des VLANs différents doivent communiquer. La méthode "router-on-a-stick" utilise un routeur connecté au switch via un lien trunk, avec des sous-interfaces configurées pour chaque VLAN. Le routeur route le trafic entre les VLANs.
+
+- A) ❌ Deux PCs dans le même VLAN communiquent directement via le switch (Layer 2), pas besoin de routage
+- B) ✅ La communication entre VLAN 10 et VLAN 20 nécessite un routeur (ou switch L3) pour le routage inter-VLAN
+- C) ❌ L'apprentissage des adresses MAC est une fonction de commutation L2, pas liée au routage inter-VLAN
+- D) ❌ La synchronisation des VLANs entre switches utilise VTP, pas le routage inter-VLAN
+
+:::
+
+**Q24.** Un administrateur examine l'output suivant. Quel problème identifiez-vous ? _(Topic 2.1)_
+
+```{.default}
+Switch# show vlan brief
+
+VLAN Name                             Status    Ports
+---- -------------------------------- --------- -----------------------
+1    default                          active    Gi0/1, Gi0/2, Gi0/3
+10   USERS                            active
+20   SERVERS                          active    Gi0/10, Gi0/11
+30   MGMT                             active    Gi0/24
+```
+
+- A) Le VLAN 10 n'a aucun port assigné
+- B) Le VLAN 1 ne devrait avoir aucun port
+- C) Il manque un VLAN natif
+- D) Les ports trunk ne sont pas visibles dans `show vlan brief`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A** — L'output montre clairement que le VLAN 10 (USERS) n'a aucun port assigné (la colonne Ports est vide). Si des utilisateurs doivent se trouver dans ce VLAN, leurs ports n'ont pas encore été configurés. Note : la réponse D est également vraie (les ports trunk ne s'affichent pas dans `show vlan brief`), mais la question demande d'identifier le **problème**, et l'absence de ports dans le VLAN USERS est le problème fonctionnel.
+
+- A) ✅ Le VLAN 10 USERS est créé mais aucun port ne lui est assigné — aucun utilisateur ne peut l'utiliser
+- B) ❌ Des ports dans le VLAN 1 par défaut n'est pas nécessairement un problème (bien que non recommandé)
+- C) ❌ Le VLAN natif n'apparaît pas séparément dans cette commande, il est configuré sur les ports trunk
+- D) ❌ Vrai en soi (les ports trunk n'apparaissent pas), mais ce n'est pas un problème fonctionnel
+
+:::
+
+**Q25.** Quelle commande configure un lien trunk 802.1Q sur un port de switch Cisco ? _(Topic 2.2)_
+
+- A) `switchport mode access`
+- B) `switchport mode trunk`
+- C) `switchport trunk encapsulation isl`
+- D) `switchport nonegotiate`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — La commande `switchport mode trunk` configure explicitement le port en mode trunk. Sur les switches modernes qui supportent uniquement 802.1Q, l'encapsulation est automatique. Sur les anciens switches qui supportent aussi ISL, il faut d'abord spécifier `switchport trunk encapsulation dot1q`.
+
+- A) ❌ `switchport mode access` configure un port d'accès, pas un trunk
+- B) ✅ `switchport mode trunk` force le port en mode trunk 802.1Q
+- C) ❌ `switchport trunk encapsulation isl` configure l'encapsulation ISL (obsolète), pas 802.1Q
+- D) ❌ `switchport nonegotiate` désactive DTP mais ne configure pas le mode trunk en soi
+
+:::
+
+**Q26.** Un administrateur observe du trafic inattendu sur le VLAN 1. Après analyse, il réalise que le VLAN natif du trunk n'a pas été changé. Quel risque cela présente-t-il ? _(Topic 2.2)_
+
+- A) Les trames du VLAN natif ne sont pas taguées sur le trunk, ce qui peut permettre des attaques de type VLAN hopping
+- B) Le trunk ne peut pas transporter de trafic tant que le VLAN natif reste le VLAN 1
+- C) Les adresses MAC ne peuvent pas être apprises sur le VLAN natif
+- D) Le spanning-tree ne fonctionne pas sur le VLAN 1
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A** — Sur un trunk 802.1Q, les trames du VLAN natif sont envoyées sans tag. Si le VLAN natif reste le VLAN 1 (par défaut), un attaquant peut exploiter cette absence de tagging pour effectuer une attaque de "double tagging" (VLAN hopping) : il encapsule une trame avec deux tags 802.1Q, le premier correspondant au VLAN natif (retiré par le premier switch) et le second ciblant un autre VLAN.
+
+- A) ✅ Le VLAN natif non taggé est exploitable pour du VLAN hopping par double tagging
+- B) ❌ Le trunk fonctionne parfaitement avec le VLAN natif par défaut
+- C) ❌ L'apprentissage MAC fonctionne normalement sur le VLAN natif
+- D) ❌ Le spanning-tree fonctionne sur tous les VLANs, y compris le VLAN 1
+
+:::
+
+**Q27.** Un administrateur examine l'output suivant. Combien de VLANs sont autorisés sur ce trunk ? _(Topic 2.2)_
+
+```{.default}
+Switch# show interfaces trunk
+
+Port        Mode         Encapsulation  Status        Native vlan
+Gi0/1       on           802.1q         trunking      99
+
+Port        Vlans allowed on trunk
+Gi0/1       10,20,30,99
+
+Port        Vlans allowed and active in management domain
+Gi0/1       10,20,30,99
+
+Port        Vlans in spanning tree forwarding state and not pruned
+Gi0/1       10,20,30,99
+```
+
+- A) 1 (seulement le VLAN natif 99)
+- B) 3 (VLANs 10, 20, 30)
+- C) 4 (VLANs 10, 20, 30, 99)
+- D) Tous les VLANs (1-4094)
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — L'output montre clairement dans la section "Vlans allowed on trunk" que 4 VLANs sont autorisés : 10, 20, 30 et 99. L'administrateur a restreint les VLANs autorisés (probablement avec `switchport trunk allowed vlan 10,20,30,99`) au lieu de laisser tous les VLANs par défaut. Le VLAN 99 est aussi configuré comme VLAN natif.
+
+- A) ❌ Le VLAN natif n'est pas le seul autorisé, les VLANs 10, 20 et 30 le sont aussi
+- B) ❌ Le VLAN 99 est également autorisé (il apparaît dans la liste)
+- C) ✅ 4 VLANs sont explicitement autorisés : 10, 20, 30 et 99
+- D) ❌ La liste a été restreinte aux seuls VLANs nécessaires (bonne pratique de sécurité)
+
+:::
+
+**Q28.** Quel protocole propriétaire Cisco permet de découvrir les équipements directement connectés en échangeant des informations telles que le nom d'hôte, la plateforme et l'adresse IP de gestion ? _(Topic 2.3)_
+
+- A) LLDP
+- B) CDP
+- C) STP
+- D) VTP
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — CDP (Cisco Discovery Protocol) est un protocole propriétaire Cisco de couche 2 qui permet aux équipements Cisco directement connectés de se découvrir mutuellement. Il transmet le nom d'hôte, la plateforme matérielle, les capacités, l'adresse IP de gestion, le VLAN natif, et la version IOS.
+
+- A) ❌ LLDP (Link Layer Discovery Protocol) est le standard ouvert IEEE 802.1AB équivalent à CDP
+- B) ✅ CDP est le protocole de découverte propriétaire Cisco
+- C) ❌ STP (Spanning Tree Protocol) prévient les boucles de couche 2, pas la découverte
+- D) ❌ VTP (VLAN Trunking Protocol) synchronise les bases VLAN entre les switches
+
+:::
+
+**Q29.** Quelle est la différence fondamentale entre CDP et LLDP ? _(Topic 2.3)_ — **Choisissez 2 réponses**
+
+- A) CDP est propriétaire Cisco, LLDP est un standard IEEE 802.1AB
+- B) CDP opère au Layer 3, LLDP opère au Layer 2
+- C) LLDP est activé par défaut sur tous les switches Cisco, CDP ne l'est pas
+- D) CDP peut afficher les VLANs natifs des voisins, LLDP ne le peut pas nativement
+- E) LLDP ne fonctionne pas sur les équipements Cisco
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A, D** — CDP est propriétaire Cisco et fournit des informations spécifiques à Cisco comme le VLAN natif. LLDP est le standard ouvert IEEE 802.1AB utilisable avec des équipements multi-vendors. Sur les switches Cisco, CDP est activé par défaut tandis que LLDP doit être activé manuellement (`lldp run`).
+
+- A) ✅ CDP = propriétaire Cisco, LLDP = standard ouvert IEEE 802.1AB
+- B) ❌ Les deux opèrent au Layer 2 (ils utilisent des trames multicast sans adresse IP)
+- C) ❌ C'est l'inverse : CDP est activé par défaut, LLDP doit être activé manuellement
+- D) ✅ CDP transmet le VLAN natif dans ses TLVs, ce qui n'est pas prévu dans le standard LLDP de base
+- E) ❌ LLDP fonctionne sur les équipements Cisco (il suffit de l'activer avec `lldp run`)
+
+:::
+
+**Q30.** Un administrateur veut créer un EtherChannel entre deux switches en utilisant LACP. Quelle combinaison de modes sur les deux côtés formera un EtherChannel fonctionnel ? _(Topic 2.4)_
+
+- A) active / active
+- B) active / passive
+- C) passive / passive
+- D) Les deux réponses A et B sont correctes
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**D** — LACP (Link Aggregation Control Protocol, IEEE 802.3ad) nécessite qu'au moins un côté soit en mode **active** pour initier la négociation. Le mode **active** envoie activement des paquets LACP. Le mode **passive** attend des paquets LACP avant de répondre. Donc active/active et active/passive fonctionnent, mais passive/passive ne formera jamais de canal.
+
+- A) ❌ Correct individuellement mais pas la seule réponse
+- B) ❌ Correct individuellement mais pas la seule réponse
+- C) ❌ passive/passive ne fonctionne pas — aucun côté n'initie la négociation LACP
+- D) ✅ active/active et active/passive forment tous deux un EtherChannel LACP valide
+
+:::
+
+**Q31.** Un administrateur examine l'output suivant. Quel est l'état de l'EtherChannel ? _(Topic 2.4)_
+
+```{.default}
+Switch# show etherchannel summary
+Flags:  D - down        P - bundled in port-channel
+        I - stand-alone s - suspended
+        H - Hot-standby (LACP only)
+        R - Layer 3      S - Layer 2
+        U - in use
+
+Group  Port-channel  Protocol    Ports
+------+-------------+-----------+----------------------------------------------
+1      Po1(SU)       LACP       Gi0/1(P)    Gi0/2(P)    Gi0/3(D)
+```
+
+- A) Les trois ports sont actifs dans l'EtherChannel
+- B) Deux ports sont bundled et actifs, un port est down
+- C) L'EtherChannel est complètement down
+- D) Le port-channel est en mode Layer 3
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Les flags indiquent que Po1 est en état SU (Layer 2, in use = actif). Gi0/1 et Gi0/2 sont marqués (P) = bundled dans le port-channel. Gi0/3 est marqué (D) = down. L'EtherChannel fonctionne avec 2 des 3 ports membres.
+
+- A) ❌ Gi0/3 est marqué (D) pour down, il n'est pas actif
+- B) ✅ Gi0/1 et Gi0/2 sont (P) = bundled, Gi0/3 est (D) = down, le port-channel est (SU) = actif Layer 2
+- C) ❌ Le port-channel Po1 est marqué (SU) = actif et en service
+- D) ❌ Le flag S dans (SU) signifie Layer 2, pas Layer 3 (Layer 3 serait R)
+
+:::
+
+**Q32.** Dans Rapid PVST+, quel est le port qui offre le chemin de moindre coût vers le root bridge pour un switch donné ? _(Topic 2.5)_
+
+- A) Root port
+- B) Designated port
+- C) Alternate port
+- D) Backup port
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A** — Le root port est le port d'un switch non-root qui offre le meilleur chemin (coût le plus bas) vers le root bridge. Chaque switch non-root a exactement un root port. Ce port est en état forwarding.
+
+- A) ✅ Le root port est le port avec le meilleur chemin vers le root bridge
+- B) ❌ Le designated port est le port d'un segment qui transfère le trafic vers le root bridge — c'est le meilleur port sur un segment
+- C) ❌ L'alternate port est un port bloqué qui offre un chemin alternatif vers le root bridge (rôle Rapid STP)
+- D) ❌ Le backup port est un port bloqué qui offre un chemin redondant vers le même segment via le même switch
+
+:::
+
+**Q33.** Quel est l'avantage principal de Rapid PVST+ (802.1w) par rapport au STP classique (802.1D) ? _(Topic 2.5)_
+
+- A) Il supporte un nombre illimité de VLANs
+- B) Il converge en quelques secondes au lieu de 30-50 secondes
+- C) Il ne nécessite pas d'élection de root bridge
+- D) Il élimine complètement les boucles sans bloquer aucun port
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Rapid PVST+ (basé sur 802.1w) réduit drastiquement le temps de convergence à quelques secondes (typiquement < 6 secondes) grâce aux mécanismes de proposal/agreement et aux rôles de ports alternate/backup, contre 30-50 secondes pour le STP classique 802.1D qui devait passer par les états listening et learning (15s chacun + 20s max age).
+
+- A) ❌ Rapid PVST+ crée une instance STP par VLAN, mais le nombre de VLANs supportés est limité par les ressources du switch
+- B) ✅ La convergence rapide (quelques secondes vs 30-50s) est l'avantage majeur de Rapid STP
+- C) ❌ L'élection du root bridge est toujours nécessaire en Rapid PVST+
+- D) ❌ Des ports sont toujours bloqués (rôle alternate/backup) pour prévenir les boucles
+
+:::
+
+**Q34.** Un administrateur veut s'assurer qu'un switch spécifique devienne le root bridge pour le VLAN 10. Quelle commande doit-il utiliser ? _(Topic 2.5)_
+
+- A) `spanning-tree vlan 10 root primary`
+- B) `spanning-tree vlan 10 priority 0`
+- C) `spanning-tree mode rapid-pvst`
+- D) Les réponses A et B permettent toutes deux d'atteindre cet objectif
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**D** — Les deux commandes permettent de rendre le switch root bridge pour le VLAN 10. `spanning-tree vlan 10 root primary` est un macro-command qui ajuste automatiquement la priorité (généralement à 24576, ou 4096 de moins que le root actuel). `spanning-tree vlan 10 priority 0` définit la priorité au minimum absolu (0), garantissant que ce switch sera root.
+
+- A) ❌ Correct mais pas la seule possibilité
+- B) ❌ Correct mais pas la seule possibilité
+- C) ❌ Cette commande active le mode Rapid PVST+ mais n'influence pas l'élection du root bridge
+- D) ✅ Les deux commandes (A et B) permettent de forcer un switch à devenir root bridge pour le VLAN 10
+
+:::
+
+**Q35.** Quelle est la différence entre un point d'accès en mode autonome (autonomous) et un point d'accès en mode lightweight ? _(Topic 2.6)_ — **Choisissez 2 réponses**
+
+- A) Un AP autonome est géré individuellement, un AP lightweight est géré centralement par un WLC
+- B) Un AP lightweight utilise le protocole CAPWAP pour communiquer avec le contrôleur
+- C) Un AP autonome ne peut pas diffuser de SSID
+- D) Un AP lightweight ne peut pas fournir de connectivité Wi-Fi sans le WLC
+- E) Un AP autonome offre toujours de meilleures performances qu'un AP lightweight
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A, B** — Les AP autonomes sont des équipements indépendants configurés individuellement (IOS complet). Les AP lightweight dépendent d'un WLC (Wireless LAN Controller) pour leur configuration, leurs politiques et la gestion des canaux/puissance. La communication entre un AP lightweight et le WLC utilise le protocole CAPWAP (Control And Provisioning of Wireless Access Points) via des tunnels UDP.
+
+- A) ✅ AP autonome = gestion individuelle, AP lightweight = gestion centralisée via WLC
+- B) ✅ CAPWAP est le protocole standard entre l'AP lightweight et le WLC (ports UDP 5246/5247)
+- C) ❌ Un AP autonome diffuse parfaitement des SSIDs, il est entièrement fonctionnel de manière autonome
+- D) ❌ Certains AP lightweight peuvent fonctionner en mode "FlexConnect" même si le WLC est injoignable
+- E) ❌ Les performances dépendent du matériel, pas du mode de gestion
+
+:::
+
+**Q36.** Dans une architecture Cisco DNA Center, quel composant assure le rôle de contrôleur SDN pour le réseau sans fil et filaire ? _(Topic 2.6)_
+
+- A) Cisco Prime Infrastructure
+- B) Cisco DNA Center (Catalyst Center)
+- C) Cisco WLC uniquement
+- D) Cisco ISE
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Cisco DNA Center (renommé Catalyst Center) est la plateforme de gestion centralisée intent-based qui orchestre le réseau filaire et sans fil. Il intègre les fonctions d'automatisation, d'assurance, de gestion des politiques et de provisioning pour l'ensemble de l'infrastructure réseau.
+
+- A) ❌ Cisco Prime Infrastructure est l'ancienne plateforme de gestion, remplacée par DNA Center
+- B) ✅ DNA Center / Catalyst Center est le contrôleur central qui gère l'ensemble du réseau (filaire + Wi-Fi)
+- C) ❌ Le WLC gère uniquement le sans-fil, pas l'infrastructure filaire
+- D) ❌ Cisco ISE gère l'authentification, l'autorisation et la comptabilité (AAA), pas l'orchestration réseau
+
+:::
+
+**Q37.** Quelle norme définit la structure des trames Wi-Fi et les mécanismes d'accès au médium sans fil, incluant CSMA/CA ? _(Topic 2.7)_
+
+- A) IEEE 802.3
+- B) IEEE 802.1Q
+- C) IEEE 802.11
+- D) IEEE 802.1X
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — IEEE 802.11 est le standard qui définit les réseaux locaux sans fil (WLAN). Il spécifie les mécanismes d'accès au médium (CSMA/CA — Carrier Sense Multiple Access with Collision Avoidance), les formats de trames Wi-Fi, les fréquences, les modulations et les débits. Chaque amendement (a, b, g, n, ac, ax) est une extension de 802.11.
+
+- A) ❌ IEEE 802.3 définit Ethernet filaire (CSMA/CD)
+- B) ❌ IEEE 802.1Q définit le tagging VLAN sur les trunks
+- C) ✅ IEEE 802.11 est le standard WLAN qui définit les trames Wi-Fi et CSMA/CA
+- D) ❌ IEEE 802.1X définit l'authentification port-based (NAC), pas les trames Wi-Fi
+
+:::
+
+**Q38.** Quelles méthodes permettent de sécuriser l'accès de gestion à un switch Cisco ? _(Topic 2.8)_ — **Choisissez 3 réponses**
+
+- A) Configurer SSH au lieu de Telnet pour l'accès à distance
+- B) Créer une ACL pour restreindre les adresses IP autorisées sur les lignes VTY
+- C) Configurer un mot de passe enable secret chiffré
+- D) Activer SNMP v1 avec la community string "public"
+- E) Désactiver le service HTTP/HTTPS sur le switch
+- F) Utiliser CDP pour authentifier les administrateurs
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A, B, C** — La sécurisation de l'accès de gestion passe par plusieurs mesures complémentaires : SSH (chiffrement des sessions distantes), ACL sur les lignes VTY (filtrage IP des administrateurs autorisés) et enable secret (mot de passe chiffré pour l'accès privilégié).
+
+- A) ✅ SSH chiffre les communications de gestion, contrairement à Telnet qui transmet en clair
+- B) ✅ Une ACL sur les lignes VTY (`access-class`) restreint les IP autorisées à se connecter
+- C) ✅ `enable secret` utilise un hash plus robuste que `enable password` pour protéger le mode privilégié
+- D) ❌ SNMP v1 avec "public" est une faille de sécurité majeure (communauté par défaut, pas de chiffrement)
+- E) ❌ Désactiver HTTP peut être une bonne pratique mais n'est pas une méthode d'accès de gestion en soi
+- F) ❌ CDP est un protocole de découverte, il n'a aucune fonction d'authentification
+
+:::
+
+**Q39.** Un administrateur souhaite configurer un accès console sécurisé sur un switch. Quelle séquence de commandes est correcte ? _(Topic 2.8)_
+
+```{.cisco}
+Switch(config)# line console 0
+Switch(config-line)# ???
+```
+
+- A) `password cisco` puis `login`
+- B) `login local` (avec un utilisateur local configuré via `username admin secret Cisco123`)
+- C) Les deux réponses A et B sont des méthodes valides, B étant plus sécurisée
+- D) `transport input ssh`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — Les deux méthodes sont valides. La méthode A utilise un mot de passe simple partagé (moins sécurisé car pas d'identification individuelle). La méthode B (`login local`) requiert un nom d'utilisateur et un mot de passe, permettant l'identification individuelle et l'utilisation de `secret` pour le hachage. La méthode B est recommandée.
+
+- A) ❌ Valide mais moins sécurisé — mot de passe partagé, pas d'identification utilisateur
+- B) ❌ Valide et plus sécurisé — identification individuelle avec hachage du mot de passe
+- C) ✅ Les deux sont des méthodes valides, avec B comme meilleure pratique
+- D) ❌ `transport input ssh` s'applique aux lignes VTY, pas à la console (la console est un accès physique local)
+
+:::
+
+**Q40.** Lors de la configuration d'un WLAN sur un WLC Cisco via l'interface GUI, quels paramètres sont configurés dans l'onglet "Security" du WLAN ? _(Topic 2.9)_
+
+- A) Le SSID et le nom du profil WLAN
+- B) La méthode d'authentification (WPA2-PSK, WPA2-Enterprise) et le chiffrement
+- C) L'interface VLAN associée au WLAN
+- D) La puissance d'émission des AP
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Dans l'interface GUI du WLC, l'onglet Security d'un WLAN permet de configurer les paramètres de sécurité : méthode d'authentification (PSK, 802.1X/Enterprise), version WPA (WPA2, WPA3), type de chiffrement (AES/CCMP), et la clé pré-partagée (pour PSK) ou le serveur RADIUS (pour Enterprise).
+
+- A) ❌ Le SSID et le nom du profil sont configurés dans l'onglet General
+- B) ✅ L'onglet Security configure l'authentification, le chiffrement et les paramètres associés
+- C) ❌ L'interface VLAN est configurée dans l'onglet General (Interface/Interface Group)
+- D) ❌ La puissance d'émission est gérée dans les paramètres RF (Radio Resource Management)
+
+:::
+
+**Q41.** Associez chaque protocole ou technologie à sa fonction principale. _(Topic 2.9)_
+
+| Technologie | → | Fonction |
+|-------------|---|----------|
+| 1. WPA2-PSK | | a. Authentification centralisée via serveur RADIUS |
+| 2. WPA2-Enterprise | | b. Clé pré-partagée pour les petits réseaux |
+| 3. 802.1X | | c. Protocole de contrôle d'accès port-based |
+| 4. RADIUS | | d. Serveur d'authentification AAA |
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+| Technologie | → | Fonction |
+|-------------|---|----------|
+| 1. WPA2-PSK | → | b. Clé pré-partagée pour les petits réseaux |
+| 2. WPA2-Enterprise | → | a. Authentification centralisée via serveur RADIUS |
+| 3. 802.1X | → | c. Protocole de contrôle d'accès port-based |
+| 4. RADIUS | → | d. Serveur d'authentification AAA |
+
+**WPA2-PSK** utilise une clé pré-partagée (Pre-Shared Key) identique pour tous les utilisateurs — adapté aux petits réseaux (SOHO). **WPA2-Enterprise** utilise un serveur RADIUS externe pour authentifier individuellement chaque utilisateur (via 802.1X). **802.1X** (IEEE) est le framework d'authentification port-based composé du supplicant (client), de l'authenticator (switch/AP) et du serveur d'authentification. **RADIUS** est le protocole AAA utilisé entre l'authenticator et le serveur d'authentification.
+
+:::
+
+## Domain 3 — IP Connectivity (Q42–Q67) {#sec-exam-domaine-3}
+
+**Q42.** Un administrateur examine la table de routage suivante. Quelle route sera utilisée pour atteindre la destination 10.1.3.50 ? _(Topic 3.1)_
+
+```{.default}
+Router# show ip route
+      10.0.0.0/8 is variably subnetted, 5 subnets, 3 masks
+C        10.1.1.0/24 is directly connected, GigabitEthernet0/0
+L        10.1.1.1/32 is directly connected, GigabitEthernet0/0
+S        10.1.2.0/24 [1/0] via 10.1.1.2
+O        10.1.3.0/24 [110/20] via 10.1.1.3, 00:05:32, GigabitEthernet0/0
+S*       0.0.0.0/0 [1/0] via 192.168.1.1
+```
+
+- A) La route statique vers 10.1.2.0/24
+- B) La route OSPF vers 10.1.3.0/24 via 10.1.1.3
+- C) La route par défaut via 192.168.1.1
+- D) La route directement connectée 10.1.1.0/24
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Le routeur applique le principe du longest prefix match. La destination 10.1.3.50 correspond au préfixe 10.1.3.0/24 (route OSPF) avec 24 bits de correspondance. C'est plus spécifique que la route par défaut 0.0.0.0/0 (0 bits). La route vers 10.1.2.0/24 ne correspond pas, et la route 10.1.1.0/24 non plus.
+
+- A) ❌ 10.1.2.0/24 ne correspond pas à 10.1.3.50 (le troisième octet est 3, pas 2)
+- B) ✅ 10.1.3.0/24 correspond avec 24 bits — c'est le longest prefix match
+- C) ❌ La route par défaut serait utilisée uniquement si aucune route plus spécifique ne correspondait
+- D) ❌ 10.1.1.0/24 ne correspond pas à 10.1.3.50
+
+:::
+
+**Q43.** Dans la sortie `show ip route`, que signifient les codes "C" et "L" ? _(Topic 3.1)_
+
+- A) C = configurée manuellement, L = apprise par LLDP
+- B) C = directement connectée, L = adresse locale de l'interface (/32)
+- C) C = route candidate, L = route la plus longue
+- D) C = route convergée, L = route locale OSPF
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Dans la table de routage IOS, le code "C" (Connected) indique un réseau directement connecté à une interface active du routeur. Le code "L" (Local) représente l'adresse IP exacte de l'interface (/32 en IPv4, /128 en IPv6). Les routes "L" permettent au routeur d'identifier le trafic destiné à ses propres interfaces.
+
+- A) ❌ "C" n'est pas une route configurée manuellement (ce serait "S" pour Static)
+- B) ✅ C = Connected (réseau directement connecté), L = Local (adresse IP de l'interface en /32)
+- C) ❌ Ces termes n'existent pas dans la terminologie de routage IOS
+- D) ❌ "C" ne signifie pas convergé, et il n'y a pas de "route locale OSPF"
+
+:::
+
+**Q44.** Un administrateur examine la table de routage suivante et doit déterminer quel next-hop sera utilisé pour un paquet destiné à 172.16.5.100. _(Topic 3.1)_
+
+```{.default}
+Router# show ip route 172.16.0.0
+Routing entry for 172.16.0.0/16
+  Known via "ospf 1", distance 110, metric 30
+  Redistributing via ospf 1
+  Last update from 10.0.0.2 on GigabitEthernet0/1, 00:12:45 ago
+  Routing Descriptor Blocks:
+  * 10.0.0.2, from 10.0.0.2, 00:12:45 ago, via GigabitEthernet0/1
+      Route metric is 30, traffic share count is 1
+```
+
+- A) 172.16.5.1
+- B) 10.0.0.2
+- C) 172.16.0.1
+- D) Le paquet sera rejeté
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — La table de routage indique que le réseau 172.16.0.0/16 est joignable via le next-hop 10.0.0.2 sur l'interface GigabitEthernet0/1. L'adresse 172.16.5.100 fait partie du réseau 172.16.0.0/16, donc le paquet sera envoyé au next-hop 10.0.0.2.
+
+- A) ❌ 172.16.5.1 n'apparaît nulle part dans la table de routage
+- B) ✅ Le next-hop pour 172.16.0.0/16 est 10.0.0.2 via GigabitEthernet0/1
+- C) ❌ 172.16.0.1 n'est pas le next-hop indiqué dans la table
+- D) ❌ Le paquet correspond à la route 172.16.0.0/16, il ne sera pas rejeté
+
+:::
+
+**Q45.** Un routeur a les routes suivantes dans sa table de routage pour la destination 10.10.10.0/24. Quelle route sera préférée ? _(Topic 3.1)_
+
+```{.default}
+S     10.10.10.0/24 [1/0] via 192.168.1.1
+O     10.10.10.0/24 [110/20] via 192.168.2.1
+R     10.10.10.0/24 [120/3] via 192.168.3.1
+```
+
+- A) La route statique (S) car elle a la distance administrative la plus basse
+- B) La route OSPF (O) car elle a la meilleure métrique
+- C) La route RIP (R) car elle a le moins de sauts
+- D) Les trois routes sont utilisées en load-balancing
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A** — Lorsque plusieurs protocoles de routage apprennent le même préfixe, le routeur compare les distances administratives (AD). La route avec l'AD la plus basse est préférée : Static = 1, OSPF = 110, RIP = 120. La route statique (AD = 1) sera installée dans la table de routage.
+
+- A) ✅ AD Static (1) < AD OSPF (110) < AD RIP (120) — la route statique est préférée
+- B) ❌ La métrique n'est comparée qu'entre routes du même protocole, pas entre protocoles différents
+- C) ❌ RIP a l'AD la plus élevée (120), elle sera la dernière à être considérée
+- D) ❌ Le load-balancing ne s'applique qu'entre routes de même AD et même métrique (equal-cost)
+
+:::
+
+**Q46.** Quel est le rôle du longest prefix match dans le processus de routage ? _(Topic 3.2)_
+
+- A) Le routeur choisit la route avec le préfixe le plus court (masque le plus large)
+- B) Le routeur choisit la route avec le préfixe le plus long (masque le plus spécifique) qui correspond à la destination
+- C) Le routeur choisit la route avec la métrique la plus basse
+- D) Le routeur choisit la route avec la distance administrative la plus élevée
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Le longest prefix match est le mécanisme fondamental de recherche dans la table de routage. Le routeur compare l'adresse de destination avec toutes les routes et sélectionne celle qui a le masque le plus long (le plus spécifique) qui correspond. Par exemple, pour 10.1.2.50 : une route /24 (10.1.2.0/24) sera préférée à une route /16 (10.1.0.0/16).
+
+- A) ❌ C'est l'inverse : le préfixe le plus long (le plus spécifique) est préféré
+- B) ✅ Le longest prefix match sélectionne la route la plus spécifique correspondant à la destination
+- C) ❌ La métrique départage les routes de même préfixe et même protocole, pas la sélection initiale
+- D) ❌ L'AD la plus basse est préférée (pas la plus élevée), et elle intervient après le longest prefix match
+
+:::
+
+**Q47.** Associez chaque distance administrative à son protocole de routage. _(Topic 3.2)_
+
+| Protocole | → | AD |
+|-----------|---|-----|
+| 1. Connected | | a. 110 |
+| 2. Static | | b. 0 |
+| 3. OSPF | | c. 120 |
+| 4. RIP | | d. 1 |
+| 5. EIGRP (interne) | | e. 90 |
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+| Protocole | → | AD |
+|-----------|---|-----|
+| 1. Connected | → | b. 0 |
+| 2. Static | → | d. 1 |
+| 3. OSPF | → | a. 110 |
+| 4. RIP | → | c. 120 |
+| 5. EIGRP (interne) | → | e. 90 |
+
+La distance administrative est une valeur de préférence locale au routeur. Plus elle est basse, plus la source de routage est considérée fiable. L'ordre de préférence est : **Connected (0)** > **Static (1)** > **EIGRP interne (90)** > **OSPF (110)** > **RIP (120)**. Une floating static route utilise une AD supérieure (ex: 200) pour servir de backup.
+
+:::
+
+**Q48.** Si deux routes OSPF ont la même destination (/24), comment le routeur départage-t-il ? _(Topic 3.2)_ — **Choisissez 2 réponses**
+
+- A) Il compare les distances administratives
+- B) Il compare les métriques (coût OSPF) et préfère la plus basse
+- C) Si les métriques sont égales, il effectue du load-balancing (ECMP)
+- D) Il choisit la route avec le router-id OSPF le plus élevé
+- E) Il choisit aléatoirement
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B, C** — Au sein d'un même protocole (ici OSPF), les routes vers la même destination sont départagées par la métrique. OSPF utilise le coût (basé sur la bande passante) : la route avec le coût le plus bas est préférée. Si deux (ou plus) routes OSPF ont exactement le même coût, le routeur installe les deux dans sa table de routage et effectue un load-balancing ECMP (Equal-Cost Multi-Path).
+
+- A) ❌ La distance administrative est la même pour deux routes OSPF (110) — elle ne départage pas
+- B) ✅ La métrique (coût) OSPF départage les routes de même destination : le coût le plus bas gagne
+- C) ✅ En cas de coûts égaux, OSPF supporte le load-balancing ECMP (jusqu'à 4 chemins par défaut)
+- D) ❌ Le router-id est utilisé pour l'identification du routeur dans OSPF, pas pour le choix de route
+- E) ❌ Le routage est déterministe, jamais aléatoire
+
+:::
+
+**Q49.** Quelle commande configure une route statique par défaut sur un routeur Cisco ? _(Topic 3.3)_
+
+- A) `ip route 0.0.0.0 0.0.0.0 192.168.1.1`
+- B) `ip default-network 192.168.1.0`
+- C) `ip route 255.255.255.255 0.0.0.0 192.168.1.1`
+- D) `ip route default 192.168.1.1`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A** — La route statique par défaut utilise le réseau de destination 0.0.0.0 avec le masque 0.0.0.0, ce qui correspond à toute destination n'ayant pas de route plus spécifique. Le next-hop 192.168.1.1 est le routeur vers lequel tout le trafic "inconnu" sera envoyé. Cette route apparaît comme `S* 0.0.0.0/0` dans la table de routage.
+
+- A) ✅ `ip route 0.0.0.0 0.0.0.0 <next-hop>` est la syntaxe correcte pour une route par défaut
+- B) ❌ `ip default-network` est une commande classful obsolète, rarement utilisée
+- C) ❌ 255.255.255.255 comme réseau de destination n'est pas une route par défaut valide
+- D) ❌ `ip route default` n'est pas une syntaxe IOS valide
+
+:::
+
+**Q50.** Un administrateur configure une floating static route. Quelle est son utilité et comment la configure-t-on ? _(Topic 3.3)_
+
+- A) Une route avec une AD plus basse que la route dynamique, pour la remplacer
+- B) Une route statique de backup avec une AD plus élevée que la route principale, activée uniquement si la route principale tombe
+- C) Une route qui flotte entre plusieurs interfaces pour le load-balancing
+- D) Une route statique temporaire qui expire après un certain temps
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Une floating static route est une route statique configurée avec une distance administrative (AD) supérieure à celle du protocole de routage principal. Par exemple, si OSPF (AD 110) est utilisé pour la route principale, on configure la route statique avec une AD de 200 : `ip route 10.0.0.0 255.255.0.0 192.168.1.1 200`. La route n'apparaît dans la table que si la route OSPF disparaît.
+
+- A) ❌ L'inverse : une AD plus basse remplacerait immédiatement la route dynamique (pas un backup)
+- B) ✅ La floating static route a une AD élevée et ne s'active que lorsque la route principale est retirée
+- C) ❌ Le terme "floating" ne se réfère pas au load-balancing mais à l'activation conditionnelle
+- D) ❌ Les routes statiques n'ont pas de mécanisme d'expiration temporelle
+
+:::
+
+**Q51.** Quelle est la différence entre une route statique réseau et une route statique hôte ? _(Topic 3.3)_
+
+- A) Il n'y a aucune différence
+- B) Une route réseau utilise un masque de sous-réseau variable, une route hôte utilise un masque /32
+- C) Une route hôte est automatiquement créée par le routeur
+- D) Une route réseau ne peut être utilisée qu'avec OSPF
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Une route statique réseau pointe vers un réseau entier (ex: `ip route 10.1.0.0 255.255.0.0 192.168.1.1` → réseau /16), tandis qu'une route statique hôte pointe vers une seule adresse IP spécifique en utilisant un masque /32 (ex: `ip route 10.1.2.5 255.255.255.255 192.168.1.1`). Les routes hôtes sont utiles pour diriger le trafic vers un serveur spécifique.
+
+- A) ❌ Il y a une différence significative dans le masque et le nombre de destinations couvertes
+- B) ✅ Route réseau = masque variable couvrant plusieurs hôtes, route hôte = masque /32 pour une seule IP
+- C) ❌ Les routes hôte "L" (Local) sont auto-créées, mais les routes statiques hôte sont manuelles
+- D) ❌ Les routes réseau statiques sont indépendantes de tout protocole de routage
+
+:::
+
+**Q52.** Quelle commande configure correctement une route statique pointant vers une interface de sortie ? _(Topic 3.3)_
+
+- A) `ip route 10.0.0.0 255.0.0.0 GigabitEthernet0/1`
+- B) `ip route 10.0.0.0 255.0.0.0 next-hop GigabitEthernet0/1`
+- C) `ip static-route 10.0.0.0/8 exit GigabitEthernet0/1`
+- D) `route 10.0.0.0 255.0.0.0 GigabitEthernet0/1`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A** — La syntaxe IOS permet de spécifier soit un next-hop IP, soit une interface de sortie, soit les deux. `ip route 10.0.0.0 255.0.0.0 GigabitEthernet0/1` est valide et indique que tout le trafic vers 10.0.0.0/8 doit sortir par Gi0/1. Sur un lien point-à-point, c'est suffisant. Sur un réseau multi-accès, il est recommandé d'ajouter aussi le next-hop pour éviter des requêtes ARP proxy.
+
+- A) ✅ Syntaxe correcte pour une route statique avec interface de sortie
+- B) ❌ Le mot-clé "next-hop" n'est pas utilisé dans cette syntaxe
+- C) ❌ `ip static-route` et le format CIDR `/8` ne sont pas de la syntaxe IOS
+- D) ❌ `route` seul (sans `ip`) n'est pas une commande IOS valide en mode configuration globale
+
+:::
+
+**Q53.** Quel paquet OSPF est utilisé pour établir et maintenir la relation de voisinage entre deux routeurs OSPF ? _(Topic 3.4)_
+
+- A) LSA (Link-State Advertisement)
+- B) Hello
+- C) DBD (Database Description)
+- D) LSR (Link-State Request)
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Les paquets Hello sont le fondement de la relation de voisinage OSPF. Ils sont envoyés périodiquement (par défaut toutes les 10 secondes sur les réseaux broadcast) à l'adresse multicast 224.0.0.5 (AllSPFRouters). Ils servent à découvrir les voisins, vérifier la compatibilité des paramètres (Hello/Dead timers, area, stub flag, MTU), élire le DR/BDR et maintenir l'adjacence.
+
+- A) ❌ Les LSA décrivent les liens et réseaux d'un routeur, ils sont échangés après l'établissement de l'adjacence
+- B) ✅ Les Hello packets établissent et maintiennent les relations de voisinage OSPF
+- C) ❌ Les DBD échangent des résumés de LSDB pendant la synchronisation initiale (après le Hello)
+- D) ❌ Les LSR demandent des LSA spécifiques manquants dans la base de données locale
+
+:::
+
+**Q54.** Sur un réseau multi-accès broadcast (ex: Ethernet), OSPF élit un DR et un BDR. Quels critères sont utilisés pour cette élection ? _(Topic 3.4)_ — **Choisissez 2 réponses**
+
+- A) La priorité OSPF de l'interface (la plus haute gagne)
+- B) Le router-id OSPF (le plus haut comme tie-breaker)
+- C) L'adresse MAC de l'interface
+- D) La bande passante de l'interface
+- E) Le numéro de zone OSPF
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A, B** — L'élection du DR/BDR OSPF se fait en deux étapes. D'abord, le routeur avec la **priorité d'interface OSPF la plus élevée** (par défaut 1, configurable de 0 à 255) devient DR. En cas d'égalité de priorité, le routeur avec le **router-id OSPF le plus élevé** est élu. Une priorité de 0 empêche un routeur de participer à l'élection.
+
+- A) ✅ La priorité d'interface OSPF est le premier critère (1 par défaut, 0 = non-éligible)
+- B) ✅ Le router-id est le tie-breaker quand les priorités sont égales
+- C) ❌ L'adresse MAC n'est pas utilisée dans l'élection DR/BDR
+- D) ❌ La bande passante influence la métrique (coût), pas l'élection DR/BDR
+- E) ❌ Le numéro de zone n'intervient pas dans l'élection DR/BDR
+
+:::
+
+**Q55.** Comment le router-id OSPF est-il déterminé sur un routeur Cisco (par ordre de priorité) ? _(Topic 3.4)_
+
+- A) L'adresse IP la plus basse de toute interface active
+- B) 1) Commande `router-id` explicite → 2) IP la plus haute d'une interface Loopback active → 3) IP la plus haute d'une interface physique active
+- C) L'adresse MAC convertie en format 32 bits
+- D) Le numéro de processus OSPF (ex: `router ospf 1`)
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Le router-id OSPF est déterminé selon un ordre de priorité strict : (1) Si la commande `router-id X.X.X.X` est configurée, cette valeur est utilisée. (2) Sinon, l'adresse IP la plus haute parmi les interfaces Loopback actives. (3) Sinon, l'adresse IP la plus haute parmi les interfaces physiques actives. Le router-id est fixé au démarrage d'OSPF et ne change que via `clear ip ospf process`.
+
+- A) ❌ C'est l'adresse la plus haute (pas la plus basse) et les Loopbacks sont prioritaires
+- B) ✅ router-id manuel > IP Loopback la plus haute > IP physique la plus haute
+- C) ❌ L'adresse MAC n'est pas utilisée pour déterminer le router-id OSPF
+- D) ❌ Le numéro de processus OSPF est local au routeur et n'est pas le router-id
+
+:::
+
+**Q56.** Un administrateur examine la sortie suivante. Quelle information peut-on en tirer ? _(Topic 3.4)_
+
+```{.default}
+Router# show ip ospf neighbor
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+10.0.0.1          1   FULL/DR         00:00:33    192.168.1.1     GigabitEthernet0/0
+10.0.0.3          1   FULL/BDR        00:00:37    192.168.1.3     GigabitEthernet0/0
+10.0.0.4          1   2WAY/DROTHER    00:00:35    192.168.1.4     GigabitEthernet0/0
+```
+
+- A) Le routeur local est le DR du segment
+- B) Le routeur 10.0.0.1 est le DR et le routeur 10.0.0.3 est le BDR
+- C) Le voisin 10.0.0.4 a un problème de connectivité
+- D) L'adjacence avec 10.0.0.4 n'est pas complète, indiquant une erreur
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — L'output montre que le voisin 10.0.0.1 est en état FULL/DR (adjacence complète avec le DR) et 10.0.0.3 est en état FULL/BDR (adjacence complète avec le BDR). Le voisin 10.0.0.4 est en état 2WAY/DROTHER, ce qui est **normal** — sur un segment multi-accès, les routeurs DROTHER ne forment pas d'adjacence FULL entre eux, ils restent en 2WAY. Ce n'est pas une erreur.
+
+- A) ❌ On ne peut pas déterminer le rôle du routeur local à partir de cette sortie seule
+- B) ✅ 10.0.0.1 est le DR, 10.0.0.3 est le BDR, et l'état 2WAY avec 10.0.0.4 est normal
+- C) ❌ L'état 2WAY/DROTHER est un état normal entre deux routeurs DROTHER
+- D) ❌ 2WAY entre deux DROTHER est le comportement attendu, pas une erreur
+
+:::
+
+**Q57.** Quels paramètres OSPF doivent correspondre entre deux voisins pour qu'une adjacence puisse se former ? _(Topic 3.4)_ — **Choisissez 3 réponses**
+
+- A) Hello timer et Dead timer
+- B) Area ID
+- C) Numéro de processus OSPF
+- D) Type de réseau (network type)
+- E) Router-ID
+- F) MTU (pour passer en FULL)
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A, B, F** — Pour qu'une adjacence OSPF se forme, plusieurs paramètres doivent correspondre entre les deux voisins. Les Hello/Dead timers, l'Area ID et le type de stub/NSSA doivent correspondre pour passer de Down à 2WAY. La MTU doit correspondre pour que l'échange DBD réussisse et que l'état passe à FULL (sinon, l'adjacence reste bloquée en ExStart/Exchange).
+
+- A) ✅ Les Hello et Dead timers doivent être identiques (sinon pas de voisinage)
+- B) ✅ Les deux routeurs doivent être dans la même zone OSPF (Area ID identique)
+- C) ❌ Le numéro de processus OSPF est local au routeur et n'a pas besoin de correspondre
+- D) ❌ Le network type doit idéalement correspondre, mais un mismatch n'empêche pas toujours la formation (il cause des problèmes de routage cependant). Le type de réseau est important mais D n'est pas un des paramètres obligatoires les plus testés au CCNA
+- E) ❌ Les router-ID doivent être différents (unicité), pas identiques
+- F) ✅ Un mismatch MTU bloque l'adjacence en état ExStart/Exchange (ne passe pas en FULL)
+
+:::
+
+**Q58.** Quelle séquence de commandes configure correctement OSPF single-area sur un routeur Cisco pour annoncer le réseau 10.1.1.0/24 dans l'area 0 ? _(Topic 3.4)_
+
+- A) `router ospf 1` → `network 10.1.1.0 0.0.0.255 area 0`
+- B) `router ospf 1` → `network 10.1.1.0 255.255.255.0 area 0`
+- C) `router ospf 1` → `ip ospf 1 area 0` (sous l'interface)
+- D) Les réponses A et C sont toutes deux des méthodes valides
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**D** — Il existe deux méthodes pour activer OSPF sur une interface. La méthode classique utilise la commande `network` avec un wildcard mask en mode router : `network 10.1.1.0 0.0.0.255 area 0`. La méthode interface utilise `ip ospf <process-id> area <area-id>` directement sous l'interface. Les deux activent OSPF et annoncent le réseau dans l'area 0.
+
+- A) ❌ Correct individuellement (méthode `network` avec wildcard mask)
+- B) ❌ La commande `network` utilise un wildcard mask (0.0.0.255), pas un subnet mask (255.255.255.0)
+- C) ❌ Correct individuellement (méthode interface, plus moderne et recommandée)
+- D) ✅ Les méthodes A (`network` + wildcard) et C (`ip ospf` sous interface) sont toutes deux valides
+
+:::
+
+**Q59.** Quelle commande permet de vérifier les interfaces participant à OSPF et leurs coûts associés ? _(Topic 3.4)_
+
+- A) `show ip ospf neighbor`
+- B) `show ip ospf interface brief`
+- C) `show ip route ospf`
+- D) `show ip protocols`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — La commande `show ip ospf interface brief` affiche un résumé concis de toutes les interfaces participant à OSPF avec leur area, coût, état, nombre de voisins/adjacences. C'est la commande la plus directe pour vérifier quelles interfaces sont dans OSPF et leurs coûts.
+
+- A) ❌ `show ip ospf neighbor` montre les voisins OSPF et l'état des adjacences, pas les interfaces et coûts
+- B) ✅ `show ip ospf interface brief` liste les interfaces OSPF avec area, coût, état et adjacences
+- C) ❌ `show ip route ospf` montre les routes apprises via OSPF dans la table de routage
+- D) ❌ `show ip protocols` montre la configuration du protocole (process-id, router-id, réseaux) mais pas le coût par interface
+
+:::
+
+**Q60.** Un administrateur observe que l'adjacence OSPF entre deux routeurs reste bloquée en état "EXSTART". Quelle est la cause la plus probable ? _(Topic 3.4)_
+
+- A) Les Hello timers ne correspondent pas
+- B) Les router-IDs sont identiques
+- C) Il y a un mismatch de MTU entre les deux interfaces
+- D) Les zones OSPF sont différentes
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — L'état EXSTART (ou Exchange) est la phase où les routeurs négocient l'échange de leurs LSDB via des paquets DBD. Un mismatch de MTU empêche les paquets DBD d'être correctement échangés, ce qui bloque l'adjacence dans cet état. Les problèmes de Hello timer ou d'area empêcheraient même d'atteindre l'état 2WAY.
+
+- A) ❌ Un mismatch de Hello timer empêcherait la découverte du voisin (état resterait Down ou Init)
+- B) ❌ Des router-IDs identiques causent des conflits différents (pas spécifiquement ExStart)
+- C) ✅ Un mismatch MTU est la cause classique d'un blocage en ExStart/Exchange
+- D) ❌ Des zones différentes empêcheraient la formation du voisinage dès le départ
+
+:::
+
+**Q61.** Quel protocole FHRP est un standard ouvert IEEE qui permet le partage de charge entre plusieurs routeurs utilisant la même adresse IP virtuelle ? _(Topic 3.5)_
+
+- A) HSRP (Hot Standby Router Protocol)
+- B) VRRP (Virtual Router Redundancy Protocol)
+- C) GLBP (Gateway Load Balancing Protocol)
+- D) EIGRP
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — VRRP (Virtual Router Redundancy Protocol) est le standard ouvert (RFC 5798) parmi les FHRP. HSRP est propriétaire Cisco, et GLBP est aussi propriétaire Cisco. VRRP fournit la redondance de passerelle avec un routeur master et des backups. Note : GLBP est le seul à supporter le load-balancing natif, mais ce n'est pas un standard ouvert.
+
+- A) ❌ HSRP est propriétaire Cisco
+- B) ✅ VRRP est le standard ouvert (RFC 5798) pour la redondance de passerelle
+- C) ❌ GLBP est propriétaire Cisco (bien qu'il supporte le load-balancing)
+- D) ❌ EIGRP est un protocole de routage, pas un FHRP
+
+:::
+
+**Q62.** Dans HSRP, quel routeur transfère activement le trafic envoyé à l'adresse IP virtuelle ? _(Topic 3.5)_
+
+- A) Le routeur Standby
+- B) Le routeur Active
+- C) Le routeur Backup
+- D) Tous les routeurs du groupe HSRP
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Dans HSRP, le routeur **Active** est celui qui transfère le trafic destiné à l'adresse IP et MAC virtuelles du groupe. Le routeur **Standby** surveille le routeur Active et prend le relais en cas de défaillance. Les autres routeurs du groupe sont en état Listen. Le routeur avec la priorité HSRP la plus élevée (par défaut 100) devient Active.
+
+- A) ❌ Le routeur Standby est en attente et prêt à prendre le relais, mais ne transfère pas le trafic
+- B) ✅ Le routeur Active est le seul à répondre à l'adresse IP/MAC virtuelle et à transférer le trafic
+- C) ❌ "Backup" n'est pas un état HSRP (c'est un terme VRRP)
+- D) ❌ Seul le routeur Active transfère le trafic, pas tous les routeurs
+
+:::
+
+**Q63.** Quelle est la différence principale entre HSRP et VRRP en termes de terminologie ? _(Topic 3.5)_
+
+- A) HSRP utilise "Active/Standby", VRRP utilise "Master/Backup"
+- B) HSRP utilise "Master/Slave", VRRP utilise "Primary/Secondary"
+- C) Les deux utilisent exactement la même terminologie
+- D) HSRP utilise "Primary/Secondary", VRRP utilise "Active/Passive"
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A** — HSRP et VRRP remplissent un rôle similaire (redondance de passerelle) mais utilisent une terminologie différente. HSRP désigne le routeur actif comme **Active** et le routeur de secours comme **Standby**. VRRP utilise **Master** pour le routeur actif et **Backup** pour le(s) routeur(s) de secours.
+
+- A) ✅ HSRP = Active/Standby, VRRP = Master/Backup — piège fréquent à l'examen
+- B) ❌ "Master/Slave" et "Primary/Secondary" ne sont pas utilisés par ces protocoles
+- C) ❌ La terminologie est différente entre HSRP et VRRP
+- D) ❌ "Active/Passive" et "Primary/Secondary" ne correspondent pas aux termes officiels
+
+:::
+
+**Q64.** Quel modèle de service cloud fournit l'infrastructure matérielle (calcul, stockage, réseau) tandis que le client gère les systèmes d'exploitation, les applications et les données ? _(Topic 3.6)_
+
+- A) SaaS (Software as a Service)
+- B) PaaS (Platform as a Service)
+- C) IaaS (Infrastructure as a Service)
+- D) DaaS (Desktop as a Service)
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — IaaS (Infrastructure as a Service) fournit les ressources d'infrastructure virtualisées (machines virtuelles, stockage, réseau) à la demande. Le fournisseur cloud gère le matériel physique et la virtualisation, tandis que le client est responsable de l'OS, du middleware, des applications et des données. Exemples : AWS EC2, Azure Virtual Machines, Google Compute Engine.
+
+- A) ❌ SaaS fournit l'application complète — le client ne gère rien (ex: Office 365, Gmail)
+- B) ❌ PaaS fournit la plateforme de développement — le client gère uniquement les applications et données (ex: Azure App Service, Heroku)
+- C) ✅ IaaS = infrastructure brute, le client gère tout à partir de l'OS
+- D) ❌ DaaS fournit des bureaux virtuels, c'est un sous-ensemble de cloud computing
+
+:::
+
+**Q65.** Un administrateur doit choisir entre un déploiement cloud public, privé et hybride. Quel scénario correspond le mieux à un cloud hybride ? _(Topic 3.6)_
+
+- A) Toute l'infrastructure est hébergée dans le data center de l'entreprise
+- B) Toute l'infrastructure est hébergée chez un fournisseur cloud public
+- C) Les données sensibles restent dans le data center privé tandis que les charges de travail non critiques sont dans le cloud public
+- D) L'entreprise utilise uniquement des serveurs bare-metal loués
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — Le cloud hybride combine un cloud privé (on-premises ou dédié) et un cloud public, avec une interconnexion permettant de déplacer les charges de travail entre les deux. Le cas d'usage typique est de garder les données sensibles (PII, financières) dans le cloud privé tout en utilisant le cloud public pour l'élasticité et les charges non critiques.
+
+- A) ❌ Infrastructure 100% on-premises = cloud privé
+- B) ❌ Infrastructure 100% cloud = cloud public
+- C) ✅ Combinaison privé (données sensibles) + public (charges non critiques) = cloud hybride
+- D) ❌ Des serveurs bare-metal loués correspondent plus à du IaaS ou du colocation
+
+:::
+
+**Q66.** Quelle caractéristique distingue un réseau cloud public d'un réseau cloud privé ? _(Topic 3.6)_ — **Choisissez 2 réponses**
+
+- A) Le cloud public partage l'infrastructure entre plusieurs locataires (multi-tenant)
+- B) Le cloud public offre toujours de meilleures performances qu'un cloud privé
+- C) Le cloud public est généralement facturé en mode pay-as-you-go
+- D) Le cloud privé ne peut pas utiliser la virtualisation
+- E) Le cloud public ne supporte pas les VPNs
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A, C** — Le cloud public se distingue par le partage de l'infrastructure entre de nombreux clients (multi-tenancy) et un modèle de facturation à l'usage (pay-as-you-go / OPEX). Le cloud privé est dédié à une seule organisation, offrant un contrôle total mais nécessitant un investissement initial (CAPEX).
+
+- A) ✅ Le multi-tenancy est une caractéristique fondamentale du cloud public
+- B) ❌ Les performances dépendent de la configuration et du workload, pas du type de cloud
+- C) ✅ Le modèle pay-as-you-go (OPEX) est caractéristique du cloud public
+- D) ❌ Le cloud privé utilise massivement la virtualisation (VMware, OpenStack, etc.)
+- E) ❌ Le cloud public supporte les VPNs (AWS VPN, Azure VPN Gateway, etc.)
+
+:::
+
+**Q67.** Associez chaque terme de routage à sa définition. _(Topic 3.2)_
+
+| Terme | → | Définition |
+|-------|---|-----------|
+| 1. Distance administrative | | a. Valeur calculée par un protocole de routage pour déterminer le meilleur chemin |
+| 2. Métrique | | b. Mécanisme qui sélectionne la route avec le masque le plus spécifique |
+| 3. Longest prefix match | | c. Valeur de confiance assignée à une source de routage |
+| 4. Next-hop | | d. Adresse IP du routeur suivant vers lequel le paquet est envoyé |
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+| Terme | → | Définition |
+|-------|---|-----------|
+| 1. Distance administrative | → | c. Valeur de confiance assignée à une source de routage |
+| 2. Métrique | → | a. Valeur calculée par un protocole de routage pour déterminer le meilleur chemin |
+| 3. Longest prefix match | → | b. Mécanisme qui sélectionne la route avec le masque le plus spécifique |
+| 4. Next-hop | → | d. Adresse IP du routeur suivant vers lequel le paquet est envoyé |
+
+L'ordre de traitement dans le routage est : **(1) Longest prefix match** pour trouver les routes candidates, **(2) Distance administrative** pour choisir entre différentes sources de routage, **(3) Métrique** pour départager les routes du même protocole, puis le paquet est envoyé au **(4) next-hop** de la meilleure route.
+
+:::
+
+## Domain 4 — IP Services (Q68–Q78) {#sec-exam-domaine-4}
+
+**Q68.** Un administrateur examine la configuration NAT suivante. Quel type de NAT est configuré ? _(Topic 4.1)_
+
+```{.cisco}
+Router(config)# ip nat inside source list 10 interface GigabitEthernet0/1 overload
+Router(config)# access-list 10 permit 192.168.1.0 0.0.0.255
+Router(config)# interface GigabitEthernet0/0
+Router(config-if)# ip nat inside
+Router(config)# interface GigabitEthernet0/1
+Router(config-if)# ip nat outside
+```
+
+- A) NAT statique (Static NAT)
+- B) NAT dynamique (Dynamic NAT)
+- C) PAT (Port Address Translation / NAT Overload)
+- D) NAT bidirectionnel
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — Le mot-clé `overload` dans la commande `ip nat inside source list 10 interface GigabitEthernet0/1 overload` indique du PAT (Port Address Translation), aussi appelé NAT Overload. Tous les hôtes du réseau 192.168.1.0/24 partagent l'adresse IP publique de l'interface Gi0/1, différenciés par les numéros de ports source TCP/UDP.
+
+- A) ❌ Le NAT statique utilise `ip nat inside source static <ip-privée> <ip-publique>` — correspondance 1:1
+- B) ❌ Le NAT dynamique utilise un pool d'adresses (`ip nat pool`) sans le mot-clé `overload`
+- C) ✅ Le mot-clé `overload` + l'utilisation de l'interface = PAT (plusieurs IP privées → 1 IP publique avec différenciation par port)
+- D) ❌ "NAT bidirectionnel" n'est pas un type standard de NAT Cisco
+
+:::
+
+**Q69.** Quelle est la différence entre NAT statique et NAT dynamique ? _(Topic 4.1)_
+
+- A) NAT statique utilise un pool d'adresses, NAT dynamique utilise une correspondance 1:1 permanente
+- B) NAT statique crée une correspondance permanente 1:1, NAT dynamique assigne des adresses publiques temporairement depuis un pool
+- C) NAT dynamique ne supporte pas les connexions entrantes
+- D) Il n'y a aucune différence fonctionnelle
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Le NAT statique crée une correspondance permanente (mapping 1:1) entre une adresse privée et une adresse publique. Cette correspondance persiste même sans trafic, permettant aux connexions entrantes d'atteindre le serveur interne. Le NAT dynamique assigne des adresses publiques depuis un pool de manière temporaire : la correspondance est créée lors du premier paquet sortant et expire après un timeout.
+
+- A) ❌ C'est l'inverse : le NAT statique est 1:1 permanent, le NAT dynamique utilise un pool
+- B) ✅ Statique = 1:1 permanent, Dynamique = pool avec assignation temporaire
+- C) ❌ Le NAT dynamique peut supporter les connexions entrantes tant que la correspondance est active
+- D) ❌ Il y a des différences fondamentales de fonctionnement et de cas d'usage
+
+:::
+
+**Q70.** Quel protocole permet la synchronisation de l'horloge des équipements réseau avec une source de temps fiable, ce qui est essentiel pour la corrélation des logs ? _(Topic 4.2)_
+
+- A) SNMP
+- B) NTP
+- C) Syslog
+- D) TFTP
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — NTP (Network Time Protocol) synchronise les horloges des équipements réseau avec une ou plusieurs sources de temps fiables (serveurs NTP strate 1, 2, etc.). La précision temporelle est critique pour la corrélation des logs Syslog, l'audit de sécurité, les certificats numériques et le troubleshooting. La configuration Cisco utilise `ntp server <ip>`.
+
+- A) ❌ SNMP (Simple Network Management Protocol) est pour la supervision et la gestion réseau
+- B) ✅ NTP synchronise les horloges réseau, essentiel pour des timestamps cohérents dans les logs
+- C) ❌ Syslog est le protocole de journalisation, il bénéficie de NTP mais ne synchronise pas l'heure
+- D) ❌ TFTP est un protocole de transfert de fichiers simplifié
+
+:::
+
+**Q71.** Un PC configure automatiquement son adresse IP, son masque, sa passerelle par défaut et ses serveurs DNS sans intervention manuelle. Quels protocoles sont impliqués dans ce processus ? _(Topic 4.3)_
+
+- A) DHCP uniquement
+- B) DNS uniquement
+- C) DHCP pour l'attribution de l'adresse et des paramètres, DNS pour la résolution de noms
+- D) ARP et RARP
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — DHCP (Dynamic Host Configuration Protocol) fournit automatiquement l'adresse IP, le masque, la passerelle par défaut ET les adresses des serveurs DNS aux clients. Ensuite, le DNS (Domain Name System) résout les noms de domaine (ex: www.cisco.com) en adresses IP. Les deux protocoles travaillent ensemble pour une connectivité complète.
+
+- A) ❌ DHCP seul ne résout pas les noms de domaine
+- B) ❌ DNS seul ne fournit pas l'adresse IP au client
+- C) ✅ DHCP configure l'adressage, DNS résout les noms — les deux sont complémentaires
+- D) ❌ ARP résout IP→MAC, RARP est obsolète — aucun ne fournit de configuration IP automatique
+
+:::
+
+**Q72.** Un administrateur souhaite superviser les équipements réseau de manière centralisée et recevoir des alertes en cas de panne d'interface. Quel protocole et quelle fonctionnalité doit-il utiliser ? _(Topic 4.4)_
+
+- A) Syslog avec le niveau "informational"
+- B) SNMP avec des traps configurés
+- C) NTP avec des alarmes
+- D) NetFlow avec des exports
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — SNMP (Simple Network Management Protocol) permet la supervision centralisée via un NMS (Network Management Station). Les **traps SNMP** sont des notifications asynchrones envoyées par l'agent SNMP sur l'équipement réseau vers le NMS lorsqu'un événement se produit (panne d'interface, CPU élevé, etc.), permettant une réaction rapide.
+
+- A) ❌ Syslog enregistre les messages de log mais n'est pas un système de supervision avec alertes structurées
+- B) ✅ SNMP traps = alertes automatiques envoyées au NMS lors d'événements réseau
+- C) ❌ NTP synchronise l'heure, il ne génère pas d'alarmes réseau
+- D) ❌ NetFlow collecte des statistiques de flux pour l'analyse de trafic, pas des alertes de panne
+
+:::
+
+**Q73.** Un message Syslog de niveau 3 (Error) est généré sur un routeur. Quels niveaux de Syslog seront également capturés si le logging est configuré au niveau 3 ? _(Topic 4.5)_ — **Choisissez 2 réponses**
+
+- A) Niveau 0 (Emergency)
+- B) Niveau 4 (Warning)
+- C) Niveau 5 (Notification)
+- D) Niveau 1 (Alert)
+- E) Niveau 7 (Debugging)
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A, D** — Syslog utilise des niveaux de sévérité de 0 (le plus critique) à 7 (le moins critique). Quand on configure le logging au niveau 3 (Error), **tous les messages de niveau 3 et inférieur** (plus critiques) sont capturés : niveau 0 (Emergency), niveau 1 (Alert), niveau 2 (Critical) et niveau 3 (Error). Les niveaux 4 à 7 ne sont pas capturés.
+
+- A) ✅ Niveau 0 (Emergency) est plus critique que 3, il sera capturé
+- B) ❌ Niveau 4 (Warning) est moins critique que 3, il ne sera pas capturé
+- C) ❌ Niveau 5 (Notification) est moins critique que 3, il ne sera pas capturé
+- D) ✅ Niveau 1 (Alert) est plus critique que 3, il sera capturé
+- E) ❌ Niveau 7 (Debugging) est le moins critique, il ne sera pas capturé
+
+:::
+
+**Q74.** Un serveur DHCP se trouve dans un réseau différent de celui des clients. Quelle fonctionnalité doit être configurée sur le routeur servant de passerelle pour que les requêtes DHCP Discover des clients atteignent le serveur ? _(Topic 4.6)_
+
+- A) NAT
+- B) DHCP Relay (ip helper-address)
+- C) Proxy ARP
+- D) DHCP Snooping
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Les requêtes DHCP Discover sont envoyées en broadcast (255.255.255.255), et les broadcasts ne traversent pas les routeurs. La commande `ip helper-address <ip-serveur-dhcp>` sur l'interface du routeur côté client convertit le broadcast DHCP en unicast dirigé vers le serveur DHCP distant, permettant au DHCP de fonctionner à travers les réseaux routés.
+
+- A) ❌ NAT traduit les adresses IP pour l'accès Internet, pas pour relayer le DHCP
+- B) ✅ `ip helper-address` configure le DHCP Relay, transformant le broadcast DHCP en unicast vers le serveur
+- C) ❌ Proxy ARP répond aux requêtes ARP pour des adresses dans d'autres sous-réseaux
+- D) ❌ DHCP Snooping est une fonction de sécurité L2, pas de relais DHCP
+
+:::
+
+**Q75.** Un administrateur doit prioriser le trafic VoIP sur le réseau. Quel mécanisme QoS classe les paquets en marquant le champ DSCP dans l'en-tête IP ? _(Topic 4.7)_
+
+- A) Policing
+- B) Shaping
+- C) Classification et Marking
+- D) Queuing
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — La Classification identifie les types de trafic (par ACL, protocole, port, NBAR) et le Marking les marque en modifiant le champ DSCP (Differentiated Services Code Point) dans l'en-tête IP. Par exemple, le trafic VoIP est marqué DSCP EF (Expedited Forwarding, valeur 46) pour indiquer qu'il doit être traité prioritairement tout au long du chemin réseau.
+
+- A) ❌ Policing applique des limites de débit et peut dropper les paquets excédentaires
+- B) ❌ Shaping lisse le trafic en bufferisant les excédents pour respecter un débit maximum
+- C) ✅ Classification + Marking identifie et marque les paquets (DSCP dans l'en-tête IP)
+- D) ❌ Queuing place les paquets dans des files d'attente prioritaires basées sur leur marquage
+
+:::
+
+**Q76.** Quelle valeur DSCP est recommandée pour le trafic voix (RTP payload) selon le modèle QoS de Cisco ? _(Topic 4.7)_
+
+- A) DSCP CS1 (8)
+- B) DSCP AF31 (26)
+- C) DSCP EF (46)
+- D) DSCP CS7 (56)
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — Le modèle QoS de Cisco recommande DSCP **EF (Expedited Forwarding, valeur 46)** pour le trafic voix (payload RTP). EF garantit un traitement de faible latence, faible gigue et faible perte. La signalisation voix (SIP, SCCP) est marquée CS3 (24). Le trafic vidéo interactif est marqué AF41 (34).
+
+- A) ❌ CS1 (8) est utilisé pour le trafic scavenger (basse priorité)
+- B) ❌ AF31 (26) est typiquement utilisé pour le streaming multimedia
+- C) ✅ EF (46) est la valeur DSCP standard pour le trafic voix RTP
+- D) ❌ CS7 (56) est réservé pour le contrôle réseau, pas pour la voix
+
+:::
+
+**Q77.** Un administrateur configure l'accès SSH sur un routeur. Quelle séquence de commandes est correcte ? _(Topic 4.8)_
+
+```{.cisco}
+Router(config)# hostname R1
+R1(config)# ip domain-name example.com
+R1(config)# crypto key generate rsa modulus 2048
+R1(config)# username admin secret Cisco123
+R1(config)# line vty 0 4
+R1(config-line)# ???
+```
+
+- A) `transport input telnet` et `login`
+- B) `transport input ssh` et `login local`
+- C) `transport input all` et `login`
+- D) `transport input ssh` et `password Cisco123`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Pour un accès SSH sécurisé, les commandes nécessaires sur les lignes VTY sont : `transport input ssh` (autorise uniquement SSH, bloque Telnet) et `login local` (authentification via la base locale de comptes utilisateurs configurés avec `username`). Les prérequis sont un hostname, un domaine, une clé RSA et un compte local.
+
+- A) ❌ `transport input telnet` autorise Telnet (non chiffré), pas SSH
+- B) ✅ `transport input ssh` + `login local` = SSH uniquement avec authentification locale
+- C) ❌ `transport input all` autorise Telnet ET SSH, ce qui affaiblit la sécurité
+- D) ❌ `password` + `login` (sans `local`) utilise un mot de passe partagé et n'exploite pas les comptes `username`
+
+:::
+
+**Q78.** Un administrateur doit sauvegarder la configuration d'un routeur sur un serveur distant. Quel protocole utilise UDP et ne nécessite pas d'authentification ? _(Topic 4.9)_
+
+- A) FTP
+- B) TFTP
+- C) SCP
+- D) HTTPS
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — TFTP (Trivial File Transfer Protocol) utilise UDP port 69 et ne nécessite aucune authentification (pas de nom d'utilisateur ni mot de passe). C'est le protocole le plus simple pour transférer des fichiers (configurations, images IOS) entre un équipement réseau et un serveur. La commande est `copy running-config tftp:`.
+
+- A) ❌ FTP utilise TCP (ports 20/21) et nécessite une authentification (username/password)
+- B) ✅ TFTP = UDP port 69, pas d'authentification, transfert simple
+- C) ❌ SCP (Secure Copy Protocol) utilise SSH/TCP et nécessite une authentification
+- D) ❌ HTTPS utilise TCP port 443 avec chiffrement TLS et authentification
+
+:::
+
+## Domain 5 — Security Fundamentals (Q79–Q94) {#sec-exam-domaine-5}
+
+**Q79.** Quelle triade définit les trois objectifs fondamentaux de la sécurité de l'information ? _(Topic 5.1)_
+
+- A) Authentication, Authorization, Accounting
+- B) Confidentiality, Integrity, Availability
+- C) Prevention, Detection, Response
+- D) Encryption, Hashing, Digital Signatures
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — La triade CIA (Confidentiality, Integrity, Availability) est le modèle fondamental de la sécurité de l'information. La **Confidentialité** protège les données contre l'accès non autorisé (chiffrement). L'**Intégrité** garantit que les données ne sont pas modifiées sans autorisation (hashing). La **Disponibilité** assure que les données et services sont accessibles aux utilisateurs autorisés.
+
+- A) ❌ AAA (Authentication, Authorization, Accounting) est un framework de contrôle d'accès, pas la triade de sécurité
+- B) ✅ CIA = Confidentialité, Intégrité, Disponibilité — les trois piliers de la sécurité de l'information
+- C) ❌ PDR décrit les phases de réponse aux incidents, pas les objectifs fondamentaux
+- D) ❌ Ce sont des mécanismes cryptographiques utilisés pour atteindre la CIA, pas les objectifs eux-mêmes
+
+:::
+
+**Q80.** Quelle attaque consiste à inonder un réseau ou un serveur de requêtes pour le rendre indisponible aux utilisateurs légitimes ? _(Topic 5.1)_
+
+- A) Man-in-the-Middle (MitM)
+- B) Phishing
+- C) Denial of Service (DoS)
+- D) SQL Injection
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — Une attaque DoS (Denial of Service) vise à rendre un service, un réseau ou un serveur indisponible en le submergeant de trafic ou de requêtes. La variante DDoS (Distributed DoS) utilise de nombreuses sources (botnet) pour amplifier l'attaque. L'objectif est de compromettre la **Disponibilité** (le A de la triade CIA).
+
+- A) ❌ MitM intercepte les communications entre deux parties pour les espionner ou les modifier
+- B) ❌ Le phishing utilise l'ingénierie sociale pour tromper les utilisateurs et voler des identifiants
+- C) ✅ DoS/DDoS sature les ressources pour rendre le service indisponible
+- D) ❌ L'injection SQL exploite les failles dans les applications web pour accéder aux bases de données
+
+:::
+
+**Q81.** Quels éléments constituent un programme de sécurité réseau complet ? _(Topic 5.2)_ — **Choisissez 2 réponses**
+
+- A) Des politiques de sécurité documentées et appliquées
+- B) L'utilisation exclusive de pare-feux sans autre mesure
+- C) La formation et la sensibilisation des utilisateurs
+- D) L'absence de journalisation pour réduire la charge réseau
+- E) Le chiffrement de tous les protocoles, y compris le trafic interne de gestion
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A, C** — Un programme de sécurité efficace repose sur une approche multicouche. Les **politiques de sécurité** définissent les règles, responsabilités et procédures (acceptable use policy, incident response plan). La **formation des utilisateurs** est essentielle car le facteur humain est souvent le maillon faible (phishing, mots de passe faibles).
+
+- A) ✅ Les politiques de sécurité sont le fondement de tout programme de sécurité
+- B) ❌ La sécurité ne peut pas reposer sur un seul dispositif — la défense en profondeur est nécessaire
+- C) ✅ La sensibilisation des utilisateurs réduit les risques liés au facteur humain
+- D) ❌ La journalisation est essentielle pour la détection, l'investigation et la conformité
+- E) ❌ Bien que le chiffrement soit important, il n'est pas toujours nécessaire ou pratique pour tout le trafic interne
+
+:::
+
+**Q82.** Quelle commande Cisco IOS configure un mot de passe chiffré pour l'accès au mode privilégié (enable mode) ? _(Topic 5.3)_
+
+- A) `enable password Cisco123`
+- B) `enable secret Cisco123`
+- C) `service password-encryption`
+- D) `username admin password Cisco123`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — `enable secret` utilise un algorithme de hachage fort (MD5 par défaut, ou scrypt avec `algorithm-type scrypt`) pour protéger le mot de passe du mode privilégié. `enable password` stocke le mot de passe en clair (ou faiblement chiffré avec `service password-encryption`). Si les deux sont configurés, `enable secret` a priorité.
+
+- A) ❌ `enable password` stocke le mot de passe en clair dans la configuration — non sécurisé
+- B) ✅ `enable secret` hache le mot de passe (MD5/scrypt) — la méthode recommandée
+- C) ❌ `service password-encryption` applique un chiffrement Type 7 (réversible, faible) aux mots de passe en clair
+- D) ❌ `username admin password` crée un compte local avec un mot de passe en clair
+
+:::
+
+**Q83.** Un administrateur examine la configuration suivante. Quel est le problème de sécurité ? _(Topic 5.3)_
+
+```{.default}
+Router# show running-config | include password
+enable password 7 0822455D0A16
+username admin password 7 060506324F41
+line con 0
+ password 7 02050D480809
+```
+
+- A) Aucun problème, les mots de passe sont chiffrés (Type 7)
+- B) Le chiffrement Type 7 est réversible et peut être déchiffré facilement avec des outils en ligne
+- C) Les mots de passe sont en clair
+- D) Il manque le service password-encryption
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Le chiffrement Type 7 de Cisco (indiqué par le "7" après `password`) utilise l'algorithme de Vigenère, qui est **trivialement réversible**. De nombreux outils en ligne et scripts permettent de déchiffrer ces mots de passe en quelques secondes. Il faut utiliser `enable secret` (Type 5/9) et `username admin secret` pour un hachage robuste.
+
+- A) ❌ Le Type 7 donne une fausse impression de sécurité — il est facilement déchiffrable
+- B) ✅ Le chiffrement Type 7 est réversible et ne fournit aucune protection réelle
+- C) ❌ Les mots de passe ne sont pas en clair, mais le chiffrement Type 7 est quasi-équivalent
+- D) ❌ `service password-encryption` est déjà appliqué (c'est ce qui génère le Type 7), mais c'est insuffisant
+
+:::
+
+**Q84.** Quelles sont les caractéristiques d'une bonne politique de mots de passe ? _(Topic 5.4)_
+
+- A) Longueur minimale de 4 caractères et changement tous les ans
+- B) Longueur minimale de 8-12 caractères, complexité (majuscules, chiffres, spéciaux), et rotation régulière
+- C) Utilisation du même mot de passe sur tous les équipements pour simplifier la gestion
+- D) Stockage des mots de passe dans un fichier texte partagé sur le réseau
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Une politique de mots de passe robuste impose : une longueur minimale (8-12 caractères minimum), de la complexité (mélange de majuscules, minuscules, chiffres et caractères spéciaux), une rotation régulière (30-90 jours selon la criticité), et l'interdiction de réutiliser les anciens mots de passe. Les meilleures pratiques actuelles favorisent des passphrases longues.
+
+- A) ❌ 4 caractères est beaucoup trop court, et un changement annuel est trop rare pour les systèmes critiques
+- B) ✅ Longueur ≥ 8-12 caractères + complexité + rotation = politique robuste
+- C) ❌ Utiliser le même mot de passe partout est une faille majeure (compromission en cascade)
+- D) ❌ Stocker les mots de passe en clair est une violation grave des bonnes pratiques
+
+:::
+
+**Q85.** Quel protocole VPN crée un tunnel sécurisé au niveau de la couche 3 en fournissant le chiffrement, l'authentification et l'intégrité des données ? _(Topic 5.5)_
+
+- A) GRE
+- B) IPsec
+- C) PPTP
+- D) SSL/TLS
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — IPsec (Internet Protocol Security) est un framework de protocoles qui sécurise les communications IP au niveau de la couche 3. Il fournit : le **chiffrement** (via ESP — Encapsulating Security Payload), l'**authentification** (via AH — Authentication Header ou ESP), et l'**intégrité** (via HMAC). IPsec fonctionne en mode transport (entre deux hôtes) ou en mode tunnel (entre deux gateways VPN).
+
+- A) ❌ GRE (Generic Routing Encapsulation) crée des tunnels mais sans chiffrement natif
+- B) ✅ IPsec fournit chiffrement + authentification + intégrité au Layer 3
+- C) ❌ PPTP est un protocole VPN obsolète avec des vulnérabilités connues
+- D) ❌ SSL/TLS opère au Layer 4-5 (couche session/transport), pas au Layer 3
+
+:::
+
+**Q86.** Un administrateur configure une ACL standard pour bloquer le trafic provenant du réseau 192.168.10.0/24 vers n'importe quelle destination. Quelle commande est correcte ? _(Topic 5.6)_
+
+- A) `access-list 10 deny 192.168.10.0 0.0.0.255`
+- B) `access-list 10 deny 192.168.10.0 255.255.255.0`
+- C) `access-list 110 deny ip 192.168.10.0 0.0.0.255 any`
+- D) `access-list 10 deny 192.168.10.0/24`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A** — Les ACL standard (numéros 1-99 et 1300-1999) utilisent un **wildcard mask** (pas un subnet mask) pour filtrer uniquement sur l'adresse IP source. La commande `access-list 10 deny 192.168.10.0 0.0.0.255` bloque tout le trafic provenant du réseau 192.168.10.0/24. N'oubliez pas d'ajouter `access-list 10 permit any` ensuite (sinon le deny implicite bloque tout).
+
+- A) ✅ ACL standard numéro 10 avec wildcard mask 0.0.0.255 — syntaxe correcte
+- B) ❌ 255.255.255.0 est un subnet mask, pas un wildcard mask (erreur fréquente à l'examen)
+- C) ❌ ACL 110 est une ACL étendue (100-199) — pas une ACL standard
+- D) ❌ La notation CIDR /24 n'est pas supportée dans les ACL IOS classiques
+
+:::
+
+**Q87.** Quel est le wildcard mask correct pour correspondre exactement au sous-réseau 10.0.0.0/20 dans une ACL ? _(Topic 5.6)_
+
+- A) 0.0.0.255
+- B) 0.0.15.255
+- C) 0.0.240.255
+- D) 0.0.31.255
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Un masque /20 en notation décimale est 255.255.240.0. Le wildcard mask est l'inverse du subnet mask : 255.255.255.255 - 255.255.240.0 = **0.0.15.255**. Les bits à 0 dans le wildcard doivent correspondre exactement, les bits à 1 sont ignorés. Ainsi 0.0.15.255 vérifie les 20 premiers bits et ignore les 12 derniers.
+
+- A) ❌ 0.0.0.255 correspond à un /24, pas un /20
+- B) ✅ 0.0.15.255 est le wildcard mask correct pour un /20 (255.255.255.255 - 255.255.240.0)
+- C) ❌ 0.0.240.255 n'est pas un wildcard mask valide pour un masque contigu
+- D) ❌ 0.0.31.255 correspond à un /19, pas un /20
+
+:::
+
+**Q88.** Un administrateur examine l'ACL suivante appliquée en entrée sur l'interface GigabitEthernet0/0. Quel trafic sera autorisé ? _(Topic 5.6)_
+
+```{.default}
+Router# show access-lists
+Extended IP access list 101
+    10 permit tcp 192.168.1.0 0.0.0.255 any eq 443
+    20 permit tcp 192.168.1.0 0.0.0.255 any eq 80
+    30 deny ip any any
+```
+
+- A) Tout le trafic provenant de 192.168.1.0/24
+- B) Uniquement le trafic HTTPS et HTTP provenant de 192.168.1.0/24
+- C) Tout le trafic sauf le HTTP et HTTPS
+- D) Aucun trafic n'est autorisé
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — L'ACL 101 autorise explicitement le trafic TCP vers le port 443 (HTTPS) et le port 80 (HTTP) provenant du réseau 192.168.1.0/24 vers n'importe quelle destination. La ligne 30 `deny ip any any` bloque explicitement tout le reste (rendant visible le deny implicite qui existe par défaut à la fin de toute ACL).
+
+- A) ❌ Seuls les ports 443 et 80 sont autorisés, pas tout le trafic
+- B) ✅ Seul le trafic HTTP (port 80) et HTTPS (port 443) depuis 192.168.1.0/24 est autorisé
+- C) ❌ C'est l'inverse : HTTP et HTTPS sont autorisés, tout le reste est bloqué
+- D) ❌ Les lignes 10 et 20 autorisent bien du trafic
+
+:::
+
+**Q89.** Quelle fonctionnalité de sécurité Layer 2 empêche un attaquant de connecter un switch non autorisé au réseau pour intercepter le trafic via un trunk ? _(Topic 5.7)_
+
+- A) Port Security
+- B) DHCP Snooping
+- C) BPDU Guard
+- D) Dynamic ARP Inspection
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**C** — BPDU Guard protège contre l'ajout de switches non autorisés (rogue switches) sur les ports d'accès. Lorsqu'il est activé sur un port configuré en mode accès (typiquement avec PortFast), le port passe immédiatement en état **err-disabled** s'il reçoit un BPDU (Bridge Protocol Data Unit), indiquant la présence d'un switch. Cela empêche les attaques de type STP manipulation et VLAN hopping via trunk.
+
+- A) ❌ Port Security limite le nombre d'adresses MAC sur un port, mais n'empêche pas un rogue switch
+- B) ❌ DHCP Snooping protège contre les serveurs DHCP malveillants, pas les rogue switches
+- C) ✅ BPDU Guard désactive le port dès réception d'un BPDU, empêchant les rogue switches
+- D) ❌ DAI (Dynamic ARP Inspection) protège contre les attaques ARP spoofing
+
+:::
+
+**Q90.** Un administrateur configure Port Security sur un port de switch. Quelle commande limite le port à 2 adresses MAC et désactive le port en cas de violation ? _(Topic 5.7)_
+
+```{.cisco}
+Switch(config)# interface GigabitEthernet0/5
+Switch(config-if)# switchport mode access
+Switch(config-if)# switchport port-security
+Switch(config-if)# ???
+```
+
+- A) `switchport port-security maximum 2` et `switchport port-security violation shutdown`
+- B) `switchport port-security max-mac 2` et `switchport port-security action disable`
+- C) `port-security limit 2` et `port-security violation err-disable`
+- D) `switchport port-security maximum 2` et `switchport port-security violation protect`
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A** — Les commandes correctes sont `switchport port-security maximum 2` (limite à 2 adresses MAC) et `switchport port-security violation shutdown` (met le port en err-disabled en cas de violation). Le mode **shutdown** est le plus strict : il désactive le port et nécessite une intervention manuelle (`shutdown` puis `no shutdown`) pour le réactiver.
+
+- A) ✅ `maximum 2` + `violation shutdown` = limite de 2 MAC, port désactivé en cas de violation
+- B) ❌ `max-mac` et `action disable` ne sont pas des syntaxes IOS valides
+- C) ❌ `port-security limit` et `port-security violation err-disable` ne sont pas des syntaxes valides
+- D) ❌ `violation protect` droppe les trames en excès silencieusement mais ne désactive pas le port
+
+:::
+
+**Q91.** Quel framework fournit les services d'authentification, d'autorisation et de comptabilité (AAA) pour le contrôle d'accès réseau ? _(Topic 5.8)_
+
+- A) SNMP
+- B) RADIUS/TACACS+
+- C) NTP
+- D) CDP
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — RADIUS (Remote Authentication Dial-In User Service) et TACACS+ (Terminal Access Controller Access-Control System Plus) sont les deux protocoles principaux utilisés pour implémenter le framework AAA. **RADIUS** combine authentification/autorisation et utilise UDP (1812/1813). **TACACS+** sépare les trois fonctions AAA et utilise TCP (49), offrant plus de granularité pour l'administration des équipements.
+
+- A) ❌ SNMP est pour la supervision réseau, pas l'authentification AAA
+- B) ✅ RADIUS et TACACS+ sont les protocoles AAA utilisés pour le contrôle d'accès
+- C) ❌ NTP synchronise les horloges, pas de lien avec AAA
+- D) ❌ CDP est un protocole de découverte des voisins
+
+:::
+
+**Q92.** Associez chaque standard de sécurité Wi-Fi à sa caractéristique principale. _(Topic 5.9)_
+
+| Standard | → | Caractéristique |
+|----------|---|----------------|
+| 1. WPA | | a. Chiffrement AES-CCMP obligatoire, authentification robuste |
+| 2. WPA2 | | b. SAE (Simultaneous Authentication of Equals), protection contre les attaques par dictionnaire |
+| 3. WPA3 | | c. TKIP comme mesure temporaire, amélioration de WEP |
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+| Standard | → | Caractéristique |
+|----------|---|----------------|
+| 1. WPA | → | c. TKIP comme mesure temporaire, amélioration de WEP |
+| 2. WPA2 | → | a. Chiffrement AES-CCMP obligatoire, authentification robuste |
+| 3. WPA3 | → | b. SAE (Simultaneous Authentication of Equals), protection contre les attaques par dictionnaire |
+
+**WPA** (2003) a introduit TKIP comme correctif temporaire pour les failles de WEP. **WPA2** (2004) a remplacé TKIP par AES-CCMP, devenant le standard de sécurité Wi-Fi pendant plus de 15 ans. **WPA3** (2018) a introduit SAE qui remplace le 4-way handshake PSK, éliminant les attaques par dictionnaire offline et fournissant le forward secrecy.
+
+:::
+
+**Q93.** Un administrateur configure un WLAN avec WPA2 PSK sur un WLC via l'interface GUI. Dans quel onglet et quel champ saisit-il la clé pré-partagée ? _(Topic 5.10)_
+
+- A) Onglet General → Champ "SSID Key"
+- B) Onglet Security → Layer 2 Security → WPA+WPA2 → PSK → Pre-Shared Key
+- C) Onglet QoS → Champ "Security Key"
+- D) Onglet Advanced → Champ "Encryption Key"
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Sur un WLC Cisco, la configuration WPA2-PSK se fait dans l'onglet **Security** du WLAN. On sélectionne **Layer 2 Security** → type **WPA+WPA2**, on active **WPA2 Policy** avec le chiffrement **AES**, on sélectionne **PSK** comme méthode d'authentification, puis on saisit la clé pré-partagée dans le champ **Pre-Shared Key**.
+
+- A) ❌ L'onglet General contient le SSID et l'interface VLAN, pas les clés de sécurité
+- B) ✅ Security → Layer 2 → WPA+WPA2 → PSK → Pre-Shared Key — c'est le chemin correct
+- C) ❌ L'onglet QoS gère la qualité de service, pas la sécurité
+- D) ❌ L'onglet Advanced contient des paramètres comme le timeout de session, pas les clés
+
+:::
+
+**Q94.** Comment le machine learning (ML) peut-il améliorer la sécurité réseau ? _(Topic 5.11)_
+
+- A) Le ML remplace entièrement les pare-feux et les IPS traditionnels
+- B) Le ML peut analyser les patterns de trafic pour détecter des comportements anormaux et des menaces zero-day
+- C) Le ML garantit l'élimination de 100% des cyberattaques
+- D) Le ML n'est utile que pour le spam filtering, pas pour la sécurité réseau
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Le machine learning améliore la sécurité réseau en analysant de grandes quantités de données de trafic pour identifier des patterns anormaux (anomaly detection). Il peut détecter des menaces inconnues (zero-day) que les signatures traditionnelles ne couvrent pas, identifier des comportements suspects (lateral movement, exfiltration de données) et réduire les faux positifs au fil du temps grâce à l'apprentissage.
+
+- A) ❌ Le ML complète les outils existants (NGFW, IPS), il ne les remplace pas
+- B) ✅ L'analyse comportementale et la détection d'anomalies sont les forces du ML en cybersécurité
+- C) ❌ Aucune technologie ne garantit l'élimination de 100% des attaques
+- D) ❌ Le ML a de nombreuses applications en sécurité réseau au-delà du spam filtering
+
+:::
+
+## Domain 6 — Automation and Programmability (Q95–Q102) {#sec-exam-domaine-6}
+
+**Q95.** Quel est l'impact principal de l'automatisation réseau par rapport à la gestion manuelle traditionnelle ? _(Topic 6.1)_
+
+- A) L'automatisation augmente le temps nécessaire pour déployer des changements
+- B) L'automatisation réduit les erreurs humaines, améliore la cohérence et accélère les déploiements
+- C) L'automatisation élimine complètement le besoin d'ingénieurs réseau
+- D) L'automatisation ne fonctionne que sur les équipements les plus récents
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — L'automatisation réseau apporte trois bénéfices majeurs : (1) **Réduction des erreurs humaines** — les scripts reproduisent exactement les mêmes étapes à chaque exécution, (2) **Cohérence** — tous les équipements reçoivent la même configuration, (3) **Rapidité** — les déploiements sur des centaines d'équipements prennent des minutes au lieu de jours.
+
+- A) ❌ L'automatisation accélère les déploiements, elle ne les ralentit pas
+- B) ✅ Moins d'erreurs + cohérence + rapidité sont les avantages clés de l'automatisation
+- C) ❌ Les ingénieurs réseau restent nécessaires pour concevoir, superviser et résoudre les problèmes
+- D) ❌ L'automatisation fonctionne sur de nombreux équipements via SSH, NETCONF, APIs, etc.
+
+:::
+
+**Q96.** Quelle est la différence fondamentale entre un réseau géré traditionnellement et un réseau controller-based (SDN) ? _(Topic 6.2)_
+
+- A) Le réseau traditionnel n'utilise pas de protocoles de routage
+- B) Dans un réseau SDN, le plan de contrôle est centralisé sur un contrôleur qui programme le plan de données des équipements
+- C) Un réseau controller-based ne nécessite aucun équipement physique
+- D) Le réseau traditionnel est plus rapide qu'un réseau SDN
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Dans un réseau traditionnel, chaque équipement gère son propre plan de contrôle (protocoles de routage, STP, etc.) de manière distribuée. Dans un réseau SDN (Software-Defined Networking), le plan de contrôle est **centralisé** sur un contrôleur qui a une vue globale du réseau et programme le plan de données (forwarding) de chaque équipement via des APIs southbound.
+
+- A) ❌ Le réseau traditionnel utilise des protocoles de routage (OSPF, EIGRP, BGP)
+- B) ✅ SDN = plan de contrôle centralisé sur un contrôleur qui programme les data planes
+- C) ❌ Un réseau SDN utilise des équipements physiques (ou virtuels), seul le contrôle est centralisé
+- D) ❌ La vitesse de forwarding dans le data plane est comparable
+
+:::
+
+**Q97.** Dans l'architecture SDN, quels sont les trois plans et leur rôle ? _(Topic 6.3)_ — **Choisissez 3 réponses**
+
+- A) Le plan d'application (Application plane) héberge les applications réseau qui communiquent avec le contrôleur via des APIs northbound
+- B) Le plan de contrôle (Control plane) prend les décisions de forwarding et programme les équipements
+- C) Le plan de données (Data plane) transfère les paquets selon les instructions du contrôleur
+- D) Le plan de sécurité (Security plane) gère le chiffrement de bout en bout
+- E) Le plan de gestion (Management plane) est le seul plan dans une architecture SDN
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**A, B, C** — L'architecture SDN se compose de trois plans : (1) Le **plan d'application** (northbound) contient les applications métier (monitoring, optimisation, sécurité) qui interagissent avec le contrôleur via des APIs REST (northbound APIs). (2) Le **plan de contrôle** est le contrôleur SDN qui centralise l'intelligence réseau. (3) Le **plan de données** (southbound) contient les équipements réseau qui exécutent le forwarding selon les instructions reçues via les APIs southbound (OpenFlow, NETCONF).
+
+- A) ✅ Application plane = applications réseau communiquant via northbound APIs (REST)
+- B) ✅ Control plane = contrôleur SDN centralisé qui programme le réseau
+- C) ✅ Data plane = équipements réseau qui transfèrent les paquets
+- D) ❌ Le "Security plane" n'est pas un plan standard de l'architecture SDN
+- E) ❌ Le management plane existe mais n'est pas le seul plan — les trois plans sont A, B et C
+
+:::
+
+**Q98.** Quelle API southbound est utilisée par certains contrôleurs SDN pour programmer directement les tables de forwarding des switches ? _(Topic 6.3)_
+
+- A) REST API
+- B) OpenFlow
+- C) SNMP
+- D) NETCONF
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — OpenFlow est un protocole southbound qui permet à un contrôleur SDN de programmer directement les tables de flux (flow tables) des switches compatibles OpenFlow. Le contrôleur envoie des règles de forwarding (match + action) que le switch applique dans son data plane. C'est le protocole southbound SDN historique, défini par l'ONF (Open Networking Foundation).
+
+- A) ❌ REST API est typiquement utilisé comme API northbound, pas southbound
+- B) ✅ OpenFlow est le protocole southbound SDN qui programme les flow tables des switches
+- C) ❌ SNMP est un protocole de gestion/supervision, pas un protocole SDN southbound
+- D) ❌ NETCONF est un protocole de configuration (via YANG), plus orienté gestion que programmation de flow tables
+
+:::
+
+**Q99.** Quelle plateforme Cisco fournit une interface graphique et des APIs pour gérer, automatiser et assurer la santé d'un réseau d'entreprise de manière intent-based ? _(Topic 6.4)_
+
+- A) Cisco Meraki
+- B) Cisco DNA Center (Catalyst Center)
+- C) Cisco ACI
+- D) Cisco vManage
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Cisco DNA Center (renommé Catalyst Center) est la plateforme de gestion intent-based pour les réseaux campus et branch. Elle offre : le **Design** (topologie, paramètres globaux), le **Policy** (SGT, micro-segmentation), le **Provision** (déploiement automatisé ZTP/PnP), et l'**Assurance** (monitoring IA, analytics). Elle expose des APIs REST pour l'intégration et l'automatisation.
+
+- A) ❌ Cisco Meraki est une plateforme cloud-managed pour les PME, pas intent-based enterprise
+- B) ✅ DNA Center / Catalyst Center = plateforme intent-based pour le campus avec GUI + APIs
+- C) ❌ Cisco ACI (Application Centric Infrastructure) est la solution SDN pour les data centers
+- D) ❌ Cisco vManage est le contrôleur SD-WAN, pas la plateforme campus
+
+:::
+
+**Q100.** Un administrateur utilise une API REST pour récupérer la liste des équipements réseau depuis un contrôleur. Quelle méthode HTTP utilise-t-il et quel code de retour indique le succès ? _(Topic 6.5)_
+
+- A) POST et code 201
+- B) GET et code 200
+- C) PUT et code 204
+- D) DELETE et code 200
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — Pour **récupérer** (lire) des données via une API REST, on utilise la méthode HTTP **GET**. Un code de retour **200 OK** indique que la requête a réussi et que les données sont retournées dans le corps de la réponse. Les méthodes CRUD en REST sont : Create = POST, Read = GET, Update = PUT/PATCH, Delete = DELETE.
+
+- A) ❌ POST est pour la création de ressources (Create), avec 201 (Created) comme code de succès
+- B) ✅ GET = lecture (Read), 200 OK = succès avec données retournées
+- C) ❌ PUT est pour la mise à jour (Update), 204 = succès sans contenu
+- D) ❌ DELETE est pour la suppression, pas la lecture
+
+:::
+
+**Q101.** Associez chaque outil de gestion de configuration à sa caractéristique principale. _(Topic 6.6)_
+
+| Outil | → | Caractéristique |
+|-------|---|----------------|
+| 1. Ansible | | a. Utilise des agents sur les noeuds gérés, écrit en Ruby |
+| 2. Puppet | | b. Sans agent (agentless), utilise SSH/NETCONF, playbooks en YAML |
+| 3. Chef | | c. Utilise un agent, configuration en DSL Ruby, architecture master-agent |
+| 4. Terraform | | d. Infrastructure as Code, provisioning multi-cloud, déclaratif |
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+| Outil | → | Caractéristique |
+|-------|---|----------------|
+| 1. Ansible | → | b. Sans agent (agentless), utilise SSH/NETCONF, playbooks en YAML |
+| 2. Puppet | → | a. Utilise des agents sur les noeuds gérés, écrit en Ruby |
+| 3. Chef | → | c. Utilise un agent, configuration en DSL Ruby, architecture master-agent |
+| 4. Terraform | → | d. Infrastructure as Code, provisioning multi-cloud, déclaratif |
+
+**Ansible** se distingue par son architecture **agentless** : il se connecte aux équipements via SSH (ou NETCONF pour les équipements réseau) sans nécessiter l'installation d'un logiciel agent. Les configurations sont écrites en YAML (playbooks). **Puppet** et **Chef** nécessitent des agents installés sur les noeuds gérés. **Terraform** est spécialisé dans le provisioning d'infrastructure (IaC) et n'est pas un outil de gestion de configuration au même titre que les trois autres.
+
+:::
+
+**Q102.** Un administrateur reçoit la réponse JSON suivante d'une API REST. Quelle est l'adresse IP du premier équipement dans la liste ? _(Topic 6.7)_
+
+```{.json}
+{
+  "response": [
+    {
+      "hostname": "SW-CORE-01",
+      "managementIpAddress": "10.1.1.1",
+      "platformId": "C9300-48P",
+      "softwareVersion": "17.6.3",
+      "role": "ACCESS"
+    },
+    {
+      "hostname": "RT-EDGE-01",
+      "managementIpAddress": "10.1.1.254",
+      "platformId": "ISR4331",
+      "softwareVersion": "17.3.5",
+      "role": "BORDER ROUTER"
+    }
+  ],
+  "version": "1.0"
+}
+```
+
+- A) 10.1.1.254
+- B) 10.1.1.1
+- C) SW-CORE-01
+- D) La réponse JSON ne contient pas d'adresse IP
+
+::: {.callout-note collapse="true" title="Réponse"}
+
+**B** — En JSON, les tableaux (arrays) sont indexés à partir de 0. Le premier élément du tableau `response` est l'objet à l'index [0], qui correspond à SW-CORE-01 avec `"managementIpAddress": "10.1.1.1"`. Pour extraire cette valeur programmatiquement, on utiliserait : `response[0].managementIpAddress` (JavaScript/Python) ou `jq '.response[0].managementIpAddress'` (CLI).
+
+- A) ❌ 10.1.1.254 est l'adresse IP du deuxième équipement (index [1])
+- B) ✅ 10.1.1.1 est le `managementIpAddress` du premier objet du tableau `response`
+- C) ❌ SW-CORE-01 est le hostname, pas l'adresse IP
+- D) ❌ La réponse contient bien des adresses IP dans le champ `managementIpAddress`
+
+:::
+
+## Corrigé rapide
+
+| Q | Réponse | Q | Réponse | Q | Réponse | Q | Réponse |
+|---|---------|---|---------|---|---------|---|---------|
+| 1 | B | 27 | C | 53 | B | 79 | B |
+| 2 | B | 28 | B | 54 | A, B | 80 | C |
+| 3 | B | 29 | A, D | 55 | B | 81 | A, C |
+| 4 | B | 30 | D | 56 | B | 82 | B |
+| 5 | B | 31 | B | 57 | A, B, F | 83 | B |
+| 6 | B | 32 | A | 58 | D | 84 | B |
+| 7 | C | 33 | B | 59 | B | 85 | B |
+| 8 | B | 34 | D | 60 | C | 86 | A |
+| 9 | B | 35 | A, B | 61 | B | 87 | B |
+| 10 | A | 36 | B | 62 | B | 88 | B |
+| 11 | B | 37 | C | 63 | A | 89 | C |
+| 12 | B | 38 | A, B, C | 64 | C | 90 | A |
+| 13 | D | 39 | C | 65 | C | 91 | B |
+| 14 | C | 40 | B | 66 | A, C | 92 | (voir D&D) |
+| 15 | B | 41 | (voir D&D) | 67 | (voir D&D) | 93 | B |
+| 16 | C | 42 | B | 68 | C | 94 | B |
+| 17 | B | 43 | B | 69 | B | 95 | B |
+| 18 | (voir D&D) | 44 | B | 70 | B | 96 | B |
+| 19 | C | 45 | A | 71 | C | 97 | A, B, C |
+| 20 | A, C | 46 | B | 72 | B | 98 | B |
+| 21 | B | 47 | (voir D&D) | 73 | A, D | 99 | B |
+| 22 | B | 48 | B, C | 74 | B | 100 | B |
+| 23 | B | 49 | A | 75 | C | 101 | (voir D&D) |
+| 24 | A | 50 | B | 76 | C | 102 | B |
+| 25 | B | 51 | B | 77 | B | | |
+| 26 | A | 52 | A | 78 | B | | |
+
+## Tableau des résultats
+
+| Domain | Questions | Bonnes réponses | Score |
+|--------|-----------|----------------|-------|
+| 1 — Network Fundamentals | Q1–Q20 (20) | ___/20 | ___% |
+| 2 — Network Access | Q21–Q41 (21) | ___/21 | ___% |
+| 3 — IP Connectivity | Q42–Q67 (26) | ___/26 | ___% |
+| 4 — IP Services | Q68–Q78 (11) | ___/11 | ___% |
+| 5 — Security Fundamentals | Q79–Q94 (16) | ___/16 | ___% |
+| 6 — Automation and Programmability | Q95–Q102 (8) | ___/8 | ___% |
+| **TOTAL** | **102** | **___/102** | **___% |
+
+> **Score estimé** : (Bonnes réponses / 102) x 1000 = ___/1000
+> **Seuil de passage** : ≥ 825/1000 (≈ 80%)
+>
+> **Verdict** : ☐ PASS / ☐ FAIL

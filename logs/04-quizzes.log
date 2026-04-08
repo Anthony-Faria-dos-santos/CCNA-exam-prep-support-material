@@ -1,0 +1,10 @@
+Les 4 fichiers ont été générés avec succès dans `/quizzes/` :
+
+| Fichier | Taille | Contenu |
+|---------|--------|---------|
+| **QUIZ-TRANSVERSAL-1.md** | 31 KB | 25 questions modules 1-3 (mi-parcours semaine 5), mix MCQ + scénarios CLI, 3 questions inter-modules |
+| **QUIZ-TRANSVERSAL-2.md** | 44 KB | 25 questions modules 1-5 (semaine 8), 12 questions interconnexions multi-domaines, 6 scénarios CLI |
+| **SUBNETTING-DRILL.md** | 82 KB | 50 exercices en 5 niveaux (basique → VLSM → supernetting → dépannage → examen), solutions détaillées avec binaire |
+| **EXAM-BLANC.md** | 120 KB | 102 questions format examen réel, répartition officielle par domain, 12 scénarios CLI, 14 MCQ multiples, 5 drag-and-drop, corrigé rapide |
+
+Chaque fichier respecte le template quiz, les topic IDs Cisco, les explications complètes par option, et la rédaction en français.

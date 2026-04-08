@@ -1,0 +1,46 @@
+project:
+  type: website
+  output-dir: _output
+
+website:
+  title: 'Guide CCNA 200-301 v1.1'
+  navbar:
+    left:
+      - text: "Home"
+        file: index.qmd
+  sidebar:
+    style: "floating"
+    contents:
+      - index.qmd
+      - section: "Fondamentaux"
+        contents:
+          - chapters/01-network-fundamentals.qmd
+          - chapters/02-network-access.qmd
+      - section: "Connectivité & Services"
+        contents:
+          - chapters/03-ip-connectivity.qmd
+          - chapters/04-ip-services.qmd
+      - section: "Sécurité & Automatisation"
+        contents:
+          - chapters/05-security-fundamentals.qmd
+          - chapters/06-automation.qmd
+      - section: "Pratique"
+        contents:
+          - chapters/07-labs.qmd
+          - chapters/08-exercices.qmd
+          - chapters/09-exam-blanc.qmd
+      - section: "Annexes"
+        contents:
+          - chapters/10-glossaire.qmd
+
+format:
+  html:
+    theme: default
+    toc: true
+    number-sections: true
+    code-fold: true
+    code-tools: true
+    code-copy: true
+    highlight-style: monokai
+    mermaid:
+      theme: neutral

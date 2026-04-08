@@ -1,0 +1,1525 @@
+---
+title: 'IP Services'
+description: 'Module 4 — NTP, DHCP, DNS, SNMP, Syslog, NAT (statique, dynamique, PAT), QoS per-hop behavior, SSH et transfert de fichiers TFTP/FTP'
+---
+
+## Objectif du module {#sec-topic-4-obj}
+
+A l'issue de ce module, vous serez capable de :
+
+- Configurer et verifier le NAT inside source (statique, pool dynamique, PAT overload)
+- Configurer et verifier NTP en modes client et serveur, et interpreter la hierarchie stratum
+- Expliquer les roles de DHCP (processus DORA) et DNS dans un reseau d'entreprise
+- Decrire la fonction de SNMP (NMS, agent, MIB, GET/SET/TRAP/INFORM) et les differences entre v1/v2c/v3
+- Interpreter les facilities et les 8 niveaux de severite syslog
+- Configurer un pool DHCP serveur, un client DHCP et un relay (`ip helper-address`)
+- Expliquer le forwarding per-hop behavior (PHB) de la QoS : classification, marking, queuing, policing, shaping
+- Configurer l'acces distant securise via SSH (hostname, domain, cle RSA, VTY)
+- Decrire les capacites et usages de TFTP et FTP pour la gestion des fichiers reseau
+
+Le module 4 represente environ 10 % de l'examen CCNA 200-301. Ce sont les services « invisibles » qui font tourner un reseau : personne ne les remarque quand ils fonctionnent, mais tout s'arrete des qu'ils sont mal configures. Autrement dit, c'est la plomberie de l'infrastructure --- et c'est rarement testee sur la theorie pure, mais bien sur la capacite a lire une configuration et a identifier ce qui cloche.
+
+## 4.1 --- NAT statique, dynamique et PAT {#sec-topic-4-1}
+
+> **Exam topic 4.1** : *Configure and verify* --- inside source NAT using static and pools
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Imaginez une entreprise de 500 postes en adressage prive 10.0.0.0/8. Quand un employe ouvre son navigateur sur `www.cisco.com`, son paquet porte en source l'adresse 10.1.1.50 --- une adresse RFC 1918 que **aucun routeur d'Internet** ne route. Sans mecanisme de traduction, ce paquet est silencieusement jete des la premiere hop sur Internet. Le NAT (Network Address Translation) est l'intermediaire qui reecrit l'adresse source pour la rendre routable, puis remet l'adresse d'origine sur les paquets retour. C'est grace a lui qu'IPv4 a survecu 30 ans au-dela de son epuisement theorique.
+
+### Theorie
+
+Le NAT est ne dans les annees 1990 en reponse a l'epuisement des adresses IPv4. Le principe : utiliser des adresses privees (RFC 1918) en interne et traduire en adresses publiques a la frontiere. Trois variantes existent, chacune repondant a un cas d'usage precis.
+
+#### Les quatre termes NAT a maitriser
+
+Toute la terminologie Cisco repose sur deux axes : **inside/outside** (de quel cote du routeur NAT se trouve l'hote) et **local/global** (de quel point de vue on observe l'adresse).
+
+| Terme | Definition | Exemple |
+|-------|-----------|---------|
+| **Inside local** | IP de l'hote interne, vue depuis l'interieur | 10.1.1.50 (le PC) |
+| **Inside global** | IP de l'hote interne, vue depuis l'exterieur | 203.0.113.10 (apres NAT) |
+| **Outside local** | IP de l'hote externe, vue depuis l'interieur | 8.8.8.8 (DNS Google) |
+| **Outside global** | IP de l'hote externe, vue depuis l'exterieur | 8.8.8.8 (identique en general) |
+
+Moyen mnemotechnique : *Inside* = votre reseau, *Local* = vu d'en dedans, *Global* = vu d'en dehors. La majorite du temps, seule l'adresse **inside** est traduite --- d'ou l'expression *inside source NAT*.
+
+#### Les trois variantes de NAT
+
+**1. NAT statique (static)** --- un mapping permanent un-pour-un entre une adresse privee et une adresse publique. Utilise pour les serveurs exposes (web, mail).
+
+**2. NAT dynamique (pool)** --- un pool d'adresses publiques partage a la volee. Premier arrive, premier servi. Si le pool est vide, les nouvelles connexions echouent.
+
+**3. PAT (Port Address Translation, alias NAT overload)** --- tous les hotes partagent **une seule** adresse publique, differencies par leur port source. C'est ce que fait votre box Internet domestique. Jusqu'a ~65 000 translations simultanees par adresse publique. Les trois variantes sont comparees visuellement en @fig-m4-nat-types, et le flux PAT paquet par paquet en @fig-m4-pat-flow.
+
+| Critere | NAT statique | NAT dynamique | PAT (overload) |
+|---------|-------------|---------------|----------------|
+| Mapping | 1:1 permanent | 1:1 temporaire | N:1 (port-based) |
+| Direction | Bidirectionnelle | Inside -> Outside | Inside -> Outside |
+| Adresses publiques | 1 par hote | Pool partage | 1 pour tous |
+| Cas d'usage | Serveurs publics | Groupes d'utilisateurs | Acces Internet general |
+| Connexion entrante | Oui | Non | Non (sauf port forwarding) |
+
+### Schema : comparaison des trois types de NAT {#fig-m4-nat-types}
+
+```{mermaid}
+%%| label: fig-m4-nat-types
+%%| fig-cap: "Les trois variantes de NAT inside source et leur mapping d'adresses"
+flowchart LR
+    subgraph STATIC["NAT statique (1:1)"]
+        S1[PC 10.1.1.100] --> S2[203.0.113.10]
+    end
+    subgraph DYN["NAT dynamique (pool)"]
+        D1[PC 10.1.1.50] --> DP[Pool<br/>203.0.113.10-20]
+        D2[PC 10.1.1.51] --> DP
+    end
+    subgraph PAT["PAT overload (N:1)"]
+        P1[PC 10.1.1.50:49152] --> PI[203.0.113.1:1024]
+        P2[PC 10.1.1.51:52100] --> PI2[203.0.113.1:1025]
+    end
+```
+
+*Legende* : le NAT statique consomme une adresse publique par serveur. Le pool dynamique partage quelques adresses entre les hotes actifs. Le PAT multiplexe des milliers d'hotes derriere une seule adresse publique grace aux numeros de port.
+
+### Schema : traduction PAT en action {#fig-m4-pat-flow}
+
+```{mermaid}
+%%| label: fig-m4-pat-flow
+%%| fig-cap: "Translation PAT d'un paquet sortant puis du paquet retour"
+sequenceDiagram
+    participant PC as PC 10.1.1.50:49152
+    participant R1 as R1 (NAT)
+    participant WEB as Web 142.250.74.46:443
+    PC->>R1: src=10.1.1.50:49152 dst=142.250.74.46:443
+    Note over R1: Entree table NAT<br/>10.1.1.50:49152 -> 203.0.113.1:1024
+    R1->>WEB: src=203.0.113.1:1024 dst=142.250.74.46:443
+    WEB->>R1: src=142.250.74.46:443 dst=203.0.113.1:1024
+    Note over R1: Lookup inverse<br/>203.0.113.1:1024 -> 10.1.1.50:49152
+    R1->>PC: src=142.250.74.46:443 dst=10.1.1.50:49152
+```
+
+*Legende* : le routeur NAT maintient une table bidirectionnelle. A l'aller, il reecrit la source. Au retour, il reecrit la destination. Le serveur web ne voit jamais l'adresse privee.
+
+### Mise en pratique CLI
+
+#### NAT statique pour un serveur web
+
+```{.cisco filename="R1"}
+! Mapping fixe 10.1.1.100 <-> 203.0.113.10
+R1(config)# ip nat inside source static 10.1.1.100 203.0.113.10
+!
+! Designer les interfaces
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# ip nat inside
+R1(config-if)# exit
+R1(config)# interface GigabitEthernet0/1
+R1(config-if)# ip nat outside
+```
+
+#### NAT dynamique avec pool
+
+```{.cisco filename="R1"}
+! Definir le pool d'adresses publiques
+R1(config)# ip nat pool POOL-PUBLIC 203.0.113.10 203.0.113.20 netmask 255.255.255.0
+!
+! ACL selectionnant les hotes eligibles
+R1(config)# access-list 1 permit 10.1.1.0 0.0.0.255
+!
+! Lier l'ACL au pool
+R1(config)# ip nat inside source list 1 pool POOL-PUBLIC
+```
+
+#### PAT (overload)
+
+```{.cisco filename="R1"}
+! Methode 1 : PAT via l'adresse de l'interface outside
+R1(config)# access-list 1 permit 10.1.1.0 0.0.0.255
+R1(config)# ip nat inside source list 1 interface GigabitEthernet0/1 overload
+
+! Methode 2 : PAT via un pool reduit a 1 adresse
+R1(config)# ip nat pool PAT-POOL 203.0.113.10 203.0.113.10 netmask 255.255.255.0
+R1(config)# ip nat inside source list 1 pool PAT-POOL overload
+```
+
+Le mot-cle **overload** est la seule difference syntaxique entre NAT dynamique et PAT --- mais la difference fonctionnelle est immense.
+
+#### Verification
+
+```{.cisco filename="R1"}
+R1# show ip nat translations
+Pro  Inside global      Inside local       Outside local      Outside global
+tcp  203.0.113.1:1024   10.1.1.50:45320    8.8.8.8:443        8.8.8.8:443
+tcp  203.0.113.1:1025   10.1.1.51:52100    142.250.74.46:80   142.250.74.46:80
+---  203.0.113.10       10.1.1.100         ---                ---
+```
+
+**Interpretation** : les deux premieres lignes sont des translations PAT (protocole tcp, numeros de port). L'adresse 203.0.113.1 est partagee --- seuls les ports different. La troisieme ligne est un mapping NAT statique (pas de port, pas de protocole) : il est permanent et apparait meme sans trafic actif.
+
+```{.cisco filename="R1"}
+R1# show ip nat statistics
+Total active translations: 3 (1 static, 2 dynamic; 2 extended)
+Peak translations: 47, occurred 01:23:45 ago
+Outside interfaces:
+  GigabitEthernet0/1
+Inside interfaces:
+  GigabitEthernet0/0
+Hits: 15234  Misses: 12
+Dynamic mappings:
+-- Inside Source
+[Id: 1] access-list 1 interface GigabitEthernet0/1 refcount 2
+```
+
+Pour effacer uniquement les translations dynamiques (utile en troubleshooting) :
+
+```{.cisco filename="R1"}
+R1# clear ip nat translation *
+```
+
+::: {.callout-important icon=false}
+## 🎯 Point exam --- NAT
+
+- **Piege classique** : oublier `ip nat inside` ou `ip nat outside` sur les interfaces. Sans ces directives, la regle de translation est ignoree. C'est la cause numero 1 des NAT qui « ne fonctionnent pas ».
+- Le mot-cle `overload` transforme un pool en PAT. Sans lui, chaque hote consomme une adresse complete du pool.
+- L'examen teste souvent les 4 termes *inside/outside local/global* avec des scenarios d'identification. Retenez : *inside* = votre reseau, *global* = vu d'Internet.
+:::
+
+### Exercice 4.1 --- NAT statique + PAT combines
+
+**Contexte** : l'entreprise NetCorp dispose d'un reseau 172.16.0.0/16 et d'un bloc public 198.51.100.0/28 (14 adresses utilisables). Le serveur web interne (172.16.1.100) doit etre joignable depuis Internet sur 198.51.100.10. Tous les autres postes doivent sortir en PAT sur l'adresse de l'interface outside (198.51.100.1).
+
+**Consigne** : ecrivez la configuration complete du routeur NAT-GW (Gi0/0 inside, Gi0/1 outside).
+
+<details><summary>💡 Indice</summary>
+Vous avez besoin de deux regles : une statique pour le serveur web, une dynamique avec `overload` pour les autres postes. L'ACL doit matcher 172.16.0.0/16 (wildcard 0.0.255.255).
+</details>
+
+<details><summary>🔬 Solution</summary>
+
+```{.cisco filename="NAT-GW"}
+NAT-GW(config)# interface GigabitEthernet0/0
+NAT-GW(config-if)# ip address 172.16.0.1 255.255.0.0
+NAT-GW(config-if)# ip nat inside
+NAT-GW(config-if)# no shutdown
+NAT-GW(config-if)# exit
+!
+NAT-GW(config)# interface GigabitEthernet0/1
+NAT-GW(config-if)# ip address 198.51.100.1 255.255.255.240
+NAT-GW(config-if)# ip nat outside
+NAT-GW(config-if)# no shutdown
+NAT-GW(config-if)# exit
+!
+! NAT statique pour le serveur web
+NAT-GW(config)# ip nat inside source static 172.16.1.100 198.51.100.10
+!
+! PAT pour tout le reste
+NAT-GW(config)# access-list 1 permit 172.16.0.0 0.0.255.255
+NAT-GW(config)# ip nat inside source list 1 interface GigabitEthernet0/1 overload
+```
+
+Le statique donne au serveur web une adresse publique fixe et permet les connexions entrantes. Le PAT permet a tous les autres hotes de partager 198.51.100.1. Le wildcard `0.0.255.255` correspond a un /16.
+</details>
+
+### Voir aussi
+
+- @sec-topic-1-8 (adressage IPv4 prive RFC 1918 --- la raison d'etre du NAT)
+- @sec-topic-3-3 (route par defaut --- le routeur NAT a besoin d'une default route vers le FAI)
+- @sec-topic-5-6 (ACLs --- les ACLs NAT suivent la meme syntaxe que les ACLs de filtrage)
+
+---
+
+## 4.2 --- NTP : synchronisation des horloges {#sec-topic-4-2}
+
+> **Exam topic 4.2** : *Configure and verify* --- NTP operating in a client and server mode
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+Un incident de securite survient a 14h32. Vous ouvrez les logs : le routeur affiche 14h28, le switch 15h45, le pare-feu 14h31. Reconstituer la chronologie devient un casse-tete. NTP (Network Time Protocol) resout ce probleme en synchronisant toutes les horloges sur une reference commune, avec une precision a la milliseconde. Sans NTP, les logs sont inexploitables, les certificats TLS peuvent etre rejetes, Kerberos echoue, et la correlation d'evenements est impossible.
+
+### Theorie
+
+NTP est un protocole applicatif sur UDP port 123, concu en 1985 par David Mills. Il repose sur un modele hierarchique organise en **strates** (stratum). Plus le stratum est bas, plus la source est fiable.
+
+### Schema : hierarchie NTP stratum {#fig-m4-ntp-stratum}
+
+```{mermaid}
+%%| label: fig-m4-ntp-stratum
+%%| fig-cap: "Hierarchie NTP et propagation du stratum entre niveaux"
+graph TD
+    S0[Stratum 0<br/>Horloge atomique / GPS]
+    S1[Stratum 1<br/>Serveur NTP racine]
+    S2[Stratum 2<br/>pool.ntp.org]
+    S3[Stratum 3<br/>Routeur d'entreprise R1]
+    S4[Stratum 4<br/>Switches SW1, SW2]
+    S0 --> S1
+    S1 --> S2
+    S2 --> S3
+    S3 --> S4
+```
+
+*Legende* : le stratum 0 n'est jamais accessible directement par NTP (c'est le materiel de reference). Chaque niveau ajoute 1 au stratum. Au-dela de stratum 15, l'horloge est consideree comme non fiable. Stratum 16 = non synchronise.
+
+#### Pourquoi NTP est critique
+
+- **Correlation des logs** : sans horloge synchronisee, impossible de retracer un incident
+- **Certificats TLS/SSL** : un certificat n'est valide que dans un intervalle temporel precis
+- **Authentification Kerberos** : tolerance de 5 minutes maximum entre client et serveur
+- **Journalisation de conformite** : ISO 27001, PCI-DSS exigent des logs dates et synchronises
+
+### Mise en pratique CLI
+
+#### Configurer un routeur comme client NTP
+
+```{.cisco filename="R1"}
+! Pointer vers un serveur NTP (interne ou public)
+R1(config)# ntp server 10.1.1.254
+
+! Optionnel : second serveur pour la redondance
+R1(config)# ntp server 10.1.1.253
+
+! Configurer le fuseau horaire
+R1(config)# clock timezone CET 1
+R1(config)# clock summer-time CEST recurring
+```
+
+#### Configurer un routeur comme serveur NTP master
+
+```{.cisco filename="R1"}
+! Le routeur devient source NTP (a n'utiliser qu'en lab ou reseau isole)
+R1(config)# ntp master 4
+```
+
+::: {.callout-warning icon=false}
+## ⚠️ Attention --- ntp master
+
+`ntp master` fait generer le temps par le routeur lui-meme --- a reserver aux labs ou aux reseaux sans acces a une source externe. En production, preferez un vrai serveur NTP (pool.ntp.org, serveur interne, appliance GPS).
+:::
+
+### Verification
+
+```{.cisco filename="R1"}
+R1# show ntp status
+Clock is synchronized, stratum 5, reference is 10.1.1.254
+nominal freq is 250.0000 Hz, actual freq is 249.9998 Hz, precision is 2**18
+reference time is E4A1B2C3.4D5E6F70 (14:32:15.302 CET Fri Apr 4 2026)
+clock offset is 0.5234 msec, root delay is 12.45 msec
+root dispersion is 25.67 msec, peer dispersion is 1.23 msec
+```
+
+**Interpretation** : `Clock is synchronized` confirme la synchro reussie. Le stratum 5 signifie que R1 est a 5 sauts de l'horloge de reference. Un offset de 0.5 ms est excellent (< 1 ms).
+
+```{.cisco filename="R1"}
+R1# show ntp associations
+  address         ref clock       st   when   poll reach  delay  offset   disp
+*~10.1.1.254      10.1.1.1         4     32     64   377  12.4    0.52    1.23
++~10.1.1.253      10.1.1.1         4     45     64   377  15.2    1.10    2.45
+ * sys.peer, # selected, + candidate, - outlyer, x falseticker, ~ configured
+```
+
+**Interpretation** :
+- `*` : serveur actuellement selectionne comme source (sys.peer)
+- `+` : candidat acceptable comme source de secours
+- `reach` : registre octal des 8 dernieres tentatives. `377` octal = 11111111 binaire = 8 succes sur 8
+- `poll` : intervalle en secondes entre deux requetes (64 s ici)
+
+::: {.callout-important icon=false}
+## 🎯 Point exam --- NTP
+
+- Distinguez `ntp server <ip>` (le routeur est **client**) et `ntp master <stratum>` (le routeur devient **source** de temps). Piege classique a l'examen.
+- Le stratum d'un client est **toujours** `stratum du serveur + 1`.
+- NTP = UDP port 123. La synchronisation initiale peut prendre 5 a 15 minutes --- ne paniquez pas si le premier `show ntp status` affiche *unsynchronized*.
+- Un routeur configure avec `ntp server` agit automatiquement comme serveur pour les equipements qui le pointent --- pas besoin de `ntp master` dans ce cas.
+:::
+
+### Exercice 4.2 --- Chaine de synchronisation
+
+**Contexte** : chez MediaPlus, le serveur NTP central SRV-NTP (10.10.10.254, stratum 2) doit etre la reference. Le routeur R1 doit se synchroniser dessus, et les switches SW1 et SW2 doivent se synchroniser sur R1.
+
+**Consigne** : ecrivez les commandes pour R1, SW1 et SW2. Indiquez le stratum final de chaque equipement.
+
+<details><summary>💡 Indice</summary>
+R1 est a la fois client (de SRV-NTP) et serveur (pour les switches). Pas besoin de `ntp master` : des que R1 est synchronise, il agit automatiquement comme source pour ses clients.
+</details>
+
+<details><summary>🔬 Solution</summary>
+
+```{.cisco filename="R1"}
+R1(config)# ntp server 10.10.10.254
+```
+
+```{.cisco filename="SW1"}
+SW1(config)# ntp server 10.10.10.1
+```
+
+```{.cisco filename="SW2"}
+SW2(config)# ntp server 10.10.10.1
+```
+
+Stratums finals : SRV-NTP = 2, R1 = 3 (2+1), SW1 et SW2 = 4 (3+1).
+</details>
+
+### Voir aussi
+
+- @sec-topic-4-5 (Syslog --- les timestamps syslog n'ont de valeur que si NTP synchronise l'horloge)
+- @sec-topic-2-8 (acces de management --- NTP fait partie des services de gestion reseau)
+
+---
+
+## 4.3 --- DHCP et DNS : roles dans le reseau {#sec-topic-4-3}
+
+> **Exam topic 4.3** : *Explain* --- the role of DHCP and DNS within the network
+> **Niveau** : Explain
+
+### Contexte
+
+Sans DHCP, chaque poste d'un reseau de 500 machines devrait etre configure a la main : IP, masque, passerelle, DNS. Une faute de frappe, et c'est le conflit d'adresses. Sans DNS, pour aller sur `google.com`, il faudrait taper `142.250.74.46`. Ces deux protocoles sont invisibles pour l'utilisateur final, mais absolument fondamentaux dans tout reseau moderne.
+
+### Theorie
+
+#### DHCP --- Dynamic Host Configuration Protocol
+
+DHCP fonctionne en client/serveur sur les ports **UDP 67** (serveur) et **UDP 68** (client). Son role est d'attribuer automatiquement une configuration IP complete aux clients.
+
+##### Le processus DORA
+
+L'attribution d'une adresse suit quatre etapes, resumees par l'acronyme **DORA** : Discover, Offer, Request, Acknowledge (voir @fig-m4-dora). Pour la resolution de nom, le processus recursif DNS est detaille en @fig-m4-dns-recursive.
+
+### Schema : processus DHCP DORA {#fig-m4-dora}
+
+```{mermaid}
+%%| label: fig-m4-dora
+%%| fig-cap: "Le processus DORA d'obtention d'un bail DHCP"
+sequenceDiagram
+    participant C as Client (0.0.0.0)
+    participant S as Serveur DHCP (10.1.1.254)
+    C->>S: 1. DISCOVER (broadcast 255.255.255.255)
+    Note over C,S: src=0.0.0.0:68 dst=255.255.255.255:67
+    S->>C: 2. OFFER "Je te propose 10.1.1.50/24"
+    C->>S: 3. REQUEST (broadcast) "J'accepte 10.1.1.50"
+    Note over C,S: Broadcast pour prevenir les autres serveurs
+    S->>C: 4. ACKNOWLEDGE "Confirme. Bail = 24h"
+    Note over C: Configuration IP complete
+```
+
+*Legende* : le DISCOVER et le REQUEST sont en broadcast (dst 255.255.255.255). Le REQUEST est broadcast meme si le client connait le serveur, afin d'informer les autres serveurs que leur offre a ete refusee et qu'ils peuvent liberer l'adresse qu'ils avaient reservee.
+
+#### Parametres fournis par DHCP
+
+| Parametre | Obligatoire | Exemple |
+|-----------|------------|---------|
+| Adresse IP | Oui | 10.1.1.50 |
+| Masque de sous-reseau | Oui | 255.255.255.0 |
+| Passerelle par defaut | De facto | 10.1.1.1 |
+| Serveur(s) DNS | De facto | 10.1.1.254, 8.8.8.8 |
+| Duree de bail | Oui | 86400 s (24 h) |
+| Nom de domaine | Optionnel | corp.netcorp.local |
+
+##### Le bail DHCP
+
+Le client ne possede pas l'adresse --- il la **loue**. A 50 % du bail, il tente un renouvellement (REQUEST unicast). A 87,5 %, nouveau retry. Si le bail expire, le client perd son adresse et relance DORA.
+
+#### DNS --- Domain Name System
+
+DNS traduit les noms de domaine (`www.cisco.com`) en adresses IP (`72.163.4.185`). Il fonctionne sur **UDP port 53** pour les requetes standard et **TCP port 53** pour les transferts de zone ou reponses volumineuses.
+
+### Schema : resolution DNS recursive {#fig-m4-dns-recursive}
+
+```{mermaid}
+%%| label: fig-m4-dns-recursive
+%%| fig-cap: "Resolution recursive d'un nom de domaine depuis un client"
+sequenceDiagram
+    participant PC as Client
+    participant R as Resolveur local (10.1.1.254)
+    participant RT as Serveur racine (.)
+    participant TLD as Serveur TLD (.com)
+    participant AUTH as Serveur autoritaire (cisco.com)
+    PC->>R: Qui est www.cisco.com ?
+    R->>RT: Qui gere .com ?
+    RT->>R: Les serveurs TLD .com sont a X.X.X.X
+    R->>TLD: Qui gere cisco.com ?
+    TLD->>R: Le serveur autoritaire est Y.Y.Y.Y
+    R->>AUTH: Quelle est l'IP de www.cisco.com ?
+    AUTH->>R: 72.163.4.185
+    R->>PC: www.cisco.com = 72.163.4.185
+```
+
+*Legende* : du point de vue du client, la resolution est une seule question et une seule reponse. En realite, le resolveur local remonte la hierarchie DNS (racine -> TLD -> autoritaire) pour trouver la reponse. Le resultat est ensuite mis en cache pour les requetes suivantes.
+
+#### Types d'enregistrements DNS courants
+
+| Type | Role | Exemple |
+|------|------|---------|
+| **A** | Nom -> IPv4 | www.cisco.com -> 72.163.4.185 |
+| **AAAA** | Nom -> IPv6 | www.cisco.com -> 2001:420:1101:1::185 |
+| **CNAME** | Alias vers un autre nom | mail.corp.com -> outlook.office365.com |
+| **MX** | Serveur de messagerie | corp.com -> mail.corp.com (priorite 10) |
+| **PTR** | IP -> nom (reverse DNS) | 72.163.4.185 -> www.cisco.com |
+
+### Mise en pratique CLI
+
+#### Verifier la configuration DNS sur un routeur
+
+```{.cisco filename="R1"}
+R1# show ip dns view
+DNS View default parameters:
+Logging is off
+DNS Resolver settings:
+  Domain lookup state: enabled
+  Default domain name: corp.netcorp.local
+  DNS server address(es):
+    10.1.1.254
+    8.8.8.8
+```
+
+#### Tester la resolution depuis un routeur
+
+```{.cisco filename="R1"}
+R1# ping www.cisco.com
+Translating "www.cisco.com"...domain server (10.1.1.254) [OK]
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 72.163.4.185, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 28/32/40 ms
+```
+
+#### Verification DHCP cote client Windows
+
+```{.default filename="PC1 (cmd)"}
+C:\> ipconfig /all
+   DHCP Enabled. . . . . . . . . . . : Yes
+   IPv4 Address. . . . . . . . . . . : 10.1.1.50
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : 10.1.1.1
+   DHCP Server . . . . . . . . . . . : 10.1.1.254
+   DNS Servers . . . . . . . . . . . : 10.1.1.254
+                                        8.8.8.8
+   Lease Obtained. . . . . . . . . . : vendredi 4 avril 2026 08:00:12
+   Lease Expires . . . . . . . . . . : samedi 5 avril 2026 08:00:12
+```
+
+::: {.callout-important icon=false}
+## 🎯 Point exam --- DHCP et DNS
+
+- **Ports DHCP** : serveur **UDP 67**, client **UDP 68**. Mnemonique : 67 < 68, le serveur vient en premier.
+- DHCP utilise **UDP**, pas TCP. DISCOVER et REQUEST sont des broadcasts (dst 255.255.255.255).
+- DNS : **UDP 53** pour les requetes normales, **TCP 53** pour les reponses > 512 octets et les transferts de zone.
+- L'ordre DORA est un grand classique : Discover -> Offer -> Request -> Acknowledge.
+:::
+
+### Exercice 4.3 --- Chronologie complete d'un navigateur
+
+**Contexte** : chez TechnoVert, un PC vient d'etre branche sur le VLAN 10 (10.10.10.0/24, passerelle 10.10.10.1, DHCP 10.10.10.254). L'utilisateur ouvre son navigateur et tape `www.technovert.fr`.
+
+**Consigne** : decrivez chronologiquement les 6 premieres interactions reseau (apres branchement du cable).
+
+<details><summary>💡 Indice</summary>
+D'abord DHCP (le PC n'a pas d'adresse), puis DNS (il ne connait pas l'IP du site), puis HTTP.
+</details>
+
+<details><summary>🔬 Solution</summary>
+
+1. **DHCP Discover** (broadcast UDP, src 0.0.0.0:68 dst 255.255.255.255:67) --- trouver un serveur DHCP
+2. **DHCP Offer** --- le serveur 10.10.10.254 propose 10.10.10.50/24, GW 10.10.10.1, DNS 10.10.10.254
+3. **DHCP Request** (broadcast) --- le PC accepte l'offre
+4. **DHCP Acknowledge** --- le serveur confirme, le PC a sa configuration IP
+5. **DNS Query** (UDP 53) vers 10.10.10.254 : « Quelle est l'IP de www.technovert.fr ? »
+6. **DNS Reply** --- le serveur repond avec l'adresse (ex : 185.12.34.56)
+7. *(bonus)* **TCP SYN** vers 185.12.34.56:443 --- ouverture de connexion HTTPS
+
+Sans DHCP, pas de configuration IP. Sans DNS, pas de resolution de nom. DHCP doit donc se produire en premier, puis DNS, puis seulement HTTP.
+</details>
+
+### Voir aussi
+
+- @sec-topic-1-5 (TCP vs UDP --- DHCP et DNS utilisent UDP)
+- @sec-topic-4-6 (configuration CLI DHCP --- pool, exclusions, helper-address)
+- @sec-topic-2-6 (wireless --- les clients Wi-Fi utilisent aussi DHCP)
+
+---
+
+## 4.4 --- SNMP : supervision reseau {#sec-topic-4-4}
+
+> **Exam topic 4.4** : *Explain* --- the function of SNMP in network operations
+> **Niveau** : Explain
+
+### Contexte
+
+Vous gerez 200 equipements sur 5 sites. Comment savoir en temps reel si un lien sature, si un switch chauffe, si la memoire d'un routeur atteint sa limite ? Vous n'allez pas vous connecter en SSH a chaque machine toutes les 5 minutes. SNMP (Simple Network Management Protocol) centralise la collecte des metriques et peut vous alerter instantanement en cas de probleme.
+
+### Theorie
+
+SNMP est un protocole applicatif dedie a la supervision et a la gestion d'equipements reseau. Il repose sur trois composants : le **NMS** (Network Management Station, le superviseur), les **agents** (logiciels embarques dans chaque equipement) et la **MIB** (Management Information Base, la base de variables supervisables).
+
+### Schema : architecture SNMP manager/agent {#fig-m4-snmp-flow}
+
+```{mermaid}
+%%| label: fig-m4-snmp-flow
+%%| fig-cap: "Flux SNMP entre NMS et agents : polling vs traps"
+sequenceDiagram
+    participant NMS as NMS (SolarWinds)
+    participant A1 as Agent R1
+    participant A2 as Agent SW1
+    NMS->>A1: GET sysUpTime (UDP 161)
+    A1->>NMS: Response : 15 jours
+    NMS->>A2: GET-BULK ifInOctets (UDP 161)
+    A2->>NMS: Response : tableau de compteurs
+    Note over A1: Interface Gi0/1 tombe
+    A1->>NMS: TRAP linkDown Gi0/1 (UDP 162)
+    Note over NMS: Alerte generee
+```
+
+*Legende* : le NMS interroge les agents sur le port UDP 161 (polling periodique : GET, GET-NEXT, GET-BULK, SET). Les agents envoient des notifications asynchrones (TRAP, INFORM) vers le NMS sur UDP 162 quand un evenement survient.
+
+#### Les operations SNMP
+
+| Operation | Direction | Description |
+|-----------|-----------|-------------|
+| **GET** | NMS -> Agent | Lire une variable specifique |
+| **GET-NEXT** | NMS -> Agent | Lire la variable suivante dans la MIB |
+| **GET-BULK** | NMS -> Agent | Lire plusieurs variables en une requete (v2c+) |
+| **SET** | NMS -> Agent | Modifier une variable |
+| **TRAP** | Agent -> NMS | Notification asynchrone non acquittee |
+| **INFORM** | Agent -> NMS | Notification avec acquittement (v2c+) |
+
+La difference fondamentale **TRAP vs INFORM** : le trap est *fire and forget*. L'inform exige un acquittement ; sans reponse, l'agent retransmet.
+
+#### Versions SNMP
+
+| Critere | SNMPv1 | SNMPv2c | SNMPv3 |
+|---------|--------|---------|--------|
+| Authentification | Community (clair) | Community (clair) | User + password (MD5/SHA) |
+| Chiffrement | Non | Non | Oui (DES, AES) |
+| GET-BULK | Non | Oui | Oui |
+| INFORM | Non | Oui | Oui |
+| Usage recommande | Obsolete | Labs seulement | Production |
+
+Les **community strings** de v1/v2c sont des mots de passe en clair :
+- **RO** (read-only) --- lecture seule. Defaut : `public`
+- **RW** (read-write) --- lecture + ecriture. Defaut : `private`
+
+::: {.callout-warning icon=false}
+## ⚠️ Attention --- community strings par defaut
+
+En production, changez **toujours** les communities `public` et `private`. Laisser ces valeurs, c'est comme laisser le mot de passe `admin` sur un routeur --- n'importe quel scanner automatique les essaiera.
+:::
+
+### Mise en pratique CLI
+
+#### Configurer SNMPv2c sur un routeur
+
+```{.cisco filename="R1"}
+! Community read-only pour la supervision
+R1(config)# snmp-server community MONITOR-2026 ro
+
+! Community read-write (usage restreint)
+R1(config)# snmp-server community CONFIG-SEC rw
+
+! Informations systeme
+R1(config)# snmp-server location "Salle serveur, Batiment A, Paris"
+R1(config)# snmp-server contact "noc@netcorp.com"
+
+! Envoyer les traps vers le NMS (10.1.1.200)
+R1(config)# snmp-server host 10.1.1.200 version 2c MONITOR-2026
+R1(config)# snmp-server enable traps snmp linkdown linkup
+R1(config)# snmp-server enable traps config
+```
+
+#### Verification
+
+```{.cisco filename="R1"}
+R1# show snmp
+Chassis: FTX1234A5BC
+37521 SNMP packets input
+    0 Bad SNMP version errors
+    0 Unknown community name
+    2321 Get-request PDUs
+    0 Set-request PDUs
+37500 SNMP packets output
+    35200 Response PDUs
+    2300 Trap PDUs
+```
+
+**Interpretation** : 2 321 GET recus du NMS, 2 300 traps envoyes. Le compteur `Unknown community name` a 0 indique qu'aucun attaquant ne tente de deviner la community --- si ce compteur grimpe, c'est un signal d'alerte.
+
+::: {.callout-important icon=false}
+## 🎯 Point exam --- SNMP
+
+- Ports : **UDP 161** (NMS -> agent pour GET/SET), **UDP 162** (agent -> NMS pour TRAP/INFORM). Piege classique d'inversion.
+- **SNMPv3** est la seule version offrant authentification ET chiffrement. v1 et v2c transmettent les communities en clair.
+- **TRAP** n'est pas fiable (pas d'acquittement). **INFORM** est fiable (acquittement obligatoire).
+- La MIB est une base hierarchique d'OID. `sysName` = 1.3.6.1.2.1.1.5.
+:::
+
+### Exercice 4.4 --- Diagnostic SNMP
+
+**Contexte** : le NMS de BioTech Corp ne recoit plus les alertes de changement de configuration du routeur R-CORE. Le polling (GET) fonctionne normalement.
+
+**Consigne** : identifiez trois causes possibles et la commande de verification pour chacune.
+
+<details><summary>💡 Indice</summary>
+Le GET fonctionne, donc la connectivite et la community RO sont bonnes. Le probleme touche specifiquement les traps. Regardez la configuration des traps, la destination, et les eventuels filtres.
+</details>
+
+<details><summary>🔬 Solution</summary>
+
+| Cause | Commande de verification |
+|-------|--------------------------|
+| 1. Traps de config non actives | `show running-config | include enable traps` (chercher `traps config`) |
+| 2. Host de destination des traps mal configure | `show snmp host` --- verifier l'IP du NMS et la community |
+| 3. ACL bloquant UDP 162 entre R-CORE et NMS | `show access-lists` + `show snmp` (si Trap PDUs augmente, le probleme est en transit) |
+
+Le fait que le GET fonctionne prouve que l'agent tourne et que la community RO est bonne. Les traps sont un mecanisme separe qui requiert sa propre configuration : destination + types de traps actives.
+</details>
+
+### Voir aussi
+
+- @sec-topic-4-5 (Syslog --- mecanisme de notification complementaire)
+- @sec-topic-2-8 (acces de management)
+- @sec-topic-6-2 (SDN et reseaux controller-based --- SNMP est l'outil historique, remplace progressivement par streaming telemetry / NETCONF)
+
+---
+
+## 4.5 --- Syslog : facilities et severites {#sec-topic-4-5}
+
+> **Exam topic 4.5** : *Describe* --- the use of syslog features including facilities and levels
+> **Niveau** : Describe
+
+### Contexte
+
+Un routeur redemarre a 3 h du matin. Premiere question de l'astreinte : « que s'est-il passe juste avant ? ». Les messages syslog sont le journal de bord de l'equipement --- chaque evenement significatif y est consigne, des changements d'etat d'interface aux erreurs critiques. Savoir lire et organiser ces messages est le B.A.-BA du troubleshooting reseau.
+
+### Theorie
+
+Syslog est un standard (RFC 5424) qui permet aux equipements d'envoyer des messages de journal a un collecteur centralise (port **UDP 514** par defaut). Chaque message contient trois informations :
+
+1. **Facility** : la source (quel composant IOS a genere le message)
+2. **Severity** : la gravite (0 a 7)
+3. **Message** : le contenu descriptif
+
+#### Les 8 niveaux de severite
+
+C'est le tableau le plus important de cette section --- a connaitre par coeur.
+
+| Niveau | Mot-cle | Description | Exemple |
+|--------|---------|-------------|---------|
+| **0** | Emergency | Systeme inutilisable | Crash systeme |
+| **1** | Alert | Action immediate | Temperature critique |
+| **2** | Critical | Condition critique | Erreur memoire |
+| **3** | Error | Condition d'erreur | Erreur d'interface |
+| **4** | Warning | Avertissement | Seuil memoire atteint |
+| **5** | Notification | Normal mais significatif | Interface up/down |
+| **6** | Informational | Message informatif | Transaction config |
+| **7** | Debugging | Debogage | Output de `debug` |
+
+**Mnemonique** : *Every Awesome Cisco Engineer Will Need Ice cream Daily*.
+
+::: {.callout-tip icon=false}
+## 💡 Astuce --- logique de filtrage syslog
+
+Plus le numero est **bas**, plus c'est **grave**. Configurer un niveau inclut **tous les niveaux de severite inferieure ou egale**. `logging trap warnings` (niveau 4) capture aussi les niveaux 0, 1, 2 et 3.
+:::
+
+### Schema : decision de filtrage par severite {#fig-m4-syslog-severity}
+
+```{mermaid}
+%%| label: fig-m4-syslog-severity
+%%| fig-cap: "Filtrage des messages syslog par niveau de severite"
+flowchart TD
+    M[Message syslog arrive<br/>severite N] --> C{N <= niveau<br/>configure ?}
+    C -->|Oui| A[Message logge<br/>vers destination]
+    C -->|Non| D[Message ignore]
+    A --> B[Console, buffer,<br/>VTY, serveur syslog]
+```
+
+*Legende* : chaque destination syslog (console, buffer, VTY, host) a son propre seuil. Un message dont la severite numerique est <= au seuil configure est logge. `logging trap informational` (6) capture les niveaux 0 a 6 et ignore le debugging (7).
+
+#### Anatomie d'un message syslog
+
+```{.default}
+*Apr  4 14:32:15.302: %LINEPROTO-5-UPDOWN: Line protocol on Interface
+  GigabitEthernet0/1, changed state to down
+```
+
+Decomposition : `%LINEPROTO` = facility, `5` = severity (Notification), `UPDOWN` = mnemonique, puis description.
+
+#### Destinations syslog
+
+| Destination | Commande | Persistance | Usage |
+|-------------|----------|-------------|-------|
+| Console | `logging console <niveau>` | Non | Debogage interactif |
+| Terminal VTY | `terminal monitor` | Non (session) | Debogage distant |
+| Buffer local | `logging buffered <taille> <niveau>` | Perdu au reboot | `show logging` |
+| Serveur syslog | `logging host <ip>` | Oui | Archivage, conformite |
+
+### Mise en pratique CLI
+
+#### Configurer syslog sur un routeur
+
+```{.cisco filename="R1"}
+! Envoyer les logs vers le serveur syslog
+R1(config)# logging host 10.1.1.200
+
+! Niveau pour le serveur (informational = capture 0 a 6)
+R1(config)# logging trap informational
+
+! Buffer local 64 Ko, niveau debugging
+R1(config)# logging buffered 65536 debugging
+
+! Timestamps precis (indispensable)
+R1(config)# service timestamps log datetime msec localtime
+
+! Limiter la console aux warnings pour eviter le flood
+R1(config)# logging console warnings
+```
+
+#### Verification
+
+```{.cisco filename="R1"}
+R1# show logging
+Syslog logging: enabled (0 messages dropped, 0 messages rate-limited,
+                0 flushes, 0 overflows, 15234 messages logged)
+        Logging to: console (warning)
+        Logging to: monitor (debugging)
+        Logging to: buffer (65536 bytes, debugging)
+        Logging to: host 10.1.1.200 (informational)
+
+Log Buffer (65536 bytes):
+
+*Apr  4 14:32:15.302: %LINEPROTO-5-UPDOWN: Line protocol on Interface
+  GigabitEthernet0/1, changed state to down
+*Apr  4 14:32:17.105: %LINK-3-UPDOWN: Interface GigabitEthernet0/1,
+  changed state to down
+*Apr  4 14:35:42.891: %LINEPROTO-5-UPDOWN: Line protocol on Interface
+  GigabitEthernet0/1, changed state to up
+*Apr  4 15:01:12.456: %SYS-5-CONFIG_I: Configured from console by
+  admin on vty0 (10.1.1.50)
+```
+
+**Interpretation** : `%LINK-3-UPDOWN` est de severite 3 (Error) --- la couche physique a change d'etat. `%LINEPROTO-5-UPDOWN` (severite 5) suit --- le protocole de ligne bascule. L'ordre LINK down puis LINEPROTO down revele la cascade couche 1 -> couche 2.
+
+::: {.callout-important icon=false}
+## 🎯 Point exam --- Syslog
+
+- L'examen demande souvent quel niveau configurer pour capturer les warnings et tout ce qui est plus grave. Reponse : **4** (ou `warnings`).
+- Les 8 niveaux (0 = Emergency, 7 = Debugging) a connaitre par coeur.
+- `service timestamps log datetime msec` est essentielle --- sans timestamps, les logs sont inexploitables.
+- Syslog = **UDP 514** (non fiable par nature, d'ou l'utilite du buffer local comme complement).
+:::
+
+### Exercice 4.5 --- Classer des messages syslog
+
+**Contexte** : voici 6 messages issus d'un routeur.
+
+```{.default}
+A: %OSPF-4-FLOOD_WAR: Process 1 re-originates LSA ID 10.0.0.0, ...
+B: %LINEPROTO-5-UPDOWN: Line protocol on Interface Gi0/0, changed state to up
+C: %SYS-2-MALLOCFAIL: Memory allocation of 65536 bytes failed
+D: %DUAL-7-PKTRECV: Received packet from 10.1.1.2
+E: %SYS-0-CPUHOG: Task ran for 10024 msec
+F: %SEC-6-IPACCESSLOGP: list 101 denied tcp 10.1.1.50 -> 10.1.1.100
+```
+
+**Consigne** : classez-les du plus grave au moins grave, donnez le niveau de chacun, et identifiez lesquels seraient captures avec `logging trap errors`.
+
+<details><summary>💡 Indice</summary>
+Le chiffre entre les tirets du code est la severite. `logging trap errors` = niveau 3 = capture 0, 1, 2, 3.
+</details>
+
+<details><summary>🔬 Solution</summary>
+
+| Rang | Msg | Facility | Severite | Nom |
+|------|-----|----------|----------|-----|
+| 1 | E | SYS | 0 | Emergency |
+| 2 | C | SYS | 2 | Critical |
+| 3 | A | OSPF | 4 | Warning |
+| 4 | B | LINEPROTO | 5 | Notification |
+| 5 | F | SEC | 6 | Informational |
+| 6 | D | DUAL | 7 | Debugging |
+
+Avec `logging trap errors` (niveau 3), seuls **E** (0) et **C** (2) sont captures. Le message A (warning, niveau 4) n'est PAS capture --- erreur frequente a l'examen.
+</details>
+
+### Voir aussi
+
+- @sec-topic-4-2 (NTP --- les timestamps syslog n'ont de valeur qu'avec NTP synchronise)
+- @sec-topic-4-4 (SNMP --- complementaire : SNMP pour les metriques, syslog pour les evenements)
+- @sec-topic-5-1 (concepts securite --- les logs sont un outil de detection)
+
+---
+
+## 4.6 --- DHCP : client et relay {#sec-topic-4-6}
+
+> **Exam topic 4.6** : *Configure and verify* --- DHCP client and relay
+> **Niveau** : Configure/Verify
+
+### Contexte
+
+La section 4.3 a explique la theorie de DHCP (DORA, bail, parametres). Passons a la pratique. Deux scenarios reviennent sans cesse en entreprise : configurer une interface routeur comme **client DHCP** (tres classique sur l'interface WAN chez un FAI), et configurer un **relay DHCP** pour que les clients d'un VLAN distant atteignent un serveur DHCP dans un autre sous-reseau.
+
+### Theorie
+
+#### Le probleme du broadcast DHCP
+
+Le message DHCP Discover est un broadcast L3 (dst 255.255.255.255). Or, les routeurs **ne transferent pas** les broadcasts --- c'est leur comportement par defaut, et c'est heureux (eviter les tempetes de broadcast). Consequence : si le serveur DHCP n'est pas dans le meme sous-reseau que le client, le Discover n'arrive jamais.
+
+### Schema : topologie DHCP relay inter-VLAN {#fig-m4-dhcp-relay}
+
+```{mermaid}
+%%| label: fig-m4-dhcp-relay
+%%| fig-cap: "Relay DHCP (ip helper-address) entre deux sous-reseaux"
+graph LR
+    PC1[PC1<br/>VLAN 10] -- Broadcast<br/>DHCP Discover --> R1
+    PC2[PC2<br/>VLAN 10] -- Broadcast --> R1
+    R1[R1 relay<br/>Gi0/0: 10.10.10.1<br/>Gi0/1: 10.10.20.1]
+    R1 -- Unicast<br/>GIADDR=10.10.10.1 --> SRV[SRV-DHCP<br/>10.10.20.100]
+    SRV -- Unicast reponse --> R1
+    R1 -. Broadcast ou unicast<br/>reponse au client .-> PC1
+```
+
+*Legende* : sans `ip helper-address`, le Discover s'arrete a R1. Avec la commande, R1 convertit le broadcast en unicast vers le serveur DHCP et insere son adresse d'interface receptrice dans le champ **GIADDR** du paquet DHCP. Le serveur utilise ce GIADDR pour selectionner le bon pool d'adresses.
+
+#### Ce que fait `ip helper-address`
+
+1. Intercepte le broadcast DHCP sur l'interface cote client
+2. Insere l'adresse de l'interface receptrice dans le champ **GIADDR** (Gateway IP Address)
+3. Envoie en unicast au serveur DHCP specifie
+4. Le serveur utilise GIADDR pour choisir le pool
+5. La reponse retourne au relay, qui la remet au client
+
+::: {.callout-tip icon=false}
+## 💡 Astuce --- helper-address ne se limite pas a DHCP
+
+Par defaut, `ip helper-address` relaie **8 services UDP** : DHCP (67, 68), TFTP (69), DNS (53), TACACS (49), NetBIOS Name/Datagram (137, 138), Time (37). Pour restreindre, utilisez `no ip forward-protocol udp <port>`.
+:::
+
+### Configurer un routeur comme serveur DHCP
+
+Un routeur Cisco IOS peut aussi faire serveur DHCP pour les petites agences :
+
+```{.cisco filename="R1"}
+! Exclure les adresses reservees (routeur, serveurs fixes)
+R1(config)# ip dhcp excluded-address 10.10.10.1 10.10.10.20
+
+! Creer le pool
+R1(config)# ip dhcp pool VLAN10-POOL
+R1(dhcp-config)# network 10.10.10.0 255.255.255.0
+R1(dhcp-config)# default-router 10.10.10.1
+R1(dhcp-config)# dns-server 10.10.20.100 8.8.8.8
+R1(dhcp-config)# domain-name netcorp.local
+R1(dhcp-config)# lease 0 12 0
+! lease = 0 jours, 12 heures, 0 minutes
+```
+
+::: {.callout-warning icon=false}
+## ⚠️ Attention --- emplacement de excluded-address
+
+`ip dhcp excluded-address` est une commande **globale**, pas une commande du pool. Si vous la tapez en mode `dhcp-config`, IOS l'interprete comme un nom de pool et l'exclusion n'a aucun effet. Erreur tres frequente.
+:::
+
+### Mise en pratique CLI
+
+#### Interface routeur en client DHCP
+
+```{.cisco filename="R1"}
+! L'interface obtient son adresse du FAI via DHCP
+R1(config)# interface GigabitEthernet0/1
+R1(config-if)# ip address dhcp
+R1(config-if)# no shutdown
+```
+
+#### Configurer le relay DHCP
+
+```{.cisco filename="R1"}
+! Sur l'interface cote clients
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# ip helper-address 10.10.20.100
+```
+
+Une seule ligne --- mais c'est elle qui fait la difference entre « les PC obtiennent une adresse » et « les PC ne sortent pas de link-local ».
+
+#### Verification serveur DHCP
+
+```{.cisco filename="R1"}
+R1# show ip dhcp binding
+Bindings from all pools not associated with VRF:
+IP address          Client-ID/              Lease expiration        Type
+                    Hardware address/
+                    User name
+10.10.10.21         0100.1a2b.3c4d.50       Apr 05 2026 02:15 AM   Automatic
+10.10.10.22         0100.1a2b.3c4d.60       Apr 05 2026 02:18 AM   Automatic
+10.10.10.23         0100.1a2b.3c4d.70       Apr 05 2026 02:20 AM   Automatic
+```
+
+```{.cisco filename="R1"}
+R1# show ip dhcp pool
+Pool VLAN10-POOL :
+ Utilization mark (high/low)    : 100 / 0
+ Total addresses                : 254
+ Leased addresses               : 3
+ Current index        IP address range                    Leased addresses
+ 10.10.10.24          10.10.10.1   - 10.10.10.254         3
+```
+
+```{.cisco filename="R1"}
+R1# show ip dhcp server statistics
+Message              Received
+DHCPDISCOVER         3
+DHCPREQUEST          3
+
+Message              Sent
+DHCPOFFER            3
+DHCPACK              3
+```
+
+**Interpretation** : on voit clairement DORA s'appliquer --- 3 Discover recus, 3 Offer envoyes, 3 Request recus, 3 Ack envoyes. Une colonne par etape, trois clients.
+
+::: {.callout-important icon=false}
+## 🎯 Point exam --- DHCP CLI
+
+- `ip helper-address` se configure sur l'interface **cote client**, pas cote serveur. Elle pointe vers l'IP du serveur.
+- `ip address dhcp` = le routeur est **client**. Ne pas confondre avec `ip dhcp pool` (serveur).
+- `ip dhcp excluded-address` est **globale**. Exclure les IPs reservees (routeur, imprimantes, serveurs fixes) avant de creer le pool.
+- Le GIADDR est la cle de selection du pool cote serveur DHCP.
+:::
+
+### Exercice 4.6 --- Relay DHCP multi-VLAN
+
+**Contexte** : DataFlow a 3 VLANs sur le site principal :
+- VLAN 10 Users : 10.10.10.0/24, passerelle 10.10.10.1 sur R1 Gi0/0.10
+- VLAN 20 VoIP : 10.10.20.0/24, passerelle 10.10.20.1 sur R1 Gi0/0.20
+- VLAN 30 Servers : 10.10.30.0/24, serveur DHCP 10.10.30.50
+
+**Consigne** : configurez le relay pour que les VLANs 10 et 20 obtiennent leurs adresses du serveur centralise dans le VLAN 30.
+
+<details><summary>💡 Indice</summary>
+En router-on-a-stick, les sous-interfaces sont les « interfaces cote client ». Le helper-address doit etre configure sur chaque sous-interface ayant besoin du relay.
+</details>
+
+<details><summary>🔬 Solution</summary>
+
+```{.cisco filename="R1"}
+R1(config)# interface GigabitEthernet0/0.10
+R1(config-subif)# ip helper-address 10.10.30.50
+R1(config-subif)# exit
+!
+R1(config)# interface GigabitEthernet0/0.20
+R1(config-subif)# ip helper-address 10.10.30.50
+```
+
+Quand un PC du VLAN 10 envoie un Discover, R1 le recoit sur Gi0/0.10, insere 10.10.10.1 comme GIADDR, et envoie en unicast a 10.10.30.50. Le serveur DHCP voit le GIADDR 10.10.10.1 et attribue une adresse du pool 10.10.10.0/24. Meme logique pour le VLAN 20.
+</details>
+
+### Voir aussi
+
+- @sec-topic-4-3 (theorie DHCP, DORA, bail)
+- @sec-topic-2-1 (inter-VLAN connectivity, router-on-a-stick)
+- @sec-topic-5-7 (DHCP snooping --- mecanisme L2 protegeant contre les serveurs DHCP malveillants)
+
+---
+
+## 4.7 --- QoS : classification, marking, queuing, policing, shaping {#sec-topic-4-7}
+
+> **Exam topic 4.7** : *Explain* --- the forwarding per-hop behavior (PHB) for QoS, such as classification, marking, queuing, congestion, policing, and shaping
+> **Niveau** : Explain
+
+### Contexte
+
+Sur un lien WAN, un appel VoIP et un telechargement de 2 Go se disputent la meme bande passante. Sans QoS, le telechargement noie la voix --- la conversation devient hachee. La QoS (Quality of Service) permet de dire au reseau : « la voix passe en priorite, le telechargement attend ». C'est un arbitre qui garantit que les applications critiques obtiennent les ressources dont elles ont besoin.
+
+### Theorie
+
+**PHB** (Per-Hop Behavior) signifie que **chaque equipement prend ses propres decisions**. Il n'y a pas de reservation de bout en bout (comme ATM le faisait). Chaque routeur applique ses politiques localement, en se basant sur le marquage des paquets.
+
+### Schema : pipeline QoS classification -> marking -> queuing {#fig-m4-qos-pipeline}
+
+```{mermaid}
+%%| label: fig-m4-qos-pipeline
+%%| fig-cap: "Pipeline de traitement QoS sur un routeur"
+flowchart TD
+    IN[Paquet entrant] --> CL[Classification<br/>ACL, NBAR, DSCP, CoS]
+    CL --> MK[Marking<br/>DSCP L3 ou CoS L2]
+    MK --> QU[Queuing<br/>LLQ, CBWFQ, files par classe]
+    QU --> CA{Congestion ?}
+    CA -->|Non| SCH[Scheduling<br/>envoi par priorite]
+    CA -->|Oui| WRED[WRED drop selectif<br/>AF13 > AF12 > AF11]
+    WRED --> SCH
+    SCH --> OUT[Interface de sortie]
+    QU -.-> POL[Policing<br/>drop excedentaire]
+    QU -.-> SHP[Shaping<br/>bufferise et lisse]
+```
+
+*Legende* : le pipeline suit l'ordre classification -> marking -> queuing -> scheduling. Policing (drop) et shaping (delay) agissent en parallele pour controler le debit. WRED est declenche quand une file approche de sa capacite maximale.
+
+#### 1. Classification
+
+Identifier le type de trafic selon differents criteres :
+
+| Critere | Couche | Exemple |
+|---------|--------|---------|
+| IP source/destination | 3 | ACL permit 10.1.1.0 0.0.0.255 |
+| Port TCP/UDP | 4 | Port 5060 (SIP), 16384-32767 (RTP) |
+| Valeur DSCP | 3 | EF = 46 |
+| Valeur CoS (802.1Q) | 2 | CoS 5 pour la voix |
+| NBAR (reconnaissance d'application) | 7 | YouTube, Teams, Zoom |
+
+#### 2. Marking (marquage)
+
+Apres classification, le paquet est « tampone » pour que les equipements suivants le traitent sans refaire l'analyse. Deux champs principaux :
+
+- **CoS** (Class of Service) --- 3 bits dans le tag VLAN 802.1Q (0-7). Layer 2, perdu des que la trame quitte le VLAN.
+- **DSCP** (Differentiated Services Code Point) --- 6 bits dans l'en-tete IP (0-63). Layer 3, preserve de bout en bout.
+
+| Classe | DSCP binaire | Decimal | CoS | Usage |
+|--------|-------------|---------|-----|-------|
+| Voice (EF) | 101110 | **46** | 5 | Voix RTP |
+| Video (AF41) | 100010 | **34** | 4 | Videoconference |
+| Critical Data (AF31) | 011010 | **26** | 3 | Apps metier |
+| Transactional (AF21) | 010010 | **18** | 2 | Transactions BD |
+| Best Effort | 000000 | **0** | 0 | Trafic par defaut |
+
+Notation **AFxy** : x = classe (1-4, 4 prioritaire), y = probabilite de drop (1 faible, 3 elevee). **EF** (Expedited Forwarding) = priorite absolue, latence minimale --- reserve a la voix.
+
+#### 3. Queuing --- CBWFQ et LLQ
+
+**CBWFQ** (Class-Based Weighted Fair Queuing) : chaque classe a sa file avec une bande passante minimum garantie. **LLQ** (Low Latency Queue) : file prioritaire reservee a la voix et a la video temps reel --- servie en premier, toujours.
+
+#### 4. Congestion avoidance --- WRED
+
+Quand une file approche de sa capacite, **WRED** (Weighted Random Early Detection) commence a rejeter aleatoirement des paquets **avant** saturation. Les paquets a probabilite de drop elevee (AF13) sont jetes avant les AF11. Cela evite la synchronisation TCP (tail drop) et lisse la chute de debit.
+
+#### 5. Policing vs Shaping
+
+| Critere | Policing | Shaping |
+|---------|----------|---------|
+| Action si depassement | **Drop** ou re-mark | **Delay** (buffer) |
+| Latence ajoutee | Non | Oui |
+| Direction | Entree ou sortie | Sortie uniquement |
+| Effet sur le debit | Coupure nette | Lissage progressif |
+| Analogie | Radar : exces de vitesse = amende | Feu de circulation : regule le flux |
+| Usage typique | FAI limitant un client | Adapter le debit au lien distant |
+
+### Mise en pratique CLI
+
+#### Verifier une policy-map sur une interface
+
+```{.cisco filename="R1"}
+R1# show policy-map interface GigabitEthernet0/0
+ GigabitEthernet0/0
+
+  Service-policy output: WAN-QOS-POLICY
+
+    Class-map: VOICE (match-all)
+      234521 packets, 18761680 bytes
+      5 minute offered rate 256000 bps, drop rate 0 bps
+      Match: dscp ef
+      Queueing
+        queue limit 64 packets
+        (pkts output/bytes output) 234521/18761680
+      Priority: 512 kbps, burst bytes 12800, b/w exceed drops: 0
+
+    Class-map: CRITICAL-DATA (match-all)
+      1523400 packets, 912040000 bytes
+      Match: dscp af31
+      Queueing
+        Bandwidth: 2048 kbps
+
+    Class-map: class-default (match-any)
+      5234000 packets, 6280800000 bytes
+      5 minute offered rate 25600000 bps, drop rate 12800 bps
+      Match: any
+      Queueing
+        (queue depth/total drops/no-buffer drops) 45/12340/0
+```
+
+**Interpretation** :
+- La classe VOICE (DSCP EF) a une file prioritaire de 512 kbps avec **0 drops** --- la voix n'a jamais ete degradee
+- CRITICAL-DATA a 2 048 kbps garantis via CBWFQ
+- `class-default` (best-effort) montre 12 340 drops --- du trafic standard a ete rejete durant les periodes de congestion
+
+::: {.callout-important icon=false}
+## 🎯 Point exam --- QoS
+
+- **Policing = drop**, **Shaping = delay**. L'examen pose souvent la question sous forme de scenario : « FAI limite un client » -> policing. « Adapter le debit sortant au lien WAN » -> shaping.
+- DSCP EF (46) = voix. DSCP est L3 (IP), CoS est L2 (802.1Q). Le CoS disparait au routage, le DSCP traverse.
+- Le concept PHB : chaque routeur decide independamment sur la base du marquage. Pas de signalisation de bout en bout.
+- Ordre du pipeline : classification -> marking -> queuing -> scheduling.
+:::
+
+### Exercice 4.7 --- Identifier les mecanismes QoS
+
+**Consigne** : pour chaque scenario, identifiez le mecanisme QoS principal.
+
+1. Le telephone IP marque ses paquets voix avec DSCP EF
+2. Le routeur WAN place les paquets voix dans une file a latence garantie < 150 ms
+3. Le routeur identifie le trafic YouTube et le classe comme « non-critique »
+4. Le FAI rejette les paquets du client au-dela de 100 Mbps
+5. Le routeur d'agence lisse son debit sortant a 10 Mbps pour correspondre au lien WAN
+6. Quand la file best-effort approche de la saturation, certains paquets AF13 sont rejetes avant les AF11
+
+<details><summary>💡 Indice</summary>
+Les six mecanismes a associer sont : classification, marking, queuing (LLQ), policing, shaping, congestion avoidance (WRED).
+</details>
+
+<details><summary>🔬 Solution</summary>
+
+| Scenario | Mecanisme |
+|----------|-----------|
+| 1. Telephone marque EF | **Marking** |
+| 2. File basse latence | **Queuing / LLQ** |
+| 3. Identification YouTube | **Classification** (NBAR) |
+| 4. FAI drop > 100 Mbps | **Policing** |
+| 5. Lisser a 10 Mbps | **Shaping** |
+| 6. Drop AF13 avant AF11 | **Congestion avoidance / WRED** |
+
+</details>
+
+### Voir aussi
+
+- @sec-topic-1-5 (TCP vs UDP --- la QoS les traite differemment : TCP reagit aux pertes, UDP non)
+- @sec-topic-2-9 (configuration WLAN --- les profils QoS sur wireless)
+- @sec-topic-3-4 (OSPF --- OSPF choisit le chemin, QoS traite le trafic sur ce chemin)
+
+---
+
+## 4.8 --- Acces distant securise via SSH {#sec-topic-4-8}
+
+> **Exam topic 4.8** : *Configure* --- network devices for remote access using SSH
+> **Niveau** : Configure
+
+### Contexte
+
+Se connecter a un routeur via Telnet, c'est comme envoyer un mot de passe sur une carte postale --- n'importe qui sur le chemin peut le lire. SSH (Secure Shell) chiffre toute la session : authentification, commandes, outputs. C'est le standard absolu pour l'acces distant aux equipements reseau. Aucun reseau d'entreprise serieux n'utilise Telnet en 2026.
+
+### Theorie
+
+SSH est un protocole applicatif sur **TCP port 22**. Deux versions existent :
+
+- **SSHv1** : obsolete, vulnerable --- a ne jamais utiliser
+- **SSHv2** : version courante, AES, authentification par cle ou mot de passe
+
+### Schema : SSH vs Telnet {#fig-m4-ssh-vs-telnet}
+
+```{mermaid}
+%%| label: fig-m4-ssh-vs-telnet
+%%| fig-cap: "Comparaison SSH et Telnet sur le meme canal reseau"
+flowchart LR
+    subgraph TELNET["Telnet TCP 23"]
+        A[Admin] -- "admin/cisco<br/>texte clair" --> T[Routeur]
+        S1[Sniffer] -. capture .-> A
+    end
+    subgraph SSH["SSH TCP 22"]
+        B[Admin] -- "AES-256 chiffre" --> U[Routeur]
+        S2[Sniffer] -. capture illisible .-> B
+    end
+```
+
+*Legende* : Telnet transmet les credentials et toutes les commandes en clair --- un sniffer sur le chemin lit tout. SSH chiffre l'integralite de la session avec AES, rendant le sniffing inutile. En production, `transport input ssh` bloque definitivement Telnet sur les lignes VTY.
+
+#### Prerequis SSH sur un equipement Cisco
+
+| Prerequis | Commande | Pourquoi |
+|-----------|----------|---------|
+| Hostname | `hostname R1` | Fait partie du nom de la cle RSA |
+| Nom de domaine | `ip domain-name corp.local` | Domaine + hostname = nom de cle |
+| Cle RSA (>= 2048 bits) | `crypto key generate rsa modulus 2048` | Echange de cles asymetrique |
+| Utilisateur local | `username admin secret P@ss2026!` | Authentification |
+
+::: {.callout-warning icon=false}
+## ⚠️ Attention --- pas de cle sans domaine
+
+Sans hostname et nom de domaine, `crypto key generate rsa` echoue avec `% Please define a domain-name first`. C'est la source d'erreur numero 1 en lab SSH.
+:::
+
+### Mise en pratique CLI
+
+#### Configuration complete SSH
+
+```{.cisco filename="R1"}
+! Etape 1 : hostname et domaine
+R1(config)# hostname R1
+R1(config)# ip domain-name netcorp.local
+
+! Etape 2 : generer la cle RSA (2048 bits recommande)
+R1(config)# crypto key generate rsa modulus 2048
+The name for the keys will be: R1.netcorp.local
+% The key modulus size is 2048 bits
+% Generating 2048 bit RSA keys, keys will be non-exportable...
+[OK] (elapsed time was 2 seconds)
+
+! Etape 3 : forcer SSHv2
+R1(config)# ip ssh version 2
+
+! Etape 4 : creer un utilisateur local
+R1(config)# username admin privilege 15 secret Cisco$ecure2026
+
+! Etape 5 : configurer les lignes VTY
+R1(config)# line vty 0 4
+R1(config-line)# transport input ssh
+R1(config-line)# login local
+R1(config-line)# exec-timeout 10 0
+R1(config-line)# exit
+
+! Optionnel : tuning
+R1(config)# ip ssh time-out 60
+R1(config)# ip ssh authentication-retries 3
+```
+
+Detail des commandes VTY :
+
+- `transport input ssh` : autorise **uniquement** SSH (bloque Telnet)
+- `login local` : utilise la base d'utilisateurs locale
+- `exec-timeout 10 0` : deconnexion apres 10 minutes d'inactivite
+
+#### Verification
+
+```{.cisco filename="R1"}
+R1# show ip ssh
+SSH Enabled - version 2.0
+Authentication methods: publickey, keyboard-interactive, password
+Authentication timeout: 60 secs; Authentication retries: 3
+Minimum expected Diffie Hellman key size : 2048 bits
+```
+
+```{.cisco filename="R1"}
+R1# show ssh
+Connection Version Mode Encryption  Hmac         State          Username
+0          2.0     IN   aes256-ctr  hmac-sha2-256 Session started admin
+0          2.0     OUT  aes256-ctr  hmac-sha2-256 Session started admin
+```
+
+**Interpretation** : SSHv2 actif, chiffrement AES-256-CTR, integrite HMAC-SHA2-256, un administrateur connecte.
+
+#### Se connecter depuis un autre routeur
+
+```{.cisco filename="R2"}
+R2# ssh -l admin 10.1.1.1
+Password: ********
+R1#
+```
+
+::: {.callout-important icon=false}
+## 🎯 Point exam --- SSH
+
+- SSH = **TCP 22**, Telnet = **TCP 23**. `transport input ssh` bloque Telnet.
+- Les 4 prerequis pour la cle RSA : hostname != "Router", domain-name, puis `crypto key generate rsa`. Modulus minimum 768 bits pour SSHv2, mais **2048 recommande**.
+- `login local` = base locale (securise). `login` seul = mot de passe de ligne VTY (moins securise).
+- `ip ssh version 2` force SSHv2 (empeche la retro-compatibilite avec SSHv1).
+:::
+
+### Exercice 4.8 --- Migration Telnet vers SSH
+
+**Contexte** : le routeur R-EDGE de SecureNet est accessible via Telnet depuis n'importe quel reseau. Hostname = "Router", aucune cle RSA, mot de passe VTY = "cisco123".
+
+**Consigne** : configurez la migration complete vers SSH uniquement. Creez un utilisateur `netadmin` / `S3cur3!Net` avec privilege 15.
+
+<details><summary>💡 Indice</summary>
+Six etapes : hostname, domain-name, cle RSA, version SSH, utilisateur local, VTY. `transport input ssh` bloque Telnet.
+</details>
+
+<details><summary>🔬 Solution</summary>
+
+```{.cisco filename="R-EDGE"}
+Router(config)# hostname R-EDGE
+R-EDGE(config)# ip domain-name securenet.local
+R-EDGE(config)# crypto key generate rsa modulus 2048
+R-EDGE(config)# ip ssh version 2
+R-EDGE(config)# username netadmin privilege 15 secret S3cur3!Net
+R-EDGE(config)# line vty 0 4
+R-EDGE(config-line)# transport input ssh
+R-EDGE(config-line)# login local
+R-EDGE(config-line)# exec-timeout 10 0
+R-EDGE(config-line)# exit
+!
+R-EDGE(config)# ip ssh time-out 60
+R-EDGE(config)# ip ssh authentication-retries 3
+```
+
+`transport input ssh` bloque definitivement Telnet. `login local` remplace le mot de passe partage par une authentification individuelle (chaque admin a son compte).
+</details>
+
+### Voir aussi
+
+- @sec-topic-2-8 (acces de management --- SSH, Telnet, console, HTTPS)
+- @sec-topic-5-3 (controle d'acces par mots de passe)
+- @sec-topic-5-4 (politique de mots de passe --- complexite, MFA)
+
+---
+
+## 4.9 --- TFTP et FTP : transfert de fichiers reseau {#sec-topic-4-9}
+
+> **Exam topic 4.9** : *Describe* --- the capabilities and functions of TFTP/FTP in the network
+> **Niveau** : Describe
+
+### Contexte
+
+Un routeur qui perd sa configuration, un switch a mettre a jour, un admin qui sauvegarde les configs de 50 equipements avant une maintenance : tous ces scenarios necessitent un protocole de transfert de fichiers. TFTP et FTP sont les deux protocoles historiques pour ces operations.
+
+### Theorie
+
+#### TFTP --- Trivial File Transfer Protocol
+
+TFTP est volontairement minimaliste. Concu a une epoque ou les equipements avaient tres peu de memoire, il fait le strict necessaire : transferer un fichier, point.
+
+| Caracteristique | Detail |
+|----------------|--------|
+| Transport | **UDP port 69** |
+| Authentification | **Aucune** |
+| Navigation repertoires | Non |
+| Taille blocs | 512 octets (par defaut) |
+| Fiabilite | Acquittement bloc par bloc (stop-and-wait) |
+| Chiffrement | Aucun |
+| Usage typique | Boot reseau PXE, sauvegarde/restauration IOS, transfert de configs |
+
+TFTP est comme un guichet automatique sans menu : vous devez savoir exactement ce que vous voulez. Pas de liste, pas de mot de passe, pas de repertoire.
+
+#### FTP --- File Transfer Protocol
+
+FTP est bien plus complet mais plus lourd. Il offre une vraie gestion de fichiers.
+
+| Caracteristique | Detail |
+|----------------|--------|
+| Transport | **TCP port 21** (controle) + **TCP port 20** (donnees) |
+| Authentification | Username + password (en clair) |
+| Navigation repertoires | Oui (ls, cd, pwd) |
+| Taille blocs | Variable, negociee |
+| Fiabilite | TCP (windowing) |
+| Chiffrement | Aucun en standard (SFTP/FTPS existent mais hors scope CCNA) |
+| Usage typique | Transferts volumineux (images IOS), gestion centralisee |
+
+#### Comparatif synthetique
+
+| Critere | TFTP | FTP |
+|---------|------|-----|
+| Protocole | UDP 69 | TCP 20, 21 |
+| Authentification | Non | Oui |
+| Lister les fichiers | Non | Oui |
+| Vitesse | Lent (stop-and-wait) | Rapide (windowing) |
+| Complexite | Tres simple | Plus complexe (2 connexions) |
+| Securite | Nulle | Faible (credentials en clair) |
+| Cas d'usage | Boot PXE, petits fichiers | Images IOS, transferts reguliers |
+
+#### Operations courantes en reseau
+
+1. **Sauvegarder la config** : copier running-config vers un serveur TFTP/FTP
+2. **Restaurer la config** : copier depuis le serveur vers le routeur
+3. **Mettre a jour l'IOS** : copier une nouvelle image IOS vers la flash
+4. **Sauvegarder l'IOS** : copier l'image flash vers un serveur (backup avant upgrade)
+
+### Mise en pratique CLI
+
+#### Sauvegarder la config sur TFTP
+
+```{.cisco filename="R1"}
+R1# copy running-config tftp:
+Address or name of remote host []? 10.1.1.200
+Destination filename [r1-confg]? R1-backup-20260404.cfg
+!!
+1524 bytes copied in 0.456 secs (3342 bytes/sec)
+```
+
+#### Restaurer une config depuis TFTP
+
+```{.cisco filename="R1"}
+R1# copy tftp: running-config
+Address or name of remote host []? 10.1.1.200
+Source filename []? R1-backup-20260404.cfg
+Destination filename [running-config]?
+Accessing tftp://10.1.1.200/R1-backup-20260404.cfg...
+Loading R1-backup-20260404.cfg from 10.1.1.200 (via GigabitEthernet0/0): !
+[OK - 1524 bytes]
+```
+
+#### Mettre a jour l'IOS via FTP
+
+```{.cisco filename="R1"}
+! Credentials FTP
+R1(config)# ip ftp username admin
+R1(config)# ip ftp password FtpS3cure!
+R1(config)# exit
+!
+R1# copy ftp: flash:
+Address or name of remote host []? 10.1.1.200
+Source filename []? isr4300-universalk9.17.09.04a.SPA.bin
+Destination filename [isr4300-universalk9.17.09.04a.SPA.bin]?
+Accessing ftp://10.1.1.200/isr4300-universalk9.17.09.04a.SPA.bin...
+Loading isr4300-universalk9.17.09.04a.SPA.bin
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+[OK - 523456789 bytes]
+523456789 bytes copied in 312.5 secs (1675061 bytes/sec)
+```
+
+#### Verifier les fichiers en flash
+
+```{.cisco filename="R1"}
+R1# show flash:
+-#- --length-- -----date/time------ path
+1    523456789 Apr 04 2026 15:20:30 isr4300-universalk9.17.09.04a.SPA.bin
+2    234567890 Jan 15 2026 10:00:00 isr4300-universalk9.17.06.05.SPA.bin
+
+1056321536 bytes total (298396857 bytes free)
+```
+
+::: {.callout-important icon=false}
+## 🎯 Point exam --- TFTP et FTP
+
+- **TFTP = UDP 69**. **FTP = TCP 21** (controle) + **TCP 20** (donnees). Piege classique d'inversion.
+- TFTP n'a **aucune** authentification. FTP en a, mais les credentials passent en clair. Ni l'un ni l'autre n'est securise --- utiliser **SCP** (base sur SSH) pour la securite reelle.
+- Syntaxe `copy <source> <destination>`. `copy running-config tftp:` = **sauvegarde**. `copy tftp: running-config` = **restauration**.
+- TFTP est lent par conception (stop-and-wait, blocs 512 octets). FTP est rapide grace au windowing TCP.
+:::
+
+### Exercice 4.9 --- Choix protocole pour migration IOS
+
+**Contexte** : chez LogiTrans, il faut mettre a jour l'IOS de 15 routeurs pendant une fenetre de maintenance de 2 heures. L'image fait 550 Mo. Le serveur de fichiers est a 10.1.1.200 sur un lien 100 Mbps dedie. Debits effectifs : TFTP ~500 Ko/s (stop-and-wait), FTP ~10 Mo/s.
+
+**Consigne** : recommandez TFTP ou FTP et justifiez. Estimez le temps total dans chaque cas.
+
+<details><summary>💡 Indice</summary>
+Calculez le temps par routeur = 550 Mo / debit. Multipliez par 15.
+</details>
+
+<details><summary>🔬 Solution</summary>
+
+| Protocole | Debit | Temps/routeur | Total 15 routeurs |
+|-----------|-------|---------------|-------------------|
+| TFTP | 500 Ko/s | 1 100 s ~ **18 min** | ~**4 h 30** |
+| FTP | 10 Mo/s | 55 s ~ **1 min** | ~**15 min** |
+
+**Recommandation** : **FTP** sans hesiter. Avec TFTP, la migration prendrait 4 h 30 et sortirait largement de la fenetre de 2 heures. Avec FTP, 15 minutes suffisent, laissant le temps pour les verifications post-upgrade. La difference vient du mecanisme stop-and-wait de TFTP (acquittement de chaque bloc de 512 octets) contre le windowing TCP de FTP.
+</details>
+
+### Voir aussi
+
+- @sec-topic-4-8 (SSH --- SCP, base sur SSH, est l'alternative securisee a TFTP/FTP)
+- @sec-topic-2-8 (acces de management)
+- @sec-topic-1-5 (TCP vs UDP --- illustration concrete des differences)
+
+---
+
+## Recapitulatif Module 4 {#sec-topic-4-recap}
+
+| Topic | Concept cle | Commandes essentielles |
+|-------|------------|------------------------|
+| 4.1 | NAT statique (1:1), dynamique (pool), PAT (overload) | `ip nat inside source static`, `ip nat inside source list ... overload`, `show ip nat translations` |
+| 4.2 | NTP synchronise les horloges --- hierarchie stratum | `ntp server`, `ntp master`, `show ntp status`, `show ntp associations` |
+| 4.3 | DHCP = attribution auto IP (DORA), DNS = resolution de noms | `ipconfig /all`, `show ip dns view` |
+| 4.4 | SNMP = supervision (NMS, agents, MIB, traps) | `snmp-server community`, `snmp-server host`, `show snmp` |
+| 4.5 | Syslog = journal, 8 niveaux (0=grave, 7=debug) | `logging host`, `logging trap`, `show logging` |
+| 4.6 | DHCP client (ip address dhcp), relay (ip helper-address) | `ip dhcp pool`, `ip helper-address`, `show ip dhcp binding` |
+| 4.7 | QoS PHB : classification -> marking -> queuing -> scheduling | `show policy-map interface` |
+| 4.8 | SSH : hostname + domain + RSA + VTY = acces chiffre | `crypto key generate rsa`, `transport input ssh`, `show ip ssh` |
+| 4.9 | TFTP (UDP 69, simple) vs FTP (TCP 20/21, complet) | `copy running-config tftp:`, `copy ftp: flash:` |
+
+**Check-list avant de passer au Module 5** :
+
+- [ ] Je sais configurer NAT statique, NAT dynamique avec pool, et PAT overload
+- [ ] Je distingue les 4 types d'adresses NAT (inside/outside local/global)
+- [ ] Je sais configurer NTP en client et serveur, et interpreter `show ntp status`
+- [ ] Je sais expliquer DORA et le role de DNS (ports, recursivite)
+- [ ] Je connais les versions SNMP et leurs differences de securite
+- [ ] Je connais les 8 niveaux syslog par coeur et la logique de filtrage
+- [ ] Je sais configurer un pool DHCP, le relay (`ip helper-address`) et un client DHCP
+- [ ] Je distingue policing (drop) et shaping (delay), et je connais DSCP EF / AFxy
+- [ ] Je sais configurer SSH de bout en bout (hostname, domain, RSA, VTY)
+- [ ] Je sais comparer TFTP et FTP et utiliser `copy` pour les sauvegardes

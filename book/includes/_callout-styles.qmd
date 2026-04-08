@@ -1,0 +1,26 @@
+<!-- Styles partagés pour callouts — inclure via {{< include includes/_callout-styles.qmd >}} -->
+
+<!-- Définitions de callouts personnalisés pour le guide CCNA -->
+<!--
+  Conventions utilisées dans ce guide :
+
+  ::: {.callout-tip}
+  ## Point exam
+  → Concept fréquemment testé à l'examen CCNA
+  :::
+
+  ::: {.callout-important}
+  ## Lab
+  → Exercice pratique (Packet Tracer / équipement réel)
+  :::
+
+  ::: {.callout-note}
+  ## Note technique
+  → Complément d'information ou détail approfondi
+  :::
+
+  ::: {.callout-warning}
+  ## Attention
+  → Piège courant ou point de vigilance
+  :::
+-->

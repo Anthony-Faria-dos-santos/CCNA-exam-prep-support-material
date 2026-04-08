@@ -1,0 +1,2847 @@
+# Module 1 — Network Fundamentals
+
+> **Domain** : 1 — Network Fundamentals | **Poids examen** : 20%
+> **Durée estimée** : 2 semaines | **Prérequis** : Aucun
+> **Topics couverts** : 1.1 à 1.14
+
+## Objectif du module
+
+À l'issue de ce module, vous serez capable de :
+- Expliquer le rôle de chaque composant réseau (routeur, switch L2/L3, firewall, AP, contrôleur, endpoint, serveur, PoE)
+- Décrire et comparer les architectures réseau courantes (2-tier, 3-tier, spine-leaf, WAN, SOHO, cloud)
+- Comparer les types de câblage et interfaces physiques, et diagnostiquer les problèmes associés
+- Configurer et vérifier l'adressage IPv4 avec subnetting, ainsi que l'adressage IPv6
+- Décrire les principes du wireless, de la virtualisation et des concepts de commutation
+- Identifier l'apport des outils d'IA générative dans l'administration réseau
+
+---
+
+## 1.1 — Rôle et fonction des composants réseau
+
+> **Exam topic 1.1** : *Explain* — the role and function of network components
+> **Niveau** : Explain (Bloom 2 — Comprendre)
+
+### Contexte
+
+Dans une entreprise, le réseau ressemble à un système circulatoire : chaque composant a un rôle précis, et si l'un d'eux tombe en panne, c'est toute une partie de l'activité qui s'arrête. Comprendre ce que fait chaque équipement, c'est la base pour diagnostiquer, concevoir ou faire évoluer une infrastructure.
+
+### Théorie
+
+#### 1.1.a — Routeurs
+
+Un routeur opère à la **couche 3** (réseau) du modèle OSI. Son rôle principal : **interconnecter des réseaux différents** et prendre des décisions de transfert basées sur les adresses IP.
+
+Pensez au routeur comme un aiguilleur postal. Quand un paquet arrive, le routeur consulte sa table de routage — l'équivalent d'un annuaire des destinations — pour déterminer par quelle interface l'envoyer. Contrairement à un switch qui travaille dans un réseau local, le routeur sépare les domaines de broadcast et permet la communication entre réseaux distants.
+
+Fonctions clés :
+- **Routage** : sélection du meilleur chemin via des protocoles (OSPF, EIGRP, BGP) ou des routes statiques
+- **Filtrage** : application d'ACL (Access Control Lists) pour autoriser ou bloquer le trafic
+- **NAT** : traduction d'adresses privées en adresses publiques pour l'accès Internet
+- **Services** : DHCP, QoS, VPN, redondance (HSRP/VRRP)
+
+Exemples en entreprise : un Cisco ISR 4331 connecte le LAN d'un site distant au WAN de l'entreprise via MPLS, tout en servant de passerelle Internet avec NAT.
+
+#### 1.1.b — Switches Layer 2 et Layer 3
+
+Le **switch Layer 2** opère à la couche liaison de données. Il transfère les trames Ethernet en se basant sur les **adresses MAC**. C'est le pilier du réseau local : il connecte les postes de travail, les serveurs, les imprimantes et les téléphones IP au sein d'un même site.
+
+Le **switch Layer 3** combine les fonctions d'un switch L2 et d'un routeur. Il peut effectuer du **routage inter-VLAN** directement en hardware, sans passer par un routeur externe. On le trouve typiquement en couche distribution ou core dans un campus.
+
+| Caractéristique | Switch L2 | Switch L3 |
+|----------------|-----------|-----------|
+| Couche OSI | 2 (Data Link) | 2 + 3 (Network) |
+| Base de transfert | Table MAC | Table MAC + Table de routage |
+| Routage inter-VLAN | Non (nécessite un routeur) | Oui (SVI — Switch Virtual Interface) |
+| Protocoles de routage | Non | OSPF, EIGRP, routes statiques |
+| Exemple Cisco | Catalyst 2960 | Catalyst 3850, 9300 |
+| Usage typique | Access layer | Distribution / Core |
+| Coût relatif | $ | $$$ |
+
+#### 1.1.c — Firewalls Next-Generation et IPS
+
+Un **firewall** filtre le trafic entre zones de confiance différentes (LAN, DMZ, Internet). Les firewalls traditionnels filtrent par IP/port (couche 3-4). Les **Next-Generation Firewalls (NGFW)** comme le Cisco Firepower ajoutent l'inspection applicative (couche 7), l'identification des utilisateurs, la détection de malware et le filtrage URL.
+
+Un **IPS** (Intrusion Prevention System) analyse le trafic en temps réel pour détecter et bloquer les attaques (signatures connues, comportements anormaux). Sur les plateformes Cisco modernes, le NGFW et l'IPS sont souvent intégrés dans le même boîtier — c'est le cas du Firepower Threat Defense (FTD).
+
+Différence clé : le firewall décide **qui peut communiquer avec qui**, l'IPS vérifie **ce qui transite** dans les communications autorisées.
+
+#### 1.1.d — Points d'accès (Access Points)
+
+Un **AP** (Access Point) fait le pont entre le réseau filaire et les clients sans fil (Wi-Fi). Il convertit les trames 802.11 (wireless) en trames 802.3 (Ethernet) et inversement. C'est la porte d'entrée du réseau pour les laptops, smartphones et tablettes.
+
+En entreprise, les AP ne fonctionnent pas de manière autonome (mode "autonomous") mais sont gérés de façon centralisée par un contrôleur — c'est l'architecture **split-MAC** ou **lightweight**. L'AP s'occupe du temps réel (émission/réception radio), le contrôleur gère la configuration, la sécurité et le roaming.
+
+Exemple : un Cisco Catalyst 9120AX déployé au plafond d'un open-space, relié en PoE à un switch d'accès, et piloté par un WLC 9800.
+
+#### 1.1.e — Contrôleurs (Cisco DNA Center et WLC)
+
+Le **WLC** (Wireless LAN Controller) gère de façon centralisée tous les AP d'un site ou d'un campus. Il contrôle la configuration des SSID, la politique de sécurité, l'attribution des canaux radio, la puissance d'émission et le roaming des clients entre AP. La communication AP ↔ WLC passe par le protocole **CAPWAP** (Control And Provisioning of Wireless Access Points).
+
+Le **Cisco DNA Center** (désormais Catalyst Center) va plus loin : c'est une plateforme de management réseau complète, filaire et sans fil. Il offre :
+- **Gestion centralisée** de la configuration de tous les équipements
+- **Assurance** : monitoring, analyse proactive, corrélation d'événements
+- **SD-Access** : segmentation réseau basée sur les politiques (fabric)
+- **API** : automatisation et intégration avec d'autres outils
+
+Le DNA Center représente l'approche **intent-based networking** de Cisco : l'administrateur exprime une intention ("les invités ne doivent pas accéder aux serveurs internes"), et la plateforme traduit ça en configurations réseau.
+
+#### 1.1.f — Endpoints
+
+Un **endpoint** est tout appareil qui se connecte au réseau pour consommer ou produire des données : PC, laptop, smartphone, tablette, imprimante, caméra IP, capteur IoT. Du point de vue réseau, l'endpoint est la source ou la destination finale du trafic.
+
+Les endpoints posent un défi de sécurité majeur : ce sont les cibles privilégiées des attaques (phishing, malware). C'est pourquoi des solutions comme **Cisco ISE** (Identity Services Engine) contrôlent l'accès réseau des endpoints via 802.1X, et des agents comme **Cisco AnyConnect** assurent la conformité du poste.
+
+#### 1.1.g — Serveurs
+
+Un **serveur** fournit des services aux autres équipements du réseau : DNS, DHCP, messagerie, fichiers, bases de données, applications web. Contrairement à un PC classique, un serveur est conçu pour fonctionner 24/7 avec de la redondance (alimentations, disques, cartes réseau).
+
+Du point de vue réseau, les serveurs se trouvent généralement dans un **datacenter** ou une **salle serveur** avec des connexions à haut débit (10 Gbps, 25 Gbps) et une redondance réseau (NIC teaming, dual-homing sur deux switches).
+
+#### 1.1.h — Power over Ethernet (PoE)
+
+Le **PoE** permet d'alimenter un équipement en électricité via le câble Ethernet, sans nécessiter de prise de courant séparée. Un seul câble transporte à la fois les données et l'énergie.
+
+C'est particulièrement utile pour les AP, les téléphones IP et les caméras de surveillance, souvent installés dans des endroits où il n'y a pas de prise électrique à proximité (plafond, couloir, extérieur).
+
+| Standard | Nom usuel | Puissance max par port | Norme IEEE |
+|----------|-----------|----------------------|------------|
+| PoE | Type 1 | 15,4 W | 802.3af |
+| PoE+ | Type 2 | 30 W | 802.3at |
+| UPoE | Type 3 | 60 W | 802.3bt |
+| UPoE+ | Type 4 | 90 W | 802.3bt |
+
+Le switch qui fournit l'alimentation est appelé **PSE** (Power Sourcing Equipment). L'appareil alimenté est le **PD** (Powered Device). Le PSE négocie la puissance nécessaire avant de la fournir — il ne va pas griller un appareil qui n'a besoin que de 7 W en envoyant 60 W.
+
+### Mise en pratique CLI
+
+```cisco
+! Sur un switch Cisco Catalyst — vérification des composants connectés et du PoE
+Switch# show cdp neighbors
+Capability Codes: R - Router, T - Trans Bridge, B - Source Route Bridge
+                  S - Switch, H - Host, I - IGMP, r - Repeater, P - Phone,
+                  D - Remote, C - CVTA, M - Two-port Mac Relay
+
+Device ID        Local Intrfce     Holdtme    Capability  Platform  Port ID
+R1               Gig 0/1          165              R B      ISR4331   Gig 0/0/0
+AP-FLOOR2        Gig 0/10         140              T        AIR-AP38  Gig 0
+IP-Phone-301     Gig 0/15         172              H P      CP-8845   Port 1
+SW-DISTRIB       Gig 0/24         155              S I      WS-C3850  Gig 1/0/1
+```
+
+**Interprétation** :
+- **Capability R** : `R1` est un routeur (ISR 4331)
+- **Capability T** : `AP-FLOOR2` est un AP (le T indique un bridge — les AP lightweight bridgent le wireless vers le filaire)
+- **Capability H P** : `IP-Phone-301` est un host avec capacité Phone — un téléphone IP Cisco 8845
+- **Capability S I** : `SW-DISTRIB` est un switch L3 Catalyst 3850
+
+```cisco
+! Vérification du PoE sur le switch
+Switch# show power inline
+Available:370.0(w)  Used:64.8(w)  Remaining:305.2(w)
+
+Interface Admin  Oper       Power   Device               Class Max
+                            (Watts)
+--------- ------ ---------- ------- -------------------- ----- ----
+Gi0/1     auto   off        0.0     n/a                  n/a   30.0
+Gi0/10    auto   on         15.4    AIR-AP3802I-E-K9     3     30.0
+Gi0/15    auto   on         7.0     IP Phone 8845        2     30.0
+Gi0/24    auto   off        0.0     n/a                  n/a   30.0
+```
+
+**Interprétation** : le switch fournit 15,4 W à l'AP sur Gi0/10 (classe 3 — PoE standard) et 7 W au téléphone IP sur Gi0/15 (classe 2). Le budget total est de 370 W avec 305,2 W encore disponibles.
+
+### Point exam
+
+> **Piège courant** : Ne confondez pas un switch L3 avec un routeur. Un switch L3 fait du routage, mais il reste avant tout un switch optimisé pour le switching haute performance en hardware (ASIC). Un routeur offre des fonctionnalités WAN avancées (MPLS, PPP, encapsulations série) qu'un switch L3 ne supporte généralement pas.
+>
+> **À retenir** : PoE est fourni par le **switch** (PSE), pas par le routeur. Connaissez les puissances : 802.3af = 15,4 W, 802.3at = 30 W. Le DNA Center n'est pas un simple WLC — c'est une plateforme de management réseau complète (filaire + wireless).
+
+### Exercice 1.1 — Identifier les composants réseau
+
+**Contexte** : La société MedTech est une clinique de 50 employés. Voici le schéma simplifié de leur réseau :
+
+```
+                        [Internet]
+                            |
+                       [FW-EDGE] ← Firepower 1010
+                            |
+                       [SW-CORE] ← Catalyst 9300
+                      /    |     \
+                [SW-ACC1] [SW-ACC2] [SW-ACC3] ← Catalyst 2960
+                  |   |      |   |      |
+                [PC] [Phone] [AP] [SRV] [Camera]
+```
+
+**Consigne** : Pour chaque équipement du schéma, indiquez : (a) sa couche OSI principale, (b) son rôle dans le réseau, (c) si PoE est nécessaire pour le connecter.
+
+**Indice** : <details><summary>Voir l'indice</summary>Les AP et téléphones IP sont presque toujours alimentés en PoE. Le SW-CORE est un Catalyst 9300 — vérifiez s'il s'agit d'un L2 ou L3.</details>
+
+<details>
+<summary>Solution</summary>
+
+| Équipement | Couche OSI | Rôle | PoE nécessaire ? |
+|-----------|-----------|------|-----------------|
+| FW-EDGE (Firepower 1010) | Couches 3-7 (NGFW) | Filtrage trafic Internet/LAN, IPS, inspection applicative | Non |
+| SW-CORE (Catalyst 9300) | Couches 2-3 (L3 switch) | Routage inter-VLAN, agrégation du trafic des switches d'accès | Non (mais fournit PoE aux étages inférieurs) |
+| SW-ACC1/2/3 (Catalyst 2960) | Couche 2 | Connexion des endpoints, segmentation VLAN, fourniture PoE | Non (mais fournit PoE) |
+| PC | Couche 7 (endpoint) | Endpoint utilisateur — source/destination du trafic | Non (alimentation secteur) |
+| Phone | Couches 2-7 (endpoint) | Téléphonie IP — VLAN voix | **Oui** (PoE depuis le switch) |
+| AP | Couches 1-2 (bridge) | Pont wireless ↔ filaire, gestion des clients Wi-Fi | **Oui** (PoE depuis le switch) |
+| SRV (serveur) | Couche 7 (endpoint) | Services réseau (DNS, DHCP, fichiers, apps) | Non (alimentation redondante) |
+| Camera | Couche 7 (endpoint) | Vidéosurveillance | **Oui** (PoE depuis le switch) |
+
+**Explication** : Le Catalyst 9300 est un switch L3 — il peut router entre les VLANs sans routeur externe. Les trois équipements alimentés en PoE sont ceux typiquement installés loin d'une prise : AP (plafond), téléphone IP (bureau), caméra (couloir/extérieur).
+
+</details>
+
+### Voir aussi
+
+- Topic 1.13 dans ce module (concepts de commutation — fonctionnement interne du switch)
+- Topic 2.6 dans Module 2 (architectures wireless — relation AP/WLC en détail)
+- Topic 2.8 dans Module 2 (accès d'administration — console, SSH, TACACS+)
+
+---
+
+## 1.2 — Architectures et topologies réseau
+
+> **Exam topic 1.2** : *Describe* — characteristics of network topology architectures
+> **Niveau** : Describe (Bloom 2 — Comprendre)
+
+### Contexte
+
+Quand un architecte réseau conçoit l'infrastructure d'un campus ou d'un datacenter, il ne place pas les équipements au hasard. Il choisit une topologie — un modèle d'organisation — qui détermine comment les switches, routeurs et serveurs sont interconnectés. Ce choix impacte directement la performance, la résilience et la scalabilité du réseau.
+
+### Théorie
+
+#### 1.2.a — Architecture Two-Tier (Collapsed Core)
+
+Dans une architecture **two-tier**, on fusionne les couches core et distribution en une seule. Il n'y a que deux niveaux : **access** et **collapsed core/distribution**.
+
+```
+        [SW-CORE/DISTRIB-1]────────[SW-CORE/DISTRIB-2]
+          /      |      \            /      |      \
+     [SW-A1]  [SW-A2]  [SW-A3]  [SW-A4]  [SW-A5]  [SW-A6]
+       |         |        |        |        |         |
+     Users     Users    Users    Users    Users     Users
+```
+
+Quand l'utiliser : sites de taille moyenne (jusqu'à ~200 utilisateurs, un ou deux bâtiments). Au-delà, le collapsed core devient un goulot d'étranglement et il faut passer au three-tier.
+
+Avantages : moins d'équipements, coût réduit, simplicité de gestion.
+Inconvénients : scalabilité limitée, le collapsed core concentre les risques.
+
+#### 1.2.b — Architecture Three-Tier
+
+L'architecture **three-tier** est le modèle hiérarchique classique de Cisco. Trois couches distinctes, chacune avec un rôle précis :
+
+```
+                    [CORE-1]══════════[CORE-2]
+                   ╱    ╲              ╱    ╲
+          [DIST-1]        [DIST-2]──[DIST-3]  [DIST-4]
+          /    \          /    \      /    \    /    \
+       [ACC]  [ACC]    [ACC]  [ACC][ACC] [ACC][ACC] [ACC]
+```
+
+| Couche | Rôle | Équipement typique | Fonctionnalités |
+|--------|------|-------------------|-----------------|
+| **Core** | Transit rapide entre blocs distribution | Catalyst 9500, Nexus 7000 | Switching ultra-rapide, pas de filtrage, redondance totale |
+| **Distribution** | Politique et agrégation | Catalyst 9300, 3850 | Routage inter-VLAN, ACLs, QoS, STP root |
+| **Access** | Connexion des endpoints | Catalyst 2960, 9200 | VLAN, PoE, port security, 802.1X |
+
+Quand l'utiliser : campus de grande taille (>500 utilisateurs, plusieurs bâtiments). Le core assure un transit rapide et sans filtrage, la distribution applique les politiques, l'accès connecte les utilisateurs.
+
+#### 1.2.c — Architecture Spine-Leaf
+
+Le modèle **spine-leaf** est né dans les datacenters pour répondre au trafic **est-ouest** (serveur ↔ serveur) qui domine largement le trafic nord-sud (serveur ↔ Internet).
+
+```
+     [SPINE-1]   [SPINE-2]   [SPINE-3]
+      /  |  \     /  |  \     /  |  \
+     /   |   \   /   |   \   /   |   \
+  [LEAF-1] [LEAF-2] [LEAF-3] [LEAF-4] [LEAF-5]
+    | |      | |      | |      | |      | |
+   Serveurs Serveurs Serveurs Serveurs Serveurs
+```
+
+Règle fondamentale : **chaque leaf est connecté à chaque spine**, et inversement. Aucun leaf ne se connecte directement à un autre leaf. Aucun spine ne se connecte à un autre spine.
+
+Cette topologie garantit que n'importe quel serveur peut atteindre n'importe quel autre en exactement **deux sauts** (leaf → spine → leaf), ce qui assure une latence prévisible et uniforme. Pour ajouter de la capacité, on ajoute simplement un nouveau leaf (plus de ports serveurs) ou un nouveau spine (plus de bande passante).
+
+| Critère | Three-Tier | Spine-Leaf |
+|---------|-----------|-----------|
+| Trafic dominant | Nord-sud | Est-ouest |
+| Environnement | Campus | Datacenter |
+| Latence | Variable (dépend du chemin) | Prévisible (2 sauts max) |
+| Scalabilité | Verticale (upgrade les core) | Horizontale (ajout spine/leaf) |
+| STP | Nécessaire | Non (ECMP, pas de boucles) |
+| Protocole typique | OSPF, EIGRP | BGP, VXLAN |
+
+#### 1.2.d — WAN (Wide Area Network)
+
+Le **WAN** interconnecte des sites géographiquement distants. Contrairement au LAN (quelques centaines de mètres), le WAN couvre des distances de quelques kilomètres à l'échelle mondiale.
+
+Technologies WAN courantes :
+- **MPLS** : réseau privé fourni par un opérateur, avec QoS garantie — encore très utilisé pour les sites critiques
+- **Internet VPN** : tunnel IPsec sur Internet public — moins cher, mais latence variable
+- **SD-WAN** : surcouche intelligente qui combine MPLS + Internet + 4G/5G et choisit le meilleur chemin en temps réel selon la politique définie (Cisco Viptela / Meraki)
+- **MetroEthernet** : liaison Ethernet point-à-point fournie par un opérateur — simple, performante, courte distance
+
+#### 1.2.e — SOHO (Small Office / Home Office)
+
+Un réseau SOHO est une infrastructure simplifiée pour un petit bureau ou un travailleur à domicile. Typiquement, un seul équipement multifonction fait office de routeur, switch, AP Wi-Fi et firewall basique.
+
+```
+  [Internet / FAI]
+        |
+  [Routeur SOHO] ← routeur + switch 4 ports + AP Wi-Fi + NAT/firewall
+    |       |
+  [PC]   [Wi-Fi: laptop, phone, tablette]
+```
+
+Caractéristiques : NAT pour partager une seule IP publique, DHCP intégré, Wi-Fi WPA2/WPA3, pas de VLAN ni de protocole de routage — la default route vers le FAI suffit.
+
+#### 1.2.f — On-Premises vs Cloud
+
+| Critère | On-Premises | Cloud |
+|---------|------------|-------|
+| Localisation | Datacenter/salle serveur de l'entreprise | Datacenter du fournisseur (AWS, Azure, GCP) |
+| Coût | CAPEX (achat matériel) | OPEX (abonnement mensuel) |
+| Scalabilité | Limitée au matériel acheté | Quasi illimitée (élastique) |
+| Contrôle | Total | Partagé avec le fournisseur |
+| Maintenance | Équipe IT interne | Fournisseur (shared responsibility) |
+| Modèles | — | IaaS, PaaS, SaaS |
+| Réseau | Physique, maîtrisé | Virtuel (VPC, subnets, security groups) |
+
+En pratique, la plupart des entreprises adoptent un modèle **hybride** : certains services restent on-premises (données sensibles, legacy), d'autres migrent dans le cloud (messagerie, collaboration, applications web). Le réseau doit alors gérer la connectivité entre les deux environnements — via VPN site-to-site, AWS Direct Connect, Azure ExpressRoute, etc.
+
+### Mise en pratique CLI
+
+```cisco
+! Sur un switch de distribution — vérifier l'architecture avec CDP
+SW-DISTRIB# show cdp neighbors detail | include Device|IP address|Platform
+Device ID: CORE-SW1
+  IP address: 10.1.0.1
+  Platform: cisco WS-C9500-24Y4C,
+Device ID: ACC-SW-FL1
+  IP address: 10.1.10.2
+  Platform: cisco WS-C2960X-48FPD-L,
+Device ID: ACC-SW-FL2
+  IP address: 10.1.10.3
+  Platform: cisco WS-C2960X-48FPD-L,
+Device ID: ACC-SW-FL3
+  IP address: 10.1.10.4
+  Platform: cisco WS-C2960X-24PD-L,
+```
+
+**Interprétation** : Ce switch de distribution est connecté vers le haut à un Catalyst 9500 (core) et vers le bas à trois switches d'accès Catalyst 2960X. C'est typique d'une architecture three-tier. Les modèles "FPD" indiquent du PoE+ full (tous les ports), le "24PD" est un modèle 24 ports PoE+.
+
+### Point exam
+
+> **Piège courant** : L'examen peut demander quelle architecture convient à un datacenter avec beaucoup de trafic est-ouest. La réponse est **spine-leaf**, pas three-tier. Le three-tier est conçu pour le campus (trafic nord-sud dominant).
+>
+> **À retenir** : Dans une topologie spine-leaf, chaque leaf est connecté à **tous** les spines — jamais de connexion leaf-to-leaf ni spine-to-spine. Le nombre de sauts entre deux serveurs est toujours de 2.
+
+### Exercice 1.2 — Choisir la bonne topologie
+
+**Contexte** : Vous êtes consultant réseau. Trois clients vous sollicitent :
+
+1. **DataPlex** : datacenter hébergeant 800 serveurs avec beaucoup de trafic inter-serveurs (base de données répliquée, clusters Kubernetes). Besoin de pouvoir ajouter des racks facilement.
+2. **UniCampus** : université avec 5 bâtiments, 3 000 étudiants, Wi-Fi omniprésent, serveurs on-premises.
+3. **CabinetDupont** : cabinet comptable de 8 personnes avec un NAS et un accès Internet.
+
+**Consigne** : Pour chaque client, recommandez une architecture (two-tier, three-tier, spine-leaf, SOHO) et justifiez en une phrase.
+
+**Indice** : <details><summary>Voir l'indice</summary>Le volume d'utilisateurs et le type de trafic dominant (nord-sud vs est-ouest) sont les critères de décision principaux.</details>
+
+<details>
+<summary>Solution</summary>
+
+1. **DataPlex → Spine-Leaf** : 800 serveurs avec trafic est-ouest dominant + besoin de scalabilité horizontale = spine-leaf. Ajouter un rack = ajouter un leaf connecté à tous les spines.
+
+2. **UniCampus → Three-Tier** : 3 000 utilisateurs sur 5 bâtiments = trop grand pour du two-tier. Le core assure le transit rapide entre bâtiments, la distribution applique les politiques par bâtiment, l'accès connecte étudiants et AP.
+
+3. **CabinetDupont → SOHO** : 8 personnes, un NAS, pas de complexité réseau. Un routeur Wi-Fi grand public ou un Meraki Go suffit.
+
+**Explication** : Le critère principal est l'échelle. Le SOHO couvre les très petits sites, le two-tier les sites moyens (jusqu'à ~200 users), le three-tier les grands campus, et le spine-leaf les datacenters. Le type de trafic (nord-sud vs est-ouest) est le second critère qui distingue le three-tier du spine-leaf.
+
+</details>
+
+### Voir aussi
+
+- Topic 1.1 dans ce module (composants réseau — les équipements qu'on retrouve à chaque couche)
+- Topic 3.4 dans Module 3 (OSPF — protocole de routage souvent utilisé en three-tier)
+- Topic 6.3 dans Module 6 (architecture SDN — overlay/underlay/fabric)
+
+---
+
+## 1.3 — Interfaces physiques et types de câblage
+
+> **Exam topic 1.3** : *Compare* — physical interface and cabling types
+> **Niveau** : Compare (Bloom 3 — Analyser)
+
+### Contexte
+
+Avant de configurer quoi que ce soit en CLI, il faut que les câbles soient branchés. Un câble inadapté ou un mauvais type de connecteur, et rien ne fonctionnera — ou pire, ça fonctionnera mal avec des erreurs intermittentes. Savoir quel câble utiliser dans quelle situation est une compétence de terrain fondamentale.
+
+### Théorie
+
+#### 1.3.a — Fibre monomode, fibre multimode et cuivre
+
+**Câble cuivre (UTP — Unshielded Twisted Pair)**
+
+Le câble cuivre UTP est le plus répandu en LAN. Il utilise des paires de fils torsadés pour transmettre des signaux électriques. La torsade réduit les interférences électromagnétiques (EMI).
+
+| Catégorie | Débit max | Distance max | Usage typique |
+|-----------|----------|-------------|---------------|
+| Cat 5e | 1 Gbps | 100 m | LAN classique |
+| Cat 6 | 1 Gbps (10 Gbps sur 55 m) | 100 m | LAN, PoE |
+| Cat 6a | 10 Gbps | 100 m | Datacenter, Wi-Fi 6 AP |
+| Cat 7 | 10 Gbps | 100 m | Environnements EMI élevés (blindé STP) |
+
+Connecteur : **RJ-45** (8P8C). Distance maximale : **100 mètres** (c'est une règle fondamentale à connaître).
+
+**Fibre multimode (MMF — Multi-Mode Fiber)**
+
+La fibre multimode utilise un cœur large (50 ou 62,5 µm) dans lequel la lumière emprunte plusieurs chemins (modes). Avantage : connecteurs et émetteurs moins chers (LED ou VCSEL). Inconvénient : la dispersion modale limite la distance.
+
+| Type | Cœur | Couleur gaine | Distance typique (10G) | Connecteur |
+|------|------|---------------|----------------------|-----------|
+| OM3 | 50 µm | Aqua | 300 m | LC, SC |
+| OM4 | 50 µm | Aqua/violet | 400 m | LC |
+| OM5 | 50 µm | Vert lime | 400 m (WDM) | LC |
+
+Usage : connexions intra-bâtiment (entre switches d'un même campus, datacenter).
+
+**Fibre monomode (SMF — Single-Mode Fiber)**
+
+La fibre monomode a un cœur très fin (8-10 µm) dans lequel la lumière emprunte un seul chemin. Pas de dispersion modale = distances très longues.
+
+| Caractéristique | Valeur |
+|----------------|--------|
+| Cœur | 8-10 µm |
+| Couleur gaine | **Jaune** |
+| Distance | Jusqu'à **80 km** (et plus avec amplification) |
+| Connecteur | LC, SC |
+| Coût | Plus cher (émetteurs laser) |
+
+Usage : connexions inter-bâtiments, inter-sites, WAN.
+
+**Tableau comparatif fibre monomode vs multimode**
+
+| Critère | Multimode (MMF) | Monomode (SMF) |
+|---------|----------------|----------------|
+| Cœur | 50/62,5 µm | 8-10 µm |
+| Source lumineuse | LED / VCSEL | Laser |
+| Distance max | ~550 m (1G), ~400 m (10G) | Jusqu'à 80+ km |
+| Couleur connecteur | Aqua / Beige | Jaune |
+| Coût transceivers | $ | $$$ |
+| Usage | Intra-bâtiment, datacenter | Inter-bâtiment, WAN |
+
+#### 1.3.b — Connexions Ethernet : media partagé vs point-à-point
+
+**Media partagé** (historique) : dans les premiers réseaux Ethernet (10BASE2, 10BASE5), tous les hôtes partageaient le même câble coaxial. Un seul hôte pouvait émettre à la fois, sinon : **collision**. Le protocole **CSMA/CD** (Carrier Sense Multiple Access / Collision Detection) gérait les collisions.
+
+**Point-à-point** (moderne) : avec les switches, chaque port est un lien dédié entre le switch et un seul appareil. Plus de média partagé, plus de collisions sur ce segment. Chaque port de switch est son propre **domaine de collision**. Le full-duplex est la norme : émission et réception simultanées.
+
+| Aspect | Media partagé (hub) | Point-à-point (switch) |
+|--------|-------------------|----------------------|
+| Domaine de collision | Un seul (tous les ports) | Un par port |
+| Duplex | Half-duplex | Full-duplex |
+| CSMA/CD | Nécessaire | Non nécessaire |
+| Bande passante | Partagée entre tous | Dédiée par port |
+| Équipement | Hub | Switch |
+
+### Mise en pratique CLI
+
+```cisco
+! Vérifier le type d'interface et le transceiver installé
+Switch# show interfaces GigabitEthernet0/1
+GigabitEthernet0/1 is up, line protocol is up (connected)
+  Hardware is Gigabit Ethernet, address is aabb.cc00.0100 (bia aabb.cc00.0100)
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Full-duplex, 1000Mb/s, media type is 10/100/1000BaseTX
+  input flow-control is off, output flow-control is unsupported
+  ...
+
+Switch# show interfaces TenGigabitEthernet1/0/1 transceiver
+ITU Channel not available (Wavelength not available),
+Transceiver is internally calibrated.
+                           mA: milliamperes, dBm: decibels (milliwatts)
+                         Optical      Optical       Laser
+         Temperature   Transmit     Receive       Bias
+Port     (Celsius)     Power(dBm)   Power(dBm)    Current(mA)
+-------  -----------   ----------   ----------    -----------
+Te1/0/1    32.7         -2.4         -3.1           6.4
+         Transceiver Type: SFP-10G-SR
+```
+
+**Interprétation** :
+- `Gi0/1` : interface cuivre 1 Gbps (`10/100/1000BaseTX`), full-duplex — câble UTP RJ-45
+- `Te1/0/1` : interface fibre 10 Gbps avec un transceiver **SFP-10G-SR** (Short Range = multimode, portée ~400 m). La puissance optique de réception (-3.1 dBm) est dans la plage normale.
+
+### Point exam
+
+> **Piège courant** : La couleur du connecteur fibre aide à identifier le type : **aqua = multimode**, **jaune = monomode**. Mais attention, l'examen peut poser la question en termes de distance : si on vous dit "liaison entre deux bâtiments à 5 km", c'est forcément de la **monomode** (la multimode ne dépasse pas ~550 m en 1G).
+>
+> **À retenir** : La distance maximale d'un câble UTP est de **100 mètres**, quelle que soit la catégorie. Au-delà, il faut de la fibre. Les connecteurs les plus courants en entreprise sont **LC** (fibre) et **RJ-45** (cuivre).
+
+### Exercice 1.3 — Choisir le bon câblage
+
+**Contexte** : L'entreprise LogiTrans rénove son réseau. L'architecte vous envoie ce cahier des charges :
+
+| Liaison | Distance | Débit requis |
+|---------|----------|-------------|
+| Switch accès → PC bureau | 45 m | 1 Gbps |
+| Switch accès → AP Wi-Fi 6 (plafond) | 80 m | 2.5 Gbps |
+| Switch distribution → switch core (même bâtiment) | 200 m | 10 Gbps |
+| Switch core site A → switch core site B | 12 km | 10 Gbps |
+
+**Consigne** : Pour chaque liaison, recommandez le type de câble (UTP Cat X, MMF OM3/OM4, SMF) et le connecteur. Justifiez brièvement.
+
+**Indice** : <details><summary>Voir l'indice</summary>Vérifiez d'abord la distance. Si elle dépasse 100 m, le cuivre est éliminé. Si elle dépasse ~400 m en 10G, la multimode est éliminée.</details>
+
+<details>
+<summary>Solution</summary>
+
+| Liaison | Câble | Connecteur | Justification |
+|---------|-------|-----------|---------------|
+| Switch → PC (45 m, 1G) | **Cat 5e** ou Cat 6 UTP | RJ-45 | Distance < 100 m, 1 Gbps suffit. Cat 5e est le minimum pour du Gigabit. |
+| Switch → AP Wi-Fi 6 (80 m, 2.5G) | **Cat 6** UTP | RJ-45 | Distance < 100 m. Cat 6 supporte le multigigabit (2.5G NBASE-T). Cat 5e ne supporte que 1G. |
+| Distrib → Core (200 m, 10G) | **MMF OM3** ou OM4 | LC | Distance > 100 m → cuivre éliminé. 200 m en 10G → dans les capacités de l'OM3 (300 m) et OM4 (400 m). |
+| Site A → Site B (12 km, 10G) | **SMF** (monomode) | LC | 12 km → seule la monomode atteint cette distance. |
+
+**Explication** : La distance est le premier critère. Sous 100 m, le cuivre convient. Entre 100 m et ~400 m en 10G, on passe en fibre multimode. Au-delà, seule la monomode fonctionne. Le débit requis affine le choix de catégorie UTP ou de type OM.
+
+</details>
+
+### Voir aussi
+
+- Topic 1.4 dans ce module (problèmes d'interface — ce qui se passe quand le câble est inadapté)
+- Topic 1.1.h dans ce module (PoE — le câble cuivre transporte aussi l'alimentation)
+
+---
+
+## 1.4 — Problèmes d'interface et de câbles
+
+> **Exam topic 1.4** : *Identify* — interface and cable issues (collisions, errors, mismatch duplex, and/or speed)
+> **Niveau** : Identify (Bloom 1 — Connaître)
+
+### Contexte
+
+Sur le terrain, les problèmes de couche physique sont parmi les plus frustrants : tout a l'air configuré correctement, mais le réseau rame ou des paquets se perdent. L'output de `show interfaces` est votre premier réflexe de diagnostic. Savoir lire ses compteurs d'erreurs, c'est la différence entre passer une heure à chercher et trouver le problème en 30 secondes.
+
+### Théorie
+
+#### Types de problèmes courants
+
+**Duplex mismatch** — Un côté du lien est en full-duplex, l'autre en half-duplex. Cela arrive typiquement quand l'auto-negotiation échoue ou qu'un côté est configuré en dur. Symptômes : taux d'erreurs élevé, performance dégradée, FCS errors et late collisions.
+
+Pourquoi c'est un piège : le lien monte (up/up), le ping fonctionne... mais les performances sont catastrophiques. Le côté full-duplex ne détecte pas les collisions (il ne fait pas de CSMA/CD), alors que le côté half-duplex en voit partout.
+
+**Speed mismatch** — Les deux côtés ne s'accordent pas sur la vitesse. Résultat : le lien ne monte tout simplement pas (`down/down`). C'est plus facile à diagnostiquer qu'un duplex mismatch parce que c'est immédiatement visible.
+
+**Erreurs physiques** — Câble endommagé, connecteur mal serti, interférences EMI. Génèrent des CRC errors, input errors, et runts (trames trop courtes — tronquées par le bruit).
+
+**Collisions** — En half-duplex ou sur un hub, les collisions sont normales. Mais des **late collisions** (collision détectée après les 64 premiers octets) sont toujours anormales — elles indiquent un câble trop long ou un duplex mismatch.
+
+#### Compteurs clés de `show interfaces`
+
+| Compteur | Signification | Cause probable |
+|----------|--------------|----------------|
+| `CRC` | Trames reçues avec erreur de checksum | Câble défectueux, interférences EMI, duplex mismatch |
+| `input errors` | Total des erreurs en réception | Agrège CRC, runts, giants, etc. |
+| `output errors` | Trames qui n'ont pas pu être envoyées | Congestion, erreurs buffer |
+| `collisions` | Collisions normales (half-duplex) | Normal en half-duplex ; anormal en full-duplex |
+| `late collisions` | Collision après 64 octets | Duplex mismatch, câble > 100 m |
+| `runts` | Trames < 64 octets | Câble défectueux, collision |
+| `giants` | Trames > 1518 octets (sans jumbo) | Problème de configuration MTU |
+| `frame` | Trames avec erreur de format | Interférences, problème NIC |
+
+### Mise en pratique CLI
+
+```cisco
+! Diagnostic d'une interface avec problèmes
+Switch# show interfaces GigabitEthernet0/5
+GigabitEthernet0/5 is up, line protocol is up (connected)
+  Hardware is Gigabit Ethernet, address is aabb.cc00.0105 (bia aabb.cc00.0105)
+  MTU 1500 bytes, BW 100000 Kbit/sec, DLY 100 usec,
+     reliability 235/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Half-duplex, 100Mb/s, media type is 10/100/1000BaseTX
+  ...
+     5 minute input rate 45000 bits/sec, 38 packets/sec
+     5 minute output rate 51000 bits/sec, 42 packets/sec
+     125000 packets input, 10450000 bytes, 0 no buffer
+     Received 125000 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles
+     1000 input errors, 850 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     130000 packets output, 11200000 bytes, 0 underruns
+     0 output errors, 352 collisions, 15 interface resets
+     83 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+```
+
+**Interprétation — drapeaux rouges** :
+- **`Half-duplex, 100Mb/s`** : l'interface a négocié en half-duplex à 100 Mbps alors qu'on s'attend à du full-duplex 1 Gbps. Probable duplex/speed mismatch.
+- **`reliability 235/255`** : fiabilité dégradée (255 = parfait). Signe de problèmes persistants.
+- **`850 CRC`** : 850 trames reçues avec un checksum invalide — câble défectueux ou mismatch duplex.
+- **`83 late collision`** : collisions tardives = quasiment toujours un duplex mismatch. Le côté distant est probablement en full-duplex.
+- **`352 collisions`** : normal en half-duplex, mais confirme que ce côté opère bien en half-duplex.
+
+**Diagnostic** : Le côté distant est probablement configuré en dur à 1000/full, tandis que ce port a échoué l'auto-négociation et s'est retrouvé en 100/half (comportement par défaut quand l'auto-neg échoue avec un pair qui ne négocie pas).
+
+**Correction** :
+```cisco
+Switch(config)# interface GigabitEthernet0/5
+Switch(config-if)# speed auto
+Switch(config-if)# duplex auto
+! Vérifier que le pair distant est aussi en auto, ou forcer les mêmes valeurs des deux côtés
+```
+
+### Point exam
+
+> **Piège courant** : Quand un côté est en auto-négociation et l'autre est forcé à 1000/full, l'auto-négociation du premier côté **échoue** et il retombe en **100/half** (pas 1000/full !). C'est le duplex mismatch classique. Le lien monte (up/up) mais les performances sont désastreuses avec des late collisions.
+>
+> **À retenir** : Les **late collisions** sont le symptôme n°1 du duplex mismatch. Les **CRC errors** peuvent indiquer un câble défectueux OU un duplex mismatch. Si les deux compteurs sont élevés ensemble, soupçonnez d'abord le duplex mismatch.
+
+### Exercice 1.4 — Diagnostiquer des erreurs d'interface
+
+**Contexte** : Un utilisateur se plaint de lenteurs. Vous relevez cet output sur le port de son switch :
+
+```
+GigabitEthernet0/12 is up, line protocol is up (connected)
+  Full-duplex, 1000Mb/s, media type is 10/100/1000BaseTX
+  reliability 255/255
+  ...
+  0 runts, 0 giants, 0 throttles
+  4521 input errors, 4521 CRC, 0 frame, 0 overrun
+  0 output errors, 0 collisions, 0 interface resets
+  0 late collision
+```
+
+**Consigne** : (a) Le duplex mismatch est-il la cause ? (b) Quelle est la cause probable ? (c) Quelle action recommandez-vous ?
+
+**Indice** : <details><summary>Voir l'indice</summary>Regardez les compteurs de collisions et le mode duplex. S'il n'y a pas de late collisions et que le full-duplex est actif, le duplex n'est pas en cause.</details>
+
+<details>
+<summary>Solution</summary>
+
+**(a)** Non, le duplex mismatch n'est pas la cause. L'interface est en **full-duplex 1000 Mbps**, il n'y a **aucune collision** ni late collision. En cas de mismatch, on verrait des late collisions.
+
+**(b)** Les 4 521 **input errors** sont **toutes** des CRC errors (input errors = CRC = 4521). CRC errors sans collisions en full-duplex → **câble défectueux** ou **connecteur mal serti**. Le signal électrique est altéré en transit, provoquant des erreurs de checksum.
+
+**(c)** Actions recommandées :
+1. **Remplacer le câble** (câble de patch ou jarretière)
+2. Si le câble passe dans le faux-plafond, vérifier qu'il n'est pas plié, écrasé ou à proximité d'une source d'interférences (néons, alimentation)
+3. Après remplacement, remettre les compteurs à zéro avec `clear counters GigabitEthernet0/12` et monitorer
+
+</details>
+
+### Voir aussi
+
+- Topic 1.3 dans ce module (types de câblage — choisir le bon câble évite ces problèmes)
+- Topic 2.5 dans Module 2 (Spanning Tree — un port en blocking peut aussi causer des symptômes trompeurs)
+
+---
+
+## 1.5 — TCP vs UDP
+
+> **Exam topic 1.5** : *Compare* — TCP to UDP
+> **Niveau** : Compare (Bloom 3 — Analyser)
+
+### Contexte
+
+Quand vous ouvrez une page web, téléchargez un fichier ou lancez un appel vidéo, les données ne voyagent pas toutes de la même façon. Certaines applications ont besoin d'une livraison fiable et ordonnée (un fichier corrompu est inutilisable), d'autres préfèrent la vitesse quitte à perdre quelques paquets (une milliseconde de silence dans un appel VoIP passe inaperçue). C'est le choix entre TCP et UDP.
+
+### Théorie
+
+#### TCP — Transmission Control Protocol
+
+TCP est un protocole de **couche 4** (transport) orienté **connexion**. Avant d'envoyer des données, TCP établit une connexion via le **three-way handshake** :
+
+```
+  Client                    Serveur
+    |  ---- SYN ----------->  |     1. Le client initie la connexion
+    |  <--- SYN-ACK --------  |     2. Le serveur accepte et répond
+    |  ---- ACK ----------->  |     3. Le client confirme
+    |                          |     → Connexion établie
+    |  ==== Données ========>  |
+    |  <== ACK ==============  |     Chaque segment est acquitté
+    |                          |
+    |  ---- FIN ----------->  |     Fermeture (4-way)
+    |  <--- ACK -----------  |
+    |  <--- FIN -----------  |
+    |  ---- ACK ----------->  |
+```
+
+Caractéristiques de TCP :
+- **Fiabilité** : chaque segment envoyé est acquitté (ACK). Pas d'ACK → retransmission.
+- **Ordonnancement** : les segments sont numérotés (sequence numbers). Le récepteur réassemble dans l'ordre, même si les paquets arrivent dans le désordre.
+- **Contrôle de flux** : le récepteur annonce sa fenêtre de réception (window size) pour éviter d'être submergé.
+- **Contrôle de congestion** : TCP ralentit quand le réseau est congestionné (slow start, congestion avoidance).
+- **Overhead** : en-tête de 20 octets minimum (options pouvant aller jusqu'à 60).
+
+#### UDP — User Datagram Protocol
+
+UDP est un protocole de **couche 4** sans connexion. Pas de handshake, pas d'acquittement, pas d'ordonnancement. UDP envoie les datagrammes et espère qu'ils arrivent — s'ils se perdent, c'est à l'application de gérer.
+
+C'est comme envoyer une carte postale vs un recommandé avec accusé de réception. La carte postale est plus rapide et moins chère, mais personne ne vous prévient si elle n'arrive pas.
+
+Caractéristiques d'UDP :
+- **Rapidité** : pas de handshake, pas d'attente d'ACK
+- **Légèreté** : en-tête de seulement **8 octets**
+- **Pas de retransmission** : les paquets perdus sont perdus
+- **Pas d'ordonnancement** : les paquets arrivent dans n'importe quel ordre
+- **Adapté au temps réel** : retransmettre un paquet audio arrivé 2 secondes en retard n'a aucun sens
+
+#### Tableau comparatif
+
+| Critère | TCP | UDP |
+|---------|-----|-----|
+| Connexion | Orienté connexion (3-way handshake) | Sans connexion |
+| Fiabilité | Oui (ACK, retransmission) | Non |
+| Ordonnancement | Oui (sequence numbers) | Non |
+| Contrôle de flux | Oui (window size) | Non |
+| Contrôle de congestion | Oui | Non |
+| Taille en-tête | 20-60 octets | 8 octets |
+| Vitesse | Plus lent (overhead) | Plus rapide |
+| Exemple port | 80 (HTTP), 443 (HTTPS), 22 (SSH) | 53 (DNS query), 67/68 (DHCP), 69 (TFTP) |
+
+#### Protocoles et leur transport
+
+| Protocole applicatif | Port | Transport | Pourquoi ? |
+|---------------------|------|-----------|------------|
+| HTTP / HTTPS | 80 / 443 | TCP | Intégrité des pages web |
+| SSH | 22 | TCP | Fiabilité des commandes |
+| FTP | 20 (data) / 21 (control) | TCP | Intégrité des fichiers |
+| SMTP | 25 | TCP | Livraison fiable des emails |
+| DNS | 53 | **TCP et UDP** | UDP pour les requêtes courtes, TCP pour les transferts de zone ou réponses > 512 octets |
+| DHCP | 67 (serveur) / 68 (client) | UDP | Le client n'a pas d'IP → pas de connexion TCP possible |
+| TFTP | 69 | UDP | Simplicité (firmware upload) |
+| SNMP | 161 / 162 | UDP | Polling léger, traps rapides |
+| Syslog | 514 | UDP | Logs en masse, perte acceptable |
+| VoIP (RTP) | 16384-32767 | UDP | Temps réel, latence critique |
+| NTP | 123 | UDP | Synchronisation légère |
+
+### Mise en pratique CLI
+
+```cisco
+! Sur un routeur — vérifier les connexions TCP actives
+Router# show tcp brief
+TCB       Local Address           Foreign Address        (state)
+0F2A1BC0  10.1.1.1.22             10.1.1.100.52481       ESTAB
+0F2A2340  10.1.1.1.23             10.1.1.100.52490       ESTAB
+0F2A8B10  10.1.1.1.443            10.1.1.50.61234        ESTAB
+0F2A9100  10.1.1.1.22             10.1.1.200.49822       CLOSEWAIT
+```
+
+**Interprétation** :
+- Trois connexions établies (`ESTAB`) : deux sessions SSH (port 22) et une session Telnet (port 23), plus une connexion HTTPS (port 443)
+- Une connexion SSH depuis 10.1.1.200 est en `CLOSEWAIT` — le client distant a fermé sa session, le serveur n'a pas encore libéré la connexion
+
+```cisco
+! Vérifier les statistiques IP pour voir TCP vs UDP
+Router# show ip traffic
+IP statistics:
+  Rcvd:  345621 total, 340100 local destination
+  Sent:  298450 generated, 5521 forwarded
+TCP statistics:
+  Rcvd: 245000 total
+  Sent: 230000 total, 1200 retransmit
+UDP statistics:
+  Rcvd: 95100 total
+  Sent: 68450 total
+```
+
+**Interprétation** : Le trafic TCP domine (245K reçus vs 95K UDP). Les 1 200 retransmissions TCP (sur 230K envoyés = 0,5%) indiquent une légère perte de paquets sur le réseau, que TCP gère automatiquement.
+
+### Point exam
+
+> **Piège courant** : DNS utilise **les deux** — UDP pour les requêtes standards (rapide, < 512 octets) et TCP pour les transferts de zone et les réponses volumineuses. Si l'examen demande "quel transport pour DNS ?", cherchez le contexte. Sans précision, la réponse attendue est souvent UDP (cas le plus courant).
+>
+> **À retenir** : DHCP utilise UDP (pas TCP) parce que le client n'a pas encore d'adresse IP — il ne peut pas établir de connexion TCP. Le three-way handshake TCP nécessite les deux parties identifiées par leurs IPs.
+
+### Exercice 1.5 — TCP ou UDP ?
+
+**Contexte** : Vous analysez le trafic réseau d'une entreprise. Déterminez si chaque flux utilise TCP ou UDP, et justifiez.
+
+| # | Description du flux | TCP ou UDP ? | Justification |
+|---|-------------------|-------------|---------------|
+| 1 | Un employé consulte le site intranet de l'entreprise (HTTPS) | | |
+| 2 | Les téléphones IP passent des appels VoIP | | |
+| 3 | Un switch envoie ses logs à un serveur syslog | | |
+| 4 | Un administrateur se connecte en SSH à un routeur | | |
+| 5 | Les postes récupèrent leur adresse IP au démarrage (DHCP) | | |
+| 6 | Un serveur DNS secondaire récupère la zone depuis le primaire | | |
+| 7 | Un utilisateur télécharge un fichier depuis le serveur FTP | | |
+| 8 | Le système de monitoring interroge un switch en SNMP | | |
+| 9 | Un laptop se synchronise avec le serveur NTP | | |
+| 10 | Un technicien uploade un firmware via TFTP | | |
+
+**Indice** : <details><summary>Voir l'indice</summary>Posez-vous la question : est-ce que l'application a besoin que chaque paquet arrive à coup sûr et dans l'ordre ? Si oui → TCP. Si la vitesse prime et qu'une perte occasionnelle est acceptable → UDP.</details>
+
+<details>
+<summary>Solution</summary>
+
+| # | Flux | Transport | Justification |
+|---|------|-----------|---------------|
+| 1 | HTTPS (intranet) | **TCP** (443) | Les pages web doivent arriver complètes et dans l'ordre |
+| 2 | VoIP (RTP) | **UDP** | Temps réel — une retransmission arriverait trop tard |
+| 3 | Syslog | **UDP** (514) | Logs en masse, perte d'un log acceptable |
+| 4 | SSH | **TCP** (22) | Les commandes doivent être transmises fidèlement |
+| 5 | DHCP | **UDP** (67/68) | Le client n'a pas d'IP → ne peut pas faire de 3-way handshake |
+| 6 | DNS transfert de zone | **TCP** (53) | Transfert volumineux et critique — doit être fiable |
+| 7 | FTP download | **TCP** (20/21) | Intégrité du fichier indispensable |
+| 8 | SNMP polling | **UDP** (161) | Requêtes légères et fréquentes |
+| 9 | NTP sync | **UDP** (123) | Synchronisation temps — paquets légers |
+| 10 | TFTP firmware | **UDP** (69) | Protocole simple par design (fiabilité gérée par l'application) |
+
+</details>
+
+### Voir aussi
+
+- Topic 4.3 dans Module 4 (DHCP et DNS — fonctionnement détaillé de ces protocoles)
+- Topic 4.4 dans Module 4 (SNMP — utilisation d'UDP pour le monitoring)
+- Topic 4.5 dans Module 4 (Syslog — niveaux et transport UDP)
+
+---
+
+## 1.6 — Adressage IPv4 et subnetting
+
+> **Exam topic 1.6** : *Configure and verify* — IPv4 addressing and subnetting
+> **Niveau** : Configure & Verify (Bloom 3 — Appliquer)
+
+### Contexte
+
+L'adressage IP est au réseau ce que l'adresse postale est au courrier : sans adresse correcte, rien n'arrive à destination. Le subnetting — le découpage d'un réseau en sous-réseaux — est probablement le sujet le plus testé au CCNA. C'est une compétence que vous utiliserez quotidiennement en tant qu'administrateur réseau.
+
+### Théorie
+
+#### Structure d'une adresse IPv4
+
+Une adresse IPv4 est un nombre de **32 bits**, noté en **notation décimale pointée** : quatre octets séparés par des points.
+
+```
+  Décimal :   192  .  168  .   1   .  10
+  Binaire :   11000000 . 10101000 . 00000001 . 00001010
+              |<-- 8 bits -->|<-- 8 bits -->|<-- 8 bits -->|<-- 8 bits -->|
+              |                32 bits au total                            |
+```
+
+Chaque octet va de 0 à 255 (8 bits = 2^8 = 256 valeurs). L'adresse est divisée en deux parties :
+- **Network part** (partie réseau) : identifie le réseau
+- **Host part** (partie hôte) : identifie l'appareil dans ce réseau
+
+Le **masque de sous-réseau** définit la frontière entre ces deux parties.
+
+#### Masques de sous-réseau
+
+Le masque est aussi un nombre de 32 bits. Les bits à **1** désignent la partie réseau, les bits à **0** la partie hôte.
+
+| Masque décimal | Notation CIDR | Bits réseau | Bits hôte | Hôtes possibles |
+|---------------|--------------|------------|----------|----------------|
+| 255.0.0.0 | /8 | 8 | 24 | 16 777 214 |
+| 255.255.0.0 | /16 | 16 | 16 | 65 534 |
+| 255.255.255.0 | /24 | 24 | 8 | 254 |
+| 255.255.255.128 | /25 | 25 | 7 | 126 |
+| 255.255.255.192 | /26 | 26 | 6 | 62 |
+| 255.255.255.224 | /27 | 27 | 5 | 30 |
+| 255.255.255.240 | /28 | 28 | 4 | 14 |
+| 255.255.255.248 | /29 | 29 | 3 | 6 |
+| 255.255.255.252 | /30 | 30 | 2 | 2 |
+
+Formule : **Nombre d'hôtes = 2^n - 2** (où n = nombre de bits hôte). On soustrait 2 car l'adresse réseau (tous les bits hôte à 0) et l'adresse de broadcast (tous les bits hôte à 1) ne sont pas assignables à des hôtes.
+
+#### Classes d'adresses (historique)
+
+| Classe | Plage premier octet | Masque par défaut | Usage |
+|--------|-------------------|-------------------|-------|
+| A | 1-126 | /8 (255.0.0.0) | Grands réseaux |
+| B | 128-191 | /16 (255.255.0.0) | Réseaux moyens |
+| C | 192-223 | /24 (255.255.255.0) | Petits réseaux |
+| D | 224-239 | — | Multicast |
+| E | 240-255 | — | Expérimental |
+
+En pratique, le classful addressing n'est plus utilisé depuis les années 1990 — on utilise le **CIDR** (Classless Inter-Domain Routing). Mais l'examen teste encore la connaissance des classes.
+
+Note : 127.0.0.0/8 est réservé au **loopback** (127.0.0.1 est l'adresse de bouclage locale).
+
+#### Méthode de calcul du subnetting
+
+Prenons l'exemple : **192.168.10.0/26** — Quels sont les sous-réseaux, les adresses utilisables et les broadcasts ?
+
+**Étape 1** : Identifier les bits hôte.
+- /26 = 26 bits réseau, 32 - 26 = **6 bits hôte**
+
+**Étape 2** : Calculer le nombre d'hôtes par sous-réseau.
+- 2^6 - 2 = **62 hôtes**
+
+**Étape 3** : Calculer le "pas" (incrément) des sous-réseaux.
+- Le dernier octet du masque : 256 - 192 = **64** (ou 2^6 = 64)
+- Les sous-réseaux s'incrémentent de 64 en 64 sur le 4e octet.
+
+**Étape 4** : Lister les sous-réseaux.
+
+| Sous-réseau | Première IP | Dernière IP | Broadcast |
+|-------------|------------|------------|-----------|
+| 192.168.10.0/26 | 192.168.10.1 | 192.168.10.62 | 192.168.10.63 |
+| 192.168.10.64/26 | 192.168.10.65 | 192.168.10.126 | 192.168.10.127 |
+| 192.168.10.128/26 | 192.168.10.129 | 192.168.10.190 | 192.168.10.191 |
+| 192.168.10.192/26 | 192.168.10.193 | 192.168.10.254 | 192.168.10.255 |
+
+Le broadcast d'un sous-réseau = adresse du sous-réseau suivant - 1.
+
+#### VLSM — Variable Length Subnet Masking
+
+Le VLSM permet d'utiliser des masques de taille différente au sein d'un même réseau, pour ne pas gaspiller d'adresses.
+
+Scénario : vous avez le réseau **172.16.1.0/24** et devez créer :
+- LAN A : 100 hôtes
+- LAN B : 50 hôtes
+- LAN C : 25 hôtes
+- Lien WAN point-à-point : 2 hôtes
+
+Méthode : commencer par le plus grand besoin, puis descendre.
+
+| Réseau | Besoin | Masque | Sous-réseau assigné | Hôtes disponibles |
+|--------|--------|--------|-------------------|-------------------|
+| LAN A | 100 | /25 (128-2=126 hôtes) | 172.16.1.0/25 | 126 |
+| LAN B | 50 | /26 (64-2=62 hôtes) | 172.16.1.128/26 | 62 |
+| LAN C | 25 | /27 (32-2=30 hôtes) | 172.16.1.192/27 | 30 |
+| WAN | 2 | /30 (4-2=2 hôtes) | 172.16.1.224/30 | 2 |
+
+### Mise en pratique CLI
+
+```cisco
+! Configuration de l'adressage IPv4 sur un routeur
+Router(config)# interface GigabitEthernet0/0
+Router(config-if)# ip address 192.168.10.1 255.255.255.192
+Router(config-if)# no shutdown
+Router(config-if)# exit
+Router(config)# interface GigabitEthernet0/1
+Router(config-if)# ip address 192.168.10.65 255.255.255.192
+Router(config-if)# no shutdown
+```
+
+```cisco
+! Vérification de la configuration
+Router# show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0     192.168.10.1    YES manual up                    up
+GigabitEthernet0/1     192.168.10.65   YES manual up                    up
+GigabitEthernet0/2     unassigned      YES unset  administratively down down
+Loopback0              unassigned      YES unset  up                    up
+```
+
+**Interprétation** :
+- Gi0/0 est dans le sous-réseau 192.168.10.0/26 (première IP utilisable = .1)
+- Gi0/1 est dans le sous-réseau 192.168.10.64/26 (première IP utilisable = .65)
+- Gi0/2 est `administratively down` — désactivé par la commande `shutdown` (état par défaut)
+
+```cisco
+! Vérification détaillée d'une interface
+Router# show ip interface GigabitEthernet0/0
+GigabitEthernet0/0 is up, line protocol is up
+  Internet address is 192.168.10.1/26
+  Broadcast address is 255.255.255.255
+  Address determined by setup command
+  MTU is 1500 bytes
+  Helper address is not set
+  Directed broadcast forwarding is disabled
+  ...
+  Network address translation is disabled
+```
+
+### Point exam
+
+> **Piège courant** : Si une question donne l'adresse **192.168.10.130/25**, à quel sous-réseau appartient-elle ? Le /25 donne un incrément de 128. Les sous-réseaux sont .0 et .128. L'adresse .130 est dans le sous-réseau **192.168.10.128/25** (pas .0/25). Beaucoup de candidats oublient de vérifier dans quel bloc tombe l'adresse.
+>
+> **À retenir** : Nombre d'hôtes = **2^n - 2**. Nombre de sous-réseaux = **2^s** (s = bits empruntés). L'adresse réseau a tous les bits hôte à 0, le broadcast a tous les bits hôte à 1. Un lien point-à-point entre deux routeurs utilise un **/30** (2 hôtes) ou un **/31** (RFC 3021, 2 hôtes sans broadcast — de plus en plus courant).
+
+### Exercice 1.6a — Subnetting progressif
+
+**Contexte** : Calculez les informations demandées pour chaque adresse.
+
+| # | Adresse/masque | Adresse réseau ? | Broadcast ? | Première IP ? | Dernière IP ? | Nb hôtes ? |
+|---|---------------|-----------------|-----------|-------------|-------------|-----------|
+| 1 | 10.0.0.0/8 | | | | | |
+| 2 | 172.16.50.0/24 | | | | | |
+| 3 | 192.168.1.0/28 | | | | | |
+| 4 | 10.10.10.100/27 | | | | | |
+| 5 | 172.16.128.0/19 | | | | | |
+
+**Indice** : <details><summary>Voir l'indice</summary>Pour le #4, attention : l'adresse donnée (10.10.10.100) n'est PAS forcément l'adresse réseau. Trouvez d'abord l'adresse réseau du sous-réseau auquel .100 appartient avec un masque /27 (incrément = 32).</details>
+
+<details>
+<summary>Solution</summary>
+
+| # | Adresse/masque | Adresse réseau | Broadcast | Première IP | Dernière IP | Nb hôtes |
+|---|---------------|---------------|-----------|-------------|-------------|----------|
+| 1 | 10.0.0.0/8 | 10.0.0.0 | 10.255.255.255 | 10.0.0.1 | 10.255.255.254 | 16 777 214 |
+| 2 | 172.16.50.0/24 | 172.16.50.0 | 172.16.50.255 | 172.16.50.1 | 172.16.50.254 | 254 |
+| 3 | 192.168.1.0/28 | 192.168.1.0 | 192.168.1.15 | 192.168.1.1 | 192.168.1.14 | 14 |
+| 4 | 10.10.10.100/27 | **10.10.10.96** | **10.10.10.127** | 10.10.10.97 | 10.10.10.126 | 30 |
+| 5 | 172.16.128.0/19 | 172.16.128.0 | 172.16.159.255 | 172.16.128.1 | 172.16.159.254 | 8 190 |
+
+**Explications clés** :
+- **#4** : /27 → incrément = 32. Les sous-réseaux du 3e octet .10 sont : .0, .32, .64, **96**, .128... L'adresse .100 tombe dans le bloc 96-127 → adresse réseau = .96, broadcast = .127.
+- **#5** : /19 → 19 bits réseau, le masque "mord" sur le 3e octet. 256-224=32 → incrément de 32 sur le 3e octet. Les sous-réseaux sont : 172.16.0.0, 172.16.32.0, 172.16.64.0, 172.16.96.0, **172.16.128.0**, 172.16.160.0... Le broadcast est 172.16.159.255 (128+32-1=159).
+
+</details>
+
+### Exercice 1.6b — Configuration IPv4 sur topologie
+
+**Contexte** : L'entreprise NordLogistik dispose de trois réseaux à interconnecter avec le bloc **10.10.0.0/16**. Voici le besoin :
+
+```
+  [LAN Entrepôt]---[R1]---[R2]---[LAN Bureau]
+                           |
+                         [R3]
+                           |
+                     [LAN Serveurs]
+```
+
+- LAN Entrepôt : 200 hôtes
+- LAN Bureau : 500 hôtes
+- LAN Serveurs : 30 hôtes
+- Liens WAN R1-R2, R2-R3 : point-à-point
+
+**Consigne** : Proposez un plan d'adressage VLSM et donnez les commandes de configuration pour les interfaces de R2.
+
+**Indice** : <details><summary>Voir l'indice</summary>Commencez par le LAN le plus grand (500 hôtes → /22 ou /23), puis descendez. Les liens WAN utilisent un /30.</details>
+
+<details>
+<summary>Solution</summary>
+
+**Plan d'adressage VLSM** (on part du plus grand besoin) :
+
+| Réseau | Besoin | Masque | Sous-réseau | Plage hôtes |
+|--------|--------|--------|-------------|-------------|
+| LAN Bureau | 500 | /22 (1022 hôtes) | 10.10.0.0/22 | 10.10.0.1 – 10.10.3.254 |
+| LAN Entrepôt | 200 | /24 (254 hôtes) | 10.10.4.0/24 | 10.10.4.1 – 10.10.4.254 |
+| LAN Serveurs | 30 | /26 (62 hôtes) | 10.10.5.0/26 | 10.10.5.1 – 10.10.5.62 |
+| WAN R1-R2 | 2 | /30 (2 hôtes) | 10.10.5.64/30 | 10.10.5.65 – 10.10.5.66 |
+| WAN R2-R3 | 2 | /30 (2 hôtes) | 10.10.5.68/30 | 10.10.5.69 – 10.10.5.70 |
+
+**Configuration de R2** :
+```cisco
+R2(config)# interface GigabitEthernet0/0
+R2(config-if)# description LAN Bureau
+R2(config-if)# ip address 10.10.0.1 255.255.252.0
+R2(config-if)# no shutdown
+R2(config-if)# exit
+!
+R2(config)# interface Serial0/0/0
+R2(config-if)# description WAN vers R1
+R2(config-if)# ip address 10.10.5.66 255.255.255.252
+R2(config-if)# no shutdown
+R2(config-if)# exit
+!
+R2(config)# interface Serial0/0/1
+R2(config-if)# description WAN vers R3
+R2(config-if)# ip address 10.10.5.69 255.255.255.252
+R2(config-if)# no shutdown
+```
+
+**Explication** : On assigne le plus grand bloc en premier pour éviter le chevauchement. Le /22 pour le LAN Bureau utilise les adresses 10.10.0.0 à 10.10.3.255. Le LAN Entrepôt commence à 10.10.4.0. Les liens WAN sont placés après le LAN Serveurs, dans l'espace 10.10.5.64+.
+
+</details>
+
+### Voir aussi
+
+- Topic 1.7 dans ce module (adressage IPv4 privé — RFC 1918)
+- Topic 3.1 dans Module 3 (table de routage — comment le routeur utilise le subnetting pour transférer les paquets)
+- Topic 3.2 dans Module 3 (longest prefix match — le masque influence la décision de routage)
+- Topic 5.6 dans Module 5 (ACLs — les wildcard masks sont l'inverse du masque de sous-réseau)
+
+---
+
+## 1.7 — Adressage IPv4 privé
+
+> **Exam topic 1.7** : *Describe* — the need for private IPv4 addressing
+> **Niveau** : Describe (Bloom 2 — Comprendre)
+
+### Contexte
+
+Il y a environ 4,3 milliards d'adresses IPv4 possibles. Ça paraît énorme, mais avec des milliards d'appareils connectés, les adresses publiques se sont raréfiées dès les années 1990. La solution : permettre à chaque entreprise d'utiliser les mêmes plages d'adresses en interne, sans qu'elles soient visibles sur Internet. C'est le principe de l'adressage privé.
+
+### Théorie
+
+#### Plages RFC 1918
+
+La RFC 1918 définit trois plages d'adresses réservées à un usage privé. Ces adresses ne sont **jamais routées sur Internet** — les routeurs des FAI les suppriment.
+
+| Classe | Plage RFC 1918 | Masque par défaut | Nombre d'adresses |
+|--------|---------------|-------------------|-------------------|
+| A | **10.0.0.0** – 10.255.255.255 | /8 | 16 777 216 |
+| B | **172.16.0.0** – 172.31.255.255 | /12 | 1 048 576 |
+| C | **192.168.0.0** – 192.168.255.255 | /16 | 65 536 |
+
+Attention à la plage de classe B : elle ne va **pas** de 172.0.0.0 à 172.255.255.255 mais seulement de 172.**16**.0.0 à 172.**31**.255.255. C'est un piège classique.
+
+#### Pourquoi l'adressage privé est nécessaire
+
+1. **Pénurie d'adresses IPv4** : les registres régionaux (ARIN, RIPE, APNIC) ont épuisé leurs pools d'adresses publiques. Sans adressage privé, chaque appareil aurait besoin d'une IP publique unique — impossible à l'échelle actuelle.
+
+2. **Sécurité** : les adresses privées ne sont pas routées sur Internet, ce qui crée une isolation naturelle. Un attaquant externe ne peut pas atteindre directement un poste en 192.168.1.50.
+
+3. **Flexibilité** : chaque entreprise peut utiliser les mêmes plages en interne (10.0.0.0/8 est extrêmement populaire) sans conflit, puisque ces adresses ne sortent jamais telles quelles sur Internet.
+
+#### NAT — Network Address Translation
+
+Pour qu'un hôte avec une adresse privée puisse communiquer avec Internet, il faut un mécanisme de traduction : le **NAT**. Le routeur de sortie remplace l'adresse privée source par son adresse publique avant d'envoyer le paquet sur Internet.
+
+```
+  [PC: 192.168.1.10] --→ [Routeur NAT] --→ [Internet]
+                          IP privée →→ IP publique
+                          192.168.1.10 → 203.0.113.5
+```
+
+Le NAT sera couvert en détail dans le Module 4 (Topic 4.1). Pour l'instant, retenez que l'adressage privé et le NAT fonctionnent en tandem.
+
+#### Autres adresses spéciales
+
+| Plage | Usage |
+|-------|-------|
+| 127.0.0.0/8 | Loopback (test local) |
+| 169.254.0.0/16 | APIPA (auto-configuration quand pas de DHCP) |
+| 0.0.0.0 | Route par défaut / "n'importe quelle adresse" |
+| 255.255.255.255 | Broadcast limité |
+
+### Mise en pratique CLI
+
+```cisco
+! Vérifier si une interface utilise une adresse privée
+Router# show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0     10.1.1.1        YES manual up                    up
+GigabitEthernet0/1     172.16.0.1      YES manual up                    up
+GigabitEthernet0/2     203.0.113.1     YES manual up                    up
+
+! Gi0/0 et Gi0/1 : adresses privées (RFC 1918)
+! Gi0/2 : adresse publique (interface vers le FAI)
+```
+
+```cisco
+! Vérifier qu'un routeur ne route pas les adresses privées vers Internet
+Router# show ip route 10.0.0.0
+Routing entry for 10.0.0.0/8
+  Known via "connected", distance 0, metric 0 (connected)
+  Routing Descriptor Blocks:
+  * directly connected, via GigabitEthernet0/0
+      Route metric is 0, traffic share count is 1
+```
+
+### Point exam
+
+> **Piège courant** : L'adresse **172.20.0.1** est-elle privée ou publique ? Elle est **privée** (dans la plage 172.16.0.0 – 172.31.255.255). Par contre, **172.32.0.1** est publique. L'examen teste souvent les limites de la plage 172.16-31.
+>
+> **À retenir** : Les trois plages RFC 1918 : **10.0.0.0/8**, **172.16.0.0/12**, **192.168.0.0/16**. APIPA (**169.254.0.0/16**) n'est PAS une adresse privée RFC 1918 — c'est une auto-configuration quand le client ne trouve pas de serveur DHCP.
+
+### Exercice 1.7 — Identifier les adresses privées
+
+**Contexte** : Classifiez chaque adresse comme publique, privée (RFC 1918), ou spéciale.
+
+| Adresse | Privée / Publique / Spéciale |
+|---------|------------------------------|
+| 10.255.255.1 | |
+| 172.15.0.1 | |
+| 172.16.0.1 | |
+| 192.168.100.1 | |
+| 192.169.1.1 | |
+| 127.0.0.1 | |
+| 169.254.10.5 | |
+| 8.8.8.8 | |
+
+**Indice** : <details><summary>Voir l'indice</summary>Attention aux limites exactes. 172.15.x.x est juste en dessous de la plage privée. 192.169.x.x est juste au-dessus.</details>
+
+<details>
+<summary>Solution</summary>
+
+| Adresse | Classification | Explication |
+|---------|---------------|-------------|
+| 10.255.255.1 | **Privée** | Dans 10.0.0.0/8 |
+| 172.15.0.1 | **Publique** | 172.15 < 172.16 → hors plage RFC 1918 |
+| 172.16.0.1 | **Privée** | Début exact de la plage 172.16.0.0/12 |
+| 192.168.100.1 | **Privée** | Dans 192.168.0.0/16 |
+| 192.169.1.1 | **Publique** | 192.169 > 192.168 → hors plage RFC 1918 |
+| 127.0.0.1 | **Spéciale** | Loopback (127.0.0.0/8) |
+| 169.254.10.5 | **Spéciale** | APIPA (169.254.0.0/16) — pas RFC 1918 |
+| 8.8.8.8 | **Publique** | DNS Google — adresse publique |
+
+</details>
+
+### Voir aussi
+
+- Topic 1.6 dans ce module (adressage IPv4 — le subnetting s'applique aussi aux adresses privées)
+- Topic 4.1 dans Module 4 (NAT — comment les adresses privées accèdent à Internet)
+- Topic 1.8 dans ce module (IPv6 — la solution à long terme à la pénurie d'adresses IPv4)
+
+---
+
+## 1.8 — Adressage IPv6 et préfixes
+
+> **Exam topic 1.8** : *Configure and verify* — IPv6 addressing and prefix
+> **Niveau** : Configure & Verify (Bloom 3 — Appliquer)
+
+### Contexte
+
+IPv4 est à bout de souffle avec ses 4,3 milliards d'adresses. IPv6 résout ce problème de façon radicale : **340 undécillions** d'adresses (3,4 x 10^38). Au-delà du nombre, IPv6 simplifie la configuration (auto-configuration) et améliore la sécurité. La transition est lente mais irréversible — de plus en plus de questions CCNA portent sur IPv6.
+
+### Théorie
+
+#### Structure d'une adresse IPv6
+
+Une adresse IPv6 fait **128 bits**, notée en **hexadécimal** : huit groupes de 4 chiffres hex séparés par des deux-points.
+
+```
+  2001:0DB8:0000:0001:0000:0000:0000:0A1F
+  |   Préfixe réseau   |    Interface ID    |
+  |<--- 64 bits --->|<--- 64 bits --->|
+```
+
+#### Règles de simplification
+
+1. **Supprimer les zéros en tête** de chaque groupe : `0DB8` → `DB8`, `0001` → `1`, `0000` → `0`
+2. **Remplacer un ou plusieurs groupes consécutifs de zéros** par `::` (une seule fois par adresse)
+
+Exemple :
+```
+  Complète :  2001:0DB8:0000:0001:0000:0000:0000:0A1F
+  Simplifiée: 2001:DB8:0:1::A1F
+```
+
+Autre exemple :
+```
+  FE80:0000:0000:0000:0210:A4FF:FE01:3B7C
+  → FE80::210:A4FF:FE01:3B7C
+```
+
+Erreur courante : utiliser `::` deux fois. **Interdit** — on ne saurait plus combien de groupes de zéros chaque `::` remplace.
+
+#### Préfixes IPv6
+
+Le préfixe réseau est l'équivalent du masque de sous-réseau en IPv4. Il est noté en **notation CIDR** : `/64`, `/48`, etc.
+
+- **/64** : standard pour un sous-réseau (les 64 premiers bits = réseau, les 64 derniers = ID d'interface)
+- **/48** : allocation typique pour un site
+- **/128** : adresse unique (une seule machine — loopback)
+
+La grande majorité des sous-réseaux utilisent un **/64**. C'est la recommandation de l'IETF et la valeur par défaut pour SLAAC (auto-configuration).
+
+### Mise en pratique CLI
+
+```cisco
+! Activer le routage IPv6 et configurer des adresses
+Router(config)# ipv6 unicast-routing
+!
+Router(config)# interface GigabitEthernet0/0
+Router(config-if)# ipv6 address 2001:DB8:ACAD:1::1/64
+Router(config-if)# no shutdown
+Router(config-if)# exit
+!
+Router(config)# interface GigabitEthernet0/1
+Router(config-if)# ipv6 address 2001:DB8:ACAD:2::1/64
+Router(config-if)# no shutdown
+```
+
+```cisco
+! Vérification
+Router# show ipv6 interface brief
+GigabitEthernet0/0     [up/up]
+    FE80::1                        ← Link-local (généré automatiquement)
+    2001:DB8:ACAD:1::1             ← Global unicast (configuré manuellement)
+GigabitEthernet0/1     [up/up]
+    FE80::1
+    2001:DB8:ACAD:2::1
+```
+
+**Interprétation** :
+- Chaque interface a **deux adresses** : une **link-local** (FE80::) assignée automatiquement, et une **global unicast** (2001:DB8::) configurée manuellement
+- `ipv6 unicast-routing` est **obligatoire** pour que le routeur puisse router du trafic IPv6 — sans cette commande, il ne fera que du forwarding local
+
+```cisco
+! Vérification détaillée
+Router# show ipv6 interface GigabitEthernet0/0
+GigabitEthernet0/0 is up, line protocol is up
+  IPv6 is enabled, link-local address is FE80::1
+  No Virtual link-local address(es):
+  Global unicast address(es):
+    2001:DB8:ACAD:1::1, subnet is 2001:DB8:ACAD:1::/64
+  Joined group address(es):
+    FF02::1                        ← All-nodes multicast
+    FF02::2                        ← All-routers multicast
+    FF02::1:FF00:1                 ← Solicited-node multicast
+  MTU is 1500 bytes
+  ...
+  ND DAD is enabled, number of DAD attempts: 1
+```
+
+**Interprétation** : l'interface a rejoint automatiquement trois groupes multicast. `FF02::1` (tous les noeuds), `FF02::2` (tous les routeurs — parce que `ipv6 unicast-routing` est activé), et `FF02::1:FF00:1` (solicited-node multicast, utilisé pour Neighbor Discovery).
+
+### Point exam
+
+> **Piège courant** : Oublier la commande `ipv6 unicast-routing` en mode de configuration globale. Sans elle, le routeur n'accepte PAS de router les paquets IPv6 — même si les adresses sont correctement configurées sur les interfaces. Le ping entre interfaces directement connectées fonctionnera, mais pas le routage entre réseaux.
+>
+> **À retenir** : En IPv6, chaque interface a au minimum **deux adresses** : une link-local (FE80::/10) et une global unicast (ou unique local). La link-local est **toujours** présente, même sans configuration manuelle.
+
+### Exercice 1.8 — Configuration IPv6
+
+**Contexte** : L'entreprise DataVault vous demande de configurer IPv6 sur deux routeurs interconnectés :
+
+```
+  [LAN-A]---[R1]---[R2]---[LAN-B]
+```
+
+- LAN-A : préfixe 2001:DB8:A:1::/64
+- LAN-B : préfixe 2001:DB8:A:2::/64
+- Lien R1-R2 : préfixe 2001:DB8:A:FF::/64
+
+**Consigne** : Écrivez les commandes de configuration complètes pour R1 et R2.
+
+**Indice** : <details><summary>Voir l'indice</summary>N'oubliez pas `ipv6 unicast-routing` sur chaque routeur. Le routeur R1 a deux interfaces : une vers LAN-A et une vers R2.</details>
+
+<details>
+<summary>Solution</summary>
+
+```cisco
+! ===== R1 =====
+R1(config)# ipv6 unicast-routing
+!
+R1(config)# interface GigabitEthernet0/0
+R1(config-if)# description LAN-A
+R1(config-if)# ipv6 address 2001:DB8:A:1::1/64
+R1(config-if)# no shutdown
+R1(config-if)# exit
+!
+R1(config)# interface GigabitEthernet0/1
+R1(config-if)# description Lien vers R2
+R1(config-if)# ipv6 address 2001:DB8:A:FF::1/64
+R1(config-if)# no shutdown
+```
+
+```cisco
+! ===== R2 =====
+R2(config)# ipv6 unicast-routing
+!
+R2(config)# interface GigabitEthernet0/0
+R2(config-if)# description Lien vers R1
+R2(config-if)# ipv6 address 2001:DB8:A:FF::2/64
+R2(config-if)# no shutdown
+R2(config-if)# exit
+!
+R2(config)# interface GigabitEthernet0/1
+R2(config-if)# description LAN-B
+R2(config-if)# ipv6 address 2001:DB8:A:2::1/64
+R2(config-if)# no shutdown
+```
+
+**Vérification** :
+```cisco
+R1# ping 2001:DB8:A:FF::2
+Type escape sequence to abort.
+Sending 5, 100-byte ICMP Echos to 2001:DB8:A:FF::2, timeout is 2 seconds:
+!!!!!
+Success rate is 100 percent (5/5), round-trip min/avg/max = 1/2/4 ms
+```
+
+**Explication** : `ipv6 unicast-routing` est présent sur les deux routeurs. R1 a l'adresse ::1 sur le lien inter-routeur, R2 a ::2. Les deux routeurs utilisent ::1 comme gateway sur leur LAN respectif.
+
+</details>
+
+### Voir aussi
+
+- Topic 1.9 dans ce module (types d'adresses IPv6 — GUA, LLA, ULA, multicast)
+- Topic 3.3 dans Module 3 (routage statique IPv6 — routes statiques et default route en IPv6)
+- Topic 1.6 dans ce module (IPv4 subnetting — comparaison des concepts)
+
+---
+
+## 1.9 — Types d'adresses IPv6
+
+> **Exam topic 1.9** : *Describe* — IPv6 address types
+> **Niveau** : Describe (Bloom 2 — Comprendre)
+
+### Contexte
+
+En IPv4, il y a essentiellement des adresses publiques, privées et quelques adresses spéciales. En IPv6, la typologie est plus riche : global unicast, unique local, link-local, anycast, multicast, et le mécanisme EUI-64. Chaque type a un rôle précis et un préfixe reconnaissable.
+
+### Théorie
+
+#### 1.9.a — Adresses Unicast
+
+**Global Unicast Address (GUA)** — L'équivalent IPv6 d'une adresse publique IPv4. Routable sur Internet.
+
+```
+  Préfixe : 2000::/3 (en pratique, commence par 2 ou 3)
+  Structure :
+  |  48 bits  | 16 bits |        64 bits          |
+  | Global ID | Subnet  |     Interface ID         |
+  | (attribué | (libre  | (EUI-64 ou aléatoire)    |
+  |  par RIR) | pour    |                          |
+  |           | subnetg)|                          |
+```
+
+Exemple : `2001:DB8:ACAD:1::1/64`
+
+**Unique Local Address (ULA)** — L'équivalent IPv6 des adresses privées RFC 1918. Utilisable uniquement dans un réseau privé, non routable sur Internet.
+
+```
+  Préfixe : FC00::/7 (en pratique, commence par FD)
+  Exemple : FD12:3456:789A:1::1/64
+```
+
+**Link-Local Address (LLA)** — Adresse valide uniquement sur le lien local (le segment L2). Générée automatiquement sur chaque interface IPv6. Utilisée par les protocoles de découverte (NDP), le routage (OSPFv3 utilise les LLA comme next-hop), et comme source pour les requêtes Neighbor Solicitation.
+
+```
+  Préfixe : FE80::/10
+  Exemple : FE80::210:A4FF:FE01:3B7C
+```
+
+Toujours présente, jamais routée au-delà du lien local. Un routeur n'enverra jamais un paquet avec une LLA comme destination sur une autre interface.
+
+| Type | Préfixe | Portée | Équivalent IPv4 | Routable Internet ? |
+|------|---------|--------|-----------------|-------------------|
+| GUA | 2000::/3 | Globale | IP publique | Oui |
+| ULA | FC00::/7 (FD00::/8) | Organisation | RFC 1918 (privée) | Non |
+| LLA | FE80::/10 | Lien local | APIPA (169.254) | Non |
+
+#### 1.9.b — Anycast
+
+Une adresse **anycast** est une adresse unicast assignée à **plusieurs** appareils. Quand un paquet est envoyé à une adresse anycast, il est livré au **plus proche** (en termes de routage).
+
+Cas d'usage : DNS anycast (le même préfixe BGP annoncé par plusieurs serveurs DNS dans le monde — le client est routé vers le plus proche). En IPv6, l'adresse **subnet-router anycast** (tous les bits d'interface ID à 0, par exemple `2001:DB8:1::/64` comme adresse sur un routeur) est un anycast par défaut.
+
+#### 1.9.c — Multicast
+
+Le **multicast** IPv6 remplace le broadcast d'IPv4. Il n'y a **pas de broadcast en IPv6**. Au lieu d'envoyer un paquet à tout le monde (broadcast), on l'envoie à un groupe d'intérêt (multicast).
+
+| Adresse multicast | Portée | Usage |
+|-------------------|--------|-------|
+| FF02::1 | Lien local | Tous les noeuds (équivalent du broadcast IPv4) |
+| FF02::2 | Lien local | Tous les routeurs |
+| FF02::5 | Lien local | Tous les routeurs OSPF |
+| FF02::6 | Lien local | Tous les DR OSPF |
+| FF02::9 | Lien local | Tous les routeurs RIP |
+| FF02::1:FFxx:xxxx | Lien local | Solicited-node multicast (NDP) |
+
+Le **solicited-node multicast** est généré à partir des 24 derniers bits de l'adresse unicast de l'interface. Il est utilisé par NDP pour la résolution d'adresses (l'équivalent d'ARP en IPv4, mais en multicast ciblé au lieu de broadcast).
+
+#### 1.9.d — Modified EUI-64
+
+Le **Modified EUI-64** est une méthode pour générer automatiquement les 64 bits de l'**Interface ID** à partir de l'adresse MAC (48 bits) de la carte réseau.
+
+Algorithme :
+1. Prendre l'adresse MAC : `00:1A:2B:3C:4D:5E`
+2. Insérer `FF:FE` au milieu : `00:1A:2B:**FF:FE**:3C:4D:5E`
+3. Inverser le 7e bit (bit U/L) du premier octet : `00` → `02`
+4. Résultat : `021A:2BFF:FE3C:4D5E`
+
+```
+  MAC :          00:1A:2B:3C:4D:5E
+                 |  insertion FFFE  |
+  EUI-64 :       00:1A:2B:FF:FE:3C:4D:5E
+                 | inversion bit 7 |
+  Modified :     02:1A:2B:FF:FE:3C:4D:5E
+  Interface ID : 021A:2BFF:FE3C:4D5E
+```
+
+Pourquoi le 7e bit ? En IEEE, le bit U/L (Universal/Local) à 0 signifie "universellement administré" (c'est une vraie MAC constructeur). En IPv6, on inverse la logique : le 1 signifie "universellement administré". D'où l'inversion.
+
+En pratique, EUI-64 est de moins en moins utilisé pour la confidentialité (l'adresse MAC est exposée). Les OS modernes préfèrent les **adresses temporaires aléatoires** (RFC 4941).
+
+### Mise en pratique CLI
+
+```cisco
+! Configuration d'une adresse IPv6 avec EUI-64
+Router(config)# interface GigabitEthernet0/0
+Router(config-if)# ipv6 address 2001:DB8:ACAD:1::/64 eui-64
+Router(config-if)# no shutdown
+
+! Vérification
+Router# show ipv6 interface GigabitEthernet0/0
+GigabitEthernet0/0 is up, line protocol is up
+  IPv6 is enabled, link-local address is FE80::C801:7FF:FE10:0
+  No Virtual link-local address(es):
+  Global unicast address(es):
+    2001:DB8:ACAD:1:C801:7FF:FE10:0, subnet is 2001:DB8:ACAD:1::/64 [EUI]
+  ...
+```
+
+**Interprétation** : L'adresse GUA a été générée par EUI-64 à partir de la MAC de l'interface (notez le `FFFE` au milieu de l'Interface ID — signature d'EUI-64). La mention `[EUI]` confirme la méthode de génération.
+
+```cisco
+! Voir toutes les adresses multicast qu'une interface a rejointes
+Router# show ipv6 interface GigabitEthernet0/0 | include group
+  Joined group address(es):
+    FF02::1
+    FF02::2
+    FF02::1:FF10:0
+```
+
+### Point exam
+
+> **Piège courant** : L'examen peut vous montrer une adresse IPv6 et demander son type. Retenez les préfixes : **2xxx** ou **3xxx** = GUA, **FE80** = link-local, **FDxx** = unique local, **FFxx** = multicast. L'adresse FE80 apparaît souvent dans les questions sur NDP et le next-hop OSPF.
+>
+> **À retenir** : Il n'y a **PAS de broadcast en IPv6**. À la place, FF02::1 (all-nodes multicast) remplit un rôle similaire. Le Modified EUI-64 se reconnaît par **FFFE** au milieu de l'Interface ID. Le 7e bit est **inversé** (pas simplement mis à 1).
+
+### Exercice 1.9 — Classifier des adresses IPv6
+
+**Contexte** : Identifiez le type de chaque adresse IPv6.
+
+| Adresse | Type |
+|---------|------|
+| 2001:DB8:1::100 | |
+| FE80::1 | |
+| FF02::1 | |
+| FD00:CAFE::1 | |
+| ::1 | |
+| FF02::1:FF00:100 | |
+| 2001:DB8:ACAD:1:C801:7FF:FE10:0 | |
+| FE80::210:A4FF:FE01:3B7C | |
+| FF02::2 | |
+| :: | |
+
+**Indice** : <details><summary>Voir l'indice</summary>Regardez le préfixe de chaque adresse. Deux adresses spéciales : `::1` est le loopback IPv6 (équivalent de 127.0.0.1) et `::` représente "toutes les adresses" (équivalent de 0.0.0.0).</details>
+
+<details>
+<summary>Solution</summary>
+
+| Adresse | Type | Explication |
+|---------|------|-------------|
+| 2001:DB8:1::100 | **GUA** (Global Unicast) | Commence par 2xxx → routable Internet (2001:DB8 = documentation) |
+| FE80::1 | **LLA** (Link-Local) | Préfixe FE80::/10 |
+| FF02::1 | **Multicast** — all-nodes | FF = multicast, scope 02 = link-local |
+| FD00:CAFE::1 | **ULA** (Unique Local) | Commence par FD → adresse privée IPv6 |
+| ::1 | **Loopback** | Équivalent IPv6 de 127.0.0.1 |
+| FF02::1:FF00:100 | **Multicast** — solicited-node | Préfixe FF02::1:FF → utilisé par NDP |
+| 2001:DB8:ACAD:1:C801:7FF:FE10:0 | **GUA** (EUI-64) | GUA + FFFE dans l'Interface ID = EUI-64 |
+| FE80::210:A4FF:FE01:3B7C | **LLA** (EUI-64) | LLA + FFFE = link-local générée par EUI-64 |
+| FF02::2 | **Multicast** — all-routers | FF02::2 = tous les routeurs du lien |
+| :: | **Non spécifiée** | Équivalent de 0.0.0.0 — "pas d'adresse" ou route par défaut |
+
+</details>
+
+### Voir aussi
+
+- Topic 1.8 dans ce module (configuration IPv6 — mise en pratique des adresses)
+- Topic 3.4 dans Module 3 (OSPF — OSPFv3 utilise les link-local comme next-hop)
+- Topic 5.9 dans Module 5 (sécurité wireless — IPv6 et NDP)
+
+---
+
+## 1.10 — Vérification des paramètres IP sur les OS clients
+
+> **Exam topic 1.10** : *Verify* — IP parameters for Client OS (Windows, Mac OS, Linux)
+> **Niveau** : Verify (Bloom 3 — Appliquer)
+
+### Contexte
+
+Quand un utilisateur dit "Internet ne marche pas", la première chose à vérifier est la configuration IP de son poste. Est-ce qu'il a une adresse IP valide ? Une passerelle ? Un serveur DNS ? La commande varie selon l'OS, mais les informations à vérifier sont les mêmes.
+
+### Théorie
+
+#### Paramètres IP essentiels à vérifier
+
+Sur tout OS client, quatre paramètres sont critiques :
+1. **Adresse IP** : est-elle dans le bon sous-réseau ? N'est-ce pas une APIPA (169.254.x.x) ?
+2. **Masque de sous-réseau** : correspond-il à la configuration réseau attendue ?
+3. **Passerelle par défaut (default gateway)** : est-elle dans le même sous-réseau que le poste ?
+4. **Serveur(s) DNS** : sont-ils configurés et joignables ?
+
+#### Commandes par OS
+
+| Action | Windows | macOS | Linux |
+|--------|---------|-------|-------|
+| Voir la config IP | `ipconfig` | `ifconfig` ou `ip addr` | `ip addr` ou `ifconfig` |
+| Config IP détaillée (DHCP, DNS, MAC) | `ipconfig /all` | `ifconfig` + `networksetup -getdnsservers Wi-Fi` | `ip addr` + `cat /etc/resolv.conf` |
+| Renouveler DHCP | `ipconfig /release` puis `ipconfig /renew` | `sudo ipconfig set en0 DHCP` | `sudo dhclient -r` puis `sudo dhclient` |
+| Tester la connectivité | `ping 10.1.1.1` | `ping 10.1.1.1` | `ping 10.1.1.1` |
+| Résolution DNS | `nslookup www.example.com` | `nslookup www.example.com` | `nslookup www.example.com` ou `dig` |
+| Voir la table de routage | `route print` | `netstat -rn` | `ip route` |
+| Voir les connexions actives | `netstat -an` | `netstat -an` | `ss -tunap` |
+
+### Mise en pratique CLI
+
+**Windows** :
+```
+C:\> ipconfig /all
+
+Windows IP Configuration
+
+   Host Name . . . . . . . . . . . . : PC-BUREAU-12
+   Primary Dns Suffix  . . . . . . . : medtech.local
+   Node Type . . . . . . . . . . . . : Hybrid
+
+Ethernet adapter Ethernet:
+
+   Connection-specific DNS Suffix  . : medtech.local
+   Description . . . . . . . . . . . : Intel(R) I219-LM
+   Physical Address. . . . . . . . . : 00-1A-2B-3C-4D-5E
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes
+   IPv4 Address. . . . . . . . . . . : 10.1.10.45(Preferred)
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : 10.1.10.1
+   DHCP Server . . . . . . . . . . . : 10.1.1.5
+   DNS Servers . . . . . . . . . . . : 10.1.1.10
+                                        10.1.1.11
+   Lease Obtained. . . . . . . . . . : Friday, April 4, 2026 08:12:33
+   Lease Expires . . . . . . . . . . : Saturday, April 5, 2026 08:12:33
+```
+
+**Interprétation** : Ce PC a une adresse IP valide (10.1.10.45/24) obtenue par DHCP depuis le serveur 10.1.1.5. La passerelle (10.1.10.1) est dans le même sous-réseau — correct. Deux serveurs DNS sont configurés (redondance). Le bail DHCP expire dans 24h.
+
+**Linux** :
+```
+$ ip addr show eth0
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP
+    link/ether 00:1a:2b:3c:4d:5f brd ff:ff:ff:ff:ff:ff
+    inet 10.1.10.102/24 brd 10.1.10.255 scope global dynamic eth0
+       valid_lft 86245sec preferred_lft 86245sec
+    inet6 fe80::21a:2bff:fe3c:4d5f/64 scope link
+       valid_lft forever preferred_lft forever
+
+$ ip route
+default via 10.1.10.1 dev eth0 proto dhcp metric 100
+10.1.10.0/24 dev eth0 proto kernel scope link src 10.1.10.102
+
+$ cat /etc/resolv.conf
+nameserver 10.1.1.10
+nameserver 10.1.1.11
+```
+
+**macOS** :
+```
+$ ifconfig en0
+en0: flags=8863<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+	ether 00:1a:2b:3c:4d:60
+	inet 10.1.10.78 netmask 0xffffff00 broadcast 10.1.10.255
+	inet6 fe80::21a:2bff:fe3c:4d60%en0 prefixlen 64 scopeid 0x4
+	status: active
+
+$ networksetup -getdnsservers Wi-Fi
+10.1.1.10
+10.1.1.11
+```
+
+### Point exam
+
+> **Piège courant** : Si un poste Windows affiche une adresse en **169.254.x.x**, ce n'est pas une adresse valide — c'est APIPA. Le poste n'a pas trouvé de serveur DHCP. Vérifiez la connectivité physique et le service DHCP. L'examen peut montrer un `ipconfig` avec une adresse APIPA et demander quel est le problème.
+>
+> **À retenir** : Sur Windows, `ipconfig /all` montre tout (DHCP, DNS, MAC). Sur Linux, les DNS sont dans `/etc/resolv.conf`. Sur macOS, `networksetup -getdnsservers Wi-Fi` donne les DNS. Les trois OS utilisent `ping` de la même façon.
+
+### Exercice 1.10 — Vérifier les paramètres IP
+
+**Contexte** : Un utilisateur sous Windows ne peut pas accéder à Internet. Voici son `ipconfig` :
+
+```
+Ethernet adapter Ethernet:
+   IPv4 Address. . . . . . . . . . . : 169.254.45.200
+   Subnet Mask . . . . . . . . . . . : 255.255.0.0
+   Default Gateway . . . . . . . . . :
+```
+
+**Consigne** : (a) Quel est le problème ? (b) Quels tests effectuer ? (c) Comment résoudre ?
+
+**Indice** : <details><summary>Voir l'indice</summary>L'adresse 169.254.x.x est une adresse APIPA. Que signifie l'absence de passerelle par défaut ?</details>
+
+<details>
+<summary>Solution</summary>
+
+**(a)** L'adresse **169.254.45.200** est une adresse **APIPA** (169.254.0.0/16). Le poste est configuré en DHCP mais n'a reçu aucune réponse du serveur DHCP. La passerelle est vide — le poste n'a aucune route vers Internet.
+
+**(b)** Tests à effectuer :
+1. Vérifier le câble réseau (branché ? LED du port switch allumée ?)
+2. `ipconfig /release` puis `ipconfig /renew` — tenter de renouveler le bail
+3. Si ça échoue, vérifier que le port du switch est actif (`show interfaces status` côté switch)
+4. Vérifier que le serveur DHCP fonctionne et que le scope couvre ce sous-réseau
+5. Si le poste est sur un VLAN différent du serveur DHCP, vérifier la configuration du DHCP relay (`ip helper-address`)
+
+**(c)** Résolution typique :
+- Si le câble est débranché → le rebrancher
+- Si le switch est OK mais pas de DHCP → vérifier le serveur DHCP ou configurer temporairement une IP statique pour tester la connectivité
+
+</details>
+
+### Voir aussi
+
+- Topic 4.3 dans Module 4 (DHCP — fonctionnement du protocole côté serveur)
+- Topic 4.6 dans Module 4 (DHCP relay — quand le serveur DHCP est dans un autre sous-réseau)
+- Topic 1.7 dans ce module (adressage privé — les adresses DHCP distribuées sont souvent privées)
+
+---
+
+## 1.11 — Principes du wireless
+
+> **Exam topic 1.11** : *Describe* — wireless principles
+> **Niveau** : Describe (Bloom 2 — Comprendre)
+
+### Contexte
+
+Le Wi-Fi est devenu le mode de connexion principal dans la plupart des entreprises. Les employés s'attendent à ce que ça fonctionne partout, tout le temps, avec la même qualité qu'un câble Ethernet. Comprendre les principes radio qui régissent le wireless est essentiel pour concevoir, déployer et dépanner un réseau Wi-Fi d'entreprise.
+
+### Théorie
+
+#### 1.11.a — Canaux Wi-Fi non superposés
+
+Le Wi-Fi utilise des fréquences radio partagées. Deux AP sur le même canal (ou des canaux qui se chevauchent) vont se parasiter — c'est l'**interférence co-canal** et l'**interférence de canal adjacent**.
+
+**Bande 2,4 GHz** — 14 canaux disponibles (11 en Amérique, 13 en Europe), mais seulement **3 canaux non superposés** : **1, 6, 11**.
+
+```
+  Canal:  1   2   3   4   5   6   7   8   9  10  11  12  13
+          |===== 22 MHz =====|
+                              |===== 22 MHz =====|
+                                                    |===== 22 MHz =====|
+  Non-overlapping: ←── 1 ──→           ←── 6 ──→           ←── 11 ──→
+```
+
+Chaque canal fait 22 MHz de large, et ils sont espacés de 5 MHz. Pour éviter toute superposition, il faut 5 canaux d'écart minimum → 1, 6, 11.
+
+**Bande 5 GHz** — Beaucoup plus de canaux non superposés (jusqu'à **25** selon la réglementation locale). Chaque canal UNII fait 20 MHz et ils ne se chevauchent pas naturellement. On peut aussi utiliser des canaux de 40, 80 ou 160 MHz (channel bonding) pour augmenter le débit.
+
+**Bande 6 GHz (Wi-Fi 6E)** — Encore plus d'espace : 59 canaux de 20 MHz disponibles. Pas de congestion héritée du 2,4 ou 5 GHz.
+
+#### 1.11.b — SSID (Service Set Identifier)
+
+Le **SSID** est le nom du réseau Wi-Fi visible par les clients. Un AP peut diffuser plusieurs SSID (multi-SSID) — chacun mappé à un VLAN différent.
+
+Exemple typique en entreprise :
+| SSID | Usage | VLAN | Sécurité |
+|------|-------|------|----------|
+| CORP-SECURE | Employés | VLAN 10 | WPA2-Enterprise (802.1X) |
+| GUEST | Visiteurs | VLAN 99 | WPA2-PSK + portail captif |
+| IOT-DEVICES | Capteurs, imprimantes | VLAN 50 | WPA2-PSK |
+
+Le SSID peut être **visible** (diffusé dans les beacons) ou **masqué**. Masquer le SSID n'apporte aucune sécurité réelle — les outils de scan le retrouvent facilement — mais c'est encore une pratique courante.
+
+#### 1.11.c — RF (Radio Frequency)
+
+Concepts RF essentiels pour le CCNA :
+
+- **Fréquence** : 2,4 GHz pénètre mieux les murs mais a moins de canaux. 5 GHz offre plus de débit et de canaux mais traverse moins bien les obstacles.
+- **Puissance d'émission (Tx Power)** : mesurée en dBm ou mW. Plus la puissance est élevée, plus la portée est grande — mais aussi les interférences.
+- **RSSI** (Received Signal Strength Indicator) : force du signal reçu. En dessous de **-70 dBm**, la qualité se dégrade. En dessous de **-80 dBm**, la connexion est instable.
+- **SNR** (Signal-to-Noise Ratio) : rapport signal/bruit. Un SNR > 25 dB est bon. < 15 dB = problèmes.
+- **Interférences** : micro-ondes, Bluetooth, autres AP — tout ce qui émet dans la même bande.
+
+Règle des **3 dB** : +3 dB = doublement de la puissance. +10 dB = multiplication par 10.
+
+| dBm | mW |
+|-----|-----|
+| 0 | 1 |
+| 3 | 2 |
+| 10 | 10 |
+| 17 | 50 |
+| 20 | 100 |
+
+#### 1.11.d — Chiffrement wireless
+
+| Standard | Chiffrement | Authentification | Sécurité |
+|----------|------------|-----------------|----------|
+| WEP | RC4 (40/104 bits) | Shared key | **Obsolète** — cassable en minutes |
+| WPA | TKIP (RC4 amélioré) | PSK ou Enterprise | Déprécié |
+| WPA2 | **AES-CCMP** | PSK ou Enterprise (802.1X) | Standard actuel |
+| WPA3 | AES-GCMP / SAE | SAE (Personal) ou 802.1X (Enterprise) | Dernière génération |
+
+**WPA2-Personal (PSK)** : une clé pré-partagée (mot de passe) connue de tous. Simple, mais si la clé fuit, tout le monde est exposé.
+
+**WPA2-Enterprise** : chaque utilisateur s'authentifie individuellement via **802.1X** + serveur RADIUS. Beaucoup plus sécurisé — la compromission d'un compte n'expose pas les autres.
+
+**WPA3** apporte le **SAE** (Simultaneous Authentication of Equals) qui remplace le PSK : même si un attaquant capture le handshake, il ne peut pas brute-forcer la clé offline. WPA3 offre aussi le **Forward Secrecy** — si la clé est compromise ultérieurement, les sessions passées restent protégées.
+
+### Mise en pratique CLI
+
+```cisco
+! Sur un WLC (Wireless LAN Controller) — vérifier les AP et leurs canaux
+WLC> show ap summary
+Number of APs.................................... 3
+
+AP Name            Slots  AP Model              Ethernet MAC       Location
+-----------------  -----  --------------------  -----------------  --------
+AP-FLOOR1            2    AIR-AP3802I-E-K9      00:1a:2b:3c:4d:01  Floor1
+AP-FLOOR2            2    AIR-AP3802I-E-K9      00:1a:2b:3c:4d:02  Floor2
+AP-FLOOR3            2    C9120AXI-E            00:1a:2b:3c:4d:03  Floor3
+
+WLC> show ap channel AP-FLOOR1
+                      802.11b/g/n :
+                      Channel......... 1
+                      Channel Width... 20 MHz
+                      802.11a/n/ac :
+                      Channel......... 36
+                      Channel Width... 40 MHz
+```
+
+**Interprétation** : L'AP du 1er étage utilise le canal 1 en 2,4 GHz (un des trois non-overlapping) et le canal 36 en 5 GHz avec une largeur de 40 MHz. Les trois AP devraient idéalement être sur les canaux 1, 6 et 11 en 2,4 GHz pour éviter les interférences.
+
+### Point exam
+
+> **Piège courant** : L'examen peut demander combien de canaux non superposés sont disponibles en 2,4 GHz. La réponse est **3** (canaux 1, 6, 11) — pas 11, pas 14. C'est LA question piège classique sur le wireless.
+>
+> **À retenir** : WPA2 utilise **AES-CCMP** (pas TKIP — c'est WPA). En 2,4 GHz : **3** canaux non-overlapping. En 5 GHz : **jusqu'à 25** canaux non-overlapping. Le chiffrement WEP est **obsolète** et ne devrait jamais être utilisé.
+
+### Exercice 1.11 — Plan de canaux Wi-Fi
+
+**Contexte** : Un open-space rectangulaire nécessite 3 AP pour couvrir toute la surface. Vous devez planifier les canaux en 2,4 GHz pour minimiser les interférences.
+
+```
+  ┌──────────────────────────────────────────────┐
+  │                                              │
+  │      [AP-1]         [AP-2]        [AP-3]     │
+  │                                              │
+  └──────────────────────────────────────────────┘
+```
+
+**Consigne** : (a) Assignez un canal 2,4 GHz à chaque AP. (b) Expliquez pourquoi cette répartition minimise les interférences. (c) Quel canal 5 GHz pourriez-vous assigner à AP-2 si AP-1 est sur le canal 36 ?
+
+**Indice** : <details><summary>Voir l'indice</summary>En 2,4 GHz, les trois seuls canaux qui ne se chevauchent pas sont 1, 6 et 11. En 5 GHz, les canaux UNII-1 sont 36, 40, 44, 48.</details>
+
+<details>
+<summary>Solution</summary>
+
+**(a)** Répartition optimale :
+- AP-1 : **Canal 1**
+- AP-2 : **Canal 6**
+- AP-3 : **Canal 11**
+
+**(b)** Les canaux 1, 6 et 11 sont les seuls non-overlapping en 2,4 GHz. Avec 3 AP en ligne, chacun sur un canal différent, aucun ne génère d'interférence co-canal avec ses voisins. AP-2 (canal 6) est au milieu mais n'interfère ni avec AP-1 (canal 1) ni avec AP-3 (canal 11).
+
+**(c)** Si AP-1 est sur le canal 36 en 5 GHz, AP-2 pourrait être sur le **canal 44** ou **48** (un espacement de 2+ canaux en 20 MHz est suffisant). Si on utilise des canaux de 40 MHz, AP-1 utiliserait 36+40 et AP-2 pourrait utiliser 44+48.
+
+</details>
+
+### Voir aussi
+
+- Topic 2.6 dans Module 2 (architectures wireless — CAPWAP, FlexConnect)
+- Topic 2.9 dans Module 2 (configuration WLC GUI — SSID, sécurité)
+- Topic 5.9 dans Module 5 (WPA2/WPA3 — sécurité wireless en détail)
+
+---
+
+## 1.12 — Fondamentaux de la virtualisation
+
+> **Exam topic 1.12** : *Explain* — virtualization fundamentals (server virtualization, containers, and VRFs)
+> **Niveau** : Explain (Bloom 2 — Comprendre)
+
+### Contexte
+
+Autrefois, un serveur physique exécutait un seul système d'exploitation et une seule application. C'était un gaspillage massif de ressources — un serveur web utilisant 10% du CPU pendant que les 90% restants dormaient. La virtualisation a changé ça : un seul serveur physique peut héberger des dizaines de machines virtuelles ou de containers, chacun isolé des autres.
+
+### Théorie
+
+#### Virtualisation serveur (VMs)
+
+Un **hyperviseur** est le logiciel qui permet de faire tourner plusieurs machines virtuelles (VMs) sur un même serveur physique. Chaque VM a son propre OS, ses propres interfaces réseau virtuelles et son propre espace disque.
+
+| Type | Description | Exemple |
+|------|------------|---------|
+| **Type 1** (bare-metal) | S'installe directement sur le hardware, sans OS hôte | VMware ESXi, Microsoft Hyper-V, KVM |
+| **Type 2** (hosted) | S'installe sur un OS existant comme une application | VirtualBox, VMware Workstation |
+
+```
+  Serveur physique
+  ┌─────────────────────────────────────────┐
+  │  ┌──────┐  ┌──────┐  ┌──────┐          │
+  │  │ VM1  │  │ VM2  │  │ VM3  │          │
+  │  │Ubuntu│  │Win11 │  │CentOS│          │
+  │  │ App A│  │ App B│  │ App C│          │
+  │  └──────┘  └──────┘  └──────┘          │
+  │  ┌─────────────────────────────────┐    │
+  │  │       Hyperviseur (ESXi)        │    │
+  │  └─────────────────────────────────┘    │
+  │  ┌─────────────────────────────────┐    │
+  │  │          Hardware               │    │
+  │  └─────────────────────────────────┘    │
+  └─────────────────────────────────────────┘
+```
+
+Chaque VM possède une ou plusieurs **vNIC** (virtual Network Interface Card) connectées à un **virtual switch** (vSwitch) à l'intérieur de l'hyperviseur. Le vSwitch se comporte comme un switch physique : VLANs, trunking, filtrage.
+
+#### Containers
+
+Un **container** est une forme de virtualisation plus légère. Au lieu de virtualiser un OS complet, le container partage le noyau de l'OS hôte et isole uniquement l'application et ses dépendances.
+
+```
+  Serveur physique
+  ┌─────────────────────────────────────────┐
+  │  ┌──────┐  ┌──────┐  ┌──────┐          │
+  │  │Cont.1│  │Cont.2│  │Cont.3│          │
+  │  │ App A│  │ App B│  │ App C│          │
+  │  │ Libs │  │ Libs │  │ Libs │          │
+  │  └──────┘  └──────┘  └──────┘          │
+  │  ┌─────────────────────────────────┐    │
+  │  │     Container Engine (Docker)    │    │
+  │  └─────────────────────────────────┘    │
+  │  ┌─────────────────────────────────┐    │
+  │  │       OS Hôte (Linux)            │    │
+  │  └─────────────────────────────────┘    │
+  │  ┌─────────────────────────────────┐    │
+  │  │          Hardware               │    │
+  │  └─────────────────────────────────┘    │
+  └─────────────────────────────────────────┘
+```
+
+| Critère | VM | Container |
+|---------|-----|-----------|
+| Isolation | Forte (OS séparé) | Modérée (noyau partagé) |
+| Taille | Go (OS complet) | Mo (application + libs) |
+| Démarrage | Minutes | Secondes |
+| Overhead | Élevé | Faible |
+| Portabilité | Moyenne (dépend de l'hyperviseur) | Élevée (image Docker) |
+| Usage réseau | vNIC + vSwitch | Bridge réseau, overlay (VXLAN) |
+| Orchestration | vCenter, OpenStack | Kubernetes, Docker Swarm |
+
+#### VRF — Virtual Routing and Forwarding
+
+Le **VRF** est de la virtualisation côté réseau : il permet de créer plusieurs tables de routage **indépendantes** sur un même routeur physique. C'est comme avoir plusieurs routeurs virtuels dans un seul boîtier.
+
+```
+  Routeur physique
+  ┌──────────────────────────────────────────┐
+  │  ┌──────────┐  ┌──────────┐  ┌────────┐ │
+  │  │ VRF CORP │  │ VRF GUEST│  │VRF MGMT│ │
+  │  │ Table de │  │ Table de │  │ Table  │ │
+  │  │ routage A│  │ routage B│  │ rout. C│ │
+  │  └──────────┘  └──────────┘  └────────┘ │
+  │               Routeur unique              │
+  └──────────────────────────────────────────┘
+```
+
+Cas d'usage :
+- **Segmentation** : le trafic invités (VRF GUEST) est totalement séparé du trafic corporate (VRF CORP) — même sur le même routeur physique
+- **Multi-tenancy** : un opérateur utilise des VRFs pour isoler le trafic de chaque client
+- **Sécurité** : le management réseau (VRF MGMT) est isolé du trafic de production
+
+Les VRFs sont fondamentaux dans les architectures **MPLS-VPN** et **SD-WAN**.
+
+### Mise en pratique CLI
+
+```cisco
+! Configuration d'un VRF basique
+Router(config)# ip vrf GUEST
+Router(config-vrf)# description Réseau invités
+Router(config-vrf)# exit
+!
+Router(config)# interface GigabitEthernet0/2
+Router(config-if)# ip vrf forwarding GUEST
+Router(config-if)# ip address 10.99.1.1 255.255.255.0
+Router(config-if)# no shutdown
+
+! Vérification
+Router# show ip vrf
+  Name                Default RD        Interfaces
+  GUEST               <not set>         Gi0/2
+
+Router# show ip route vrf GUEST
+Routing Table: GUEST
+Gateway of last resort is not set
+
+      10.0.0.0/24 is subnetted, 1 subnets
+C        10.99.1.0 is directly connected, GigabitEthernet0/2
+L        10.99.1.1/32 is directly connected, GigabitEthernet0/2
+```
+
+**Interprétation** : Le VRF "GUEST" a sa propre table de routage, complètement séparée de la table globale. Même si la table globale a aussi un réseau 10.99.x.x, il n'y a aucun croisement de routes. L'interface Gi0/2 est assignée exclusivement au VRF GUEST.
+
+### Point exam
+
+> **Piège courant** : Quand on assigne une interface à un VRF (`ip vrf forwarding GUEST`), l'adresse IP de cette interface est **supprimée** automatiquement. Il faut la reconfigurer après la commande VRF. C'est un piège classique dans les labs.
+>
+> **À retenir** : Hyperviseur Type 1 = directement sur le hardware (ESXi). Type 2 = sur un OS existant (VirtualBox). Un VRF crée des tables de routage **indépendantes** sur un même routeur — ce n'est pas du VLAN (qui opère en couche 2), c'est de la segmentation en **couche 3**.
+
+### Exercice 1.12 — Comparer VM, container et VRF
+
+**Contexte** : Pour chaque scénario, indiquez la technologie la plus adaptée (VM, container ou VRF) et justifiez.
+
+| Scénario | Technologie | Justification |
+|----------|------------|---------------|
+| Héberger un serveur Windows et un serveur Linux sur un même hardware | | |
+| Déployer 50 instances d'une API Node.js rapidement | | |
+| Isoler le trafic réseau de deux clients sur un même routeur d'opérateur | | |
+| Exécuter un legacy ERP qui nécessite Windows Server 2012 | | |
+| Orchestrer des microservices avec Kubernetes | | |
+
+**Indice** : <details><summary>Voir l'indice</summary>Les VMs sont pour l'isolation forte avec des OS différents. Les containers sont pour le déploiement rapide et léger d'applications. Les VRFs sont spécifiquement pour l'isolation du routage réseau.</details>
+
+<details>
+<summary>Solution</summary>
+
+| Scénario | Technologie | Justification |
+|----------|------------|---------------|
+| Windows + Linux sur même hardware | **VM** | OS différents → nécessite un hyperviseur pour virtualiser chaque OS |
+| 50 instances API Node.js | **Container** | Même application dupliquée, démarrage rapide, peu de ressources par instance |
+| Isolation trafic 2 clients | **VRF** | Segmentation des tables de routage sur un même routeur — c'est le cas d'usage exact des VRFs |
+| Legacy ERP Windows 2012 | **VM** | OS spécifique ancien, isolation forte requise pour la compatibilité |
+| Microservices Kubernetes | **Container** | Kubernetes orchestre des containers — c'est son rôle natif |
+
+</details>
+
+### Voir aussi
+
+- Topic 1.2.f dans ce module (on-premises vs cloud — les VMs et containers sont aussi dans le cloud)
+- Topic 6.3 dans Module 6 (SDN — overlay/underlay utilisent souvent des VRFs)
+- Topic 2.1 dans Module 2 (VLANs — segmentation L2, complémentaire aux VRFs en L3)
+
+---
+
+## 1.13 — Concepts de commutation
+
+> **Exam topic 1.13** : *Describe* — switching concepts
+> **Niveau** : Describe (Bloom 2 — Comprendre)
+
+### Contexte
+
+Le switch est l'épine dorsale du réseau local. Comprendre comment il apprend les adresses MAC, transfère les trames et gère sa table de commutation est fondamental — c'est la base sur laquelle reposent les VLANs, le Spanning Tree, et toute la couche 2.
+
+### Théorie
+
+#### 1.13.a — MAC Learning et Aging
+
+Quand un switch reçoit une trame, il regarde l'**adresse MAC source** et l'associe au port d'entrée dans sa **table MAC** (aussi appelée CAM table — Content Addressable Memory).
+
+Processus de learning :
+1. Le PC-A (MAC: AAAA.BBBB.0001) envoie une trame depuis le port Gi0/1
+2. Le switch note : "MAC AAAA.BBBB.0001 → port Gi0/1"
+3. Si une trame arrive plus tard avec la même MAC source sur un **autre** port, le switch met à jour l'entrée
+
+L'**aging** est le mécanisme de nettoyage : si une adresse MAC n'est pas vue pendant un certain temps (par défaut **300 secondes** / 5 minutes sur Cisco), elle est supprimée de la table. Cela évite que la table se remplisse d'adresses obsolètes (appareils déconnectés, déplacés).
+
+#### 1.13.b — Frame Switching
+
+Quand le switch reçoit une trame à transférer, il regarde l'**adresse MAC destination** :
+
+- **Adresse connue** (dans la table MAC) → le switch envoie la trame **uniquement** sur le port associé (**unicast forwarding**). C'est la situation normale.
+- **Adresse inconnue** (pas dans la table) → le switch **flood** la trame sur tous les ports du même VLAN, sauf le port source. C'est le **unknown unicast flooding**.
+- **Adresse broadcast** (FF:FF:FF:FF:FF:FF) → flood sur tous les ports du même VLAN.
+
+Méthodes de switching :
+
+| Méthode | Description | Latence | Vérification d'erreurs |
+|---------|-------------|---------|----------------------|
+| **Store-and-forward** | Reçoit la trame entière, vérifie le CRC, puis transfère | Plus élevée | Oui (CRC check) |
+| **Cut-through** | Lit seulement l'adresse MAC destination (6 premiers octets du header) et transfère immédiatement | Très faible | Non |
+| **Fragment-free** | Lit les 64 premiers octets (détecte les runts de collision) puis transfère | Moyenne | Partielle |
+
+Les switches Cisco modernes utilisent principalement le **store-and-forward**.
+
+#### 1.13.c — Frame Flooding
+
+Le flooding se produit dans trois cas :
+1. **Unknown unicast** : l'adresse MAC destination n'est pas dans la table
+2. **Broadcast** : la destination est FF:FF:FF:FF:FF:FF (ex: requête ARP)
+3. **Multicast** : en l'absence d'IGMP snooping, le multicast est floodé comme du broadcast
+
+Le flooding est limité au **VLAN** de la trame. Un switch ne floodera jamais une trame du VLAN 10 vers des ports du VLAN 20.
+
+```
+  Scénario : PC-A envoie une trame à PC-C (MAC inconnue du switch)
+
+  [PC-A]──Gi0/1──[SWITCH]──Gi0/2──[PC-B]
+                     |
+                   Gi0/3
+                     |
+                   [PC-C]
+
+  1. Trame arrive sur Gi0/1 → switch apprend MAC de PC-A sur Gi0/1
+  2. MAC destination (PC-C) pas dans la table → FLOOD
+  3. Trame envoyée sur Gi0/2 ET Gi0/3 (tous les ports sauf Gi0/1)
+  4. PC-B ignore (pas son MAC), PC-C répond
+  5. Réponse de PC-C arrive sur Gi0/3 → switch apprend MAC de PC-C sur Gi0/3
+  6. Prochaine trame de PC-A vers PC-C → unicast direct sur Gi0/3
+```
+
+#### 1.13.d — Table d'adresses MAC
+
+La table MAC est la structure de données centrale du switch. Elle associe chaque adresse MAC à un port et un VLAN.
+
+### Mise en pratique CLI
+
+```cisco
+! Voir la table MAC
+Switch# show mac address-table
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+   1    0001.4275.a3e1    DYNAMIC     Gi0/1
+   1    0050.7966.6800    DYNAMIC     Gi0/2
+   1    00d0.ba45.1234    DYNAMIC     Gi0/3
+  10    aabb.cc00.0100    DYNAMIC     Gi0/10
+  10    aabb.cc00.0200    DYNAMIC     Gi0/11
+  20    aabb.cc00.0300    DYNAMIC     Gi0/15
+Total Mac Addresses for this criterion: 6
+```
+
+**Interprétation** :
+- 3 adresses MAC sur le VLAN 1, 2 sur le VLAN 10, 1 sur le VLAN 20
+- Toutes sont `DYNAMIC` (apprises par le switch) — un type `STATIC` indiquerait une entrée configurée manuellement
+- L'adresse `0050.7966.6800` est accessible via le port Gi0/2
+
+```cisco
+! Voir le timer d'aging
+Switch# show mac address-table aging-time
+Global Aging Time:  300
+Vlan    Aging Time
+----    ----------
+
+! Modifier le timer d'aging
+Switch(config)# mac address-table aging-time 600
+
+! Effacer la table MAC (force le re-learning)
+Switch# clear mac address-table dynamic
+```
+
+```cisco
+! Rechercher un MAC spécifique (utile pour localiser un poste)
+Switch# show mac address-table address 0050.7966.6800
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+   1    0050.7966.6800    DYNAMIC     Gi0/2
+```
+
+### Point exam
+
+> **Piège courant** : Le switch apprend les MAC à partir de l'adresse **source** (pas destination). Il transfère les trames en se basant sur l'adresse **destination**. Ne mélangez pas les deux opérations : apprendre = source, transférer = destination.
+>
+> **À retenir** : Le timer d'aging par défaut est de **300 secondes** (5 minutes). Le flooding est limité au **même VLAN**. Un frame broadcast est TOUJOURS floodé. Un unknown unicast est floodé uniquement parce que le switch ne sait pas encore sur quel port se trouve la destination.
+
+### Exercice 1.13 — Parcours d'une trame
+
+**Contexte** : Un réseau avec deux switches interconnectés :
+
+```
+  [PC-A]──Gi0/1──[SW1]──Gi0/24──[SW2]──Gi0/1──[PC-B]
+                    |                     |
+                  Gi0/2                 Gi0/2
+                    |                     |
+                  [PC-C]               [PC-D]
+```
+
+Toutes les tables MAC sont vides. PC-A envoie une trame à PC-B.
+
+**Consigne** : Décrivez étape par étape : (a) le comportement de chaque switch, (b) ce que chaque switch apprend, (c) l'état des tables MAC après l'échange complet (trame + réponse).
+
+**Indice** : <details><summary>Voir l'indice</summary>Quand la table MAC est vide, le switch ne connaît aucune destination → il flood. Chaque switch apprend la MAC source quand une trame arrive.</details>
+
+<details>
+<summary>Solution</summary>
+
+**Étape 1** : PC-A envoie une trame à PC-B
+- SW1 reçoit la trame sur Gi0/1
+- SW1 **apprend** : MAC-A → Gi0/1
+- SW1 ne connaît pas MAC-B → **flood** sur Gi0/2 (vers PC-C) et Gi0/24 (vers SW2)
+- PC-C reçoit la trame, vérifie la MAC destination → pas pour lui, ignore
+
+**Étape 2** : La trame floodée arrive sur SW2 via Gi0/24
+- SW2 reçoit la trame sur Gi0/24
+- SW2 **apprend** : MAC-A → Gi0/24
+- SW2 ne connaît pas MAC-B → **flood** sur Gi0/1 (vers PC-B) et Gi0/2 (vers PC-D)
+- PC-D ignore. PC-B reconnaît sa MAC → traite la trame.
+
+**Étape 3** : PC-B répond à PC-A
+- SW2 reçoit la réponse de PC-B sur Gi0/1
+- SW2 **apprend** : MAC-B → Gi0/1
+- SW2 connaît MAC-A → Gi0/24 → **unicast** direct vers SW1 (pas de flood)
+
+**Étape 4** : La réponse arrive sur SW1 via Gi0/24
+- SW1 reçoit la trame sur Gi0/24
+- SW1 **apprend** : MAC-B → Gi0/24
+- SW1 connaît MAC-A sur Gi0/1, mais MAC-A est la **destination** de la réponse → SW1 envoie en **unicast** sur Gi0/1 vers PC-A
+
+**Tables MAC finales** :
+
+| Switch | MAC | Port |
+|--------|-----|------|
+| SW1 | MAC-A | Gi0/1 |
+| SW1 | MAC-B | Gi0/24 |
+| SW2 | MAC-A | Gi0/24 |
+| SW2 | MAC-B | Gi0/1 |
+
+Note : PC-C et PC-D n'ont envoyé aucune trame → leurs MAC ne sont pas dans les tables.
+
+</details>
+
+### Voir aussi
+
+- Topic 2.1 dans Module 2 (VLANs — le flooding est limité au VLAN)
+- Topic 2.5 dans Module 2 (STP — empêche les boucles qui causeraient un flooding infini)
+- Topic 5.7 dans Module 5 (port security — limite le nombre de MAC par port)
+
+---
+
+## 1.14 — Utilisation de l'IA générative pour le networking
+
+> **Exam topic 1.14** : *Describe* — the use of Generative AI tools for networking *(NOUVEAU v1.1)*
+> **Niveau** : Describe (Bloom 2 — Comprendre)
+
+### Contexte
+
+Le topic 1.14 est un ajout de la version 1.1 de l'examen CCNA (août 2025). Cisco reconnaît que l'IA générative transforme les pratiques d'administration réseau. Ce topic ne demande pas de maîtriser un outil spécifique, mais de comprendre comment et où les outils GenAI peuvent assister — et surtout, quelles sont leurs limites — dans un contexte réseau.
+
+### Théorie
+
+#### Qu'est-ce que l'IA générative dans le contexte réseau ?
+
+L'IA générative (GenAI) désigne les modèles capables de **produire** du contenu nouveau : du texte, du code, des configurations, des analyses. Dans le networking, ces outils peuvent :
+
+1. **Générer des configurations** — Produire une configuration de routeur ou switch à partir d'une description en langage naturel ("configure OSPF area 0 sur ce routeur avec les réseaux 10.1.1.0/24 et 10.1.2.0/24").
+
+2. **Assister le troubleshooting** — Analyser des logs, des outputs de commandes show, ou des messages d'erreur pour suggérer des causes et des solutions.
+
+3. **Documenter le réseau** — Générer de la documentation à partir de configurations existantes, créer des diagrammes, rédiger des procédures.
+
+4. **Automatiser des tâches répétitives** — Écrire des scripts Python ou Ansible pour des opérations de masse (changement de mot de passe sur 100 switches, audit de conformité).
+
+5. **Former et expliquer** — Expliquer un concept réseau complexe, traduire un output CLI en langage clair.
+
+#### Cas d'usage concrets
+
+| Domaine | Ce que l'IA peut faire | Exemple |
+|---------|----------------------|---------|
+| Configuration | Générer une config à partir d'un template ou d'instructions | "Génère la config OSPF pour R1 avec router-id 1.1.1.1 et les réseaux suivants" |
+| Troubleshooting | Analyser un output et identifier les anomalies | Coller un `show ip ospf neighbor` et demander "pourquoi l'adjacence est en INIT ?" |
+| Documentation | Résumer une configuration en documentation lisible | Transformer un `show running-config` en tableau d'adressage |
+| Scripts | Écrire du code d'automatisation réseau | Générer un script Python avec Netmiko pour collecter des infos sur 50 switches |
+| Apprentissage | Expliquer des concepts ou des outputs | "Explique-moi la différence entre une route OSPF O et O IA" |
+
+#### Intégration dans les outils Cisco
+
+Cisco intègre l'IA dans ses plateformes :
+- **Cisco AI Assistant** dans DNA Center / Catalyst Center : suggestions de troubleshooting, analyses prédictives
+- **Cisco AI Network Analytics** : détection d'anomalies basée sur le ML (voir topic 5.11)
+- **Cisco Networking Academy AI Tutor** : assistant pour l'apprentissage
+
+#### Limites et précautions
+
+C'est ici que l'examen peut poser des questions pièges. Les outils GenAI ne sont **pas** fiables à 100% et présentent des risques spécifiques en environnement réseau :
+
+| Limite | Risque réseau | Bonne pratique |
+|--------|--------------|----------------|
+| **Hallucinations** | Configurations invalides ou dangereuses | Toujours **vérifier** la config générée avant de l'appliquer |
+| **Données obsolètes** | Commandes dépréciées, syntaxe incorrecte pour la version IOS | Croiser avec la **documentation officielle Cisco** |
+| **Pas de contexte réseau** | L'IA ne connaît pas votre topologie, vos VLANs, vos contraintes | Fournir un **contexte complet** (topologie, version IOS, contraintes) |
+| **Confidentialité** | Si vous collez une config avec des mots de passe ou des IPs publiques | Ne jamais partager d'infos sensibles avec un outil IA public |
+| **Dépendance** | Perte de compétences si on se repose uniquement sur l'IA | L'IA est un **assistant**, pas un remplaçant — comprendre le "pourquoi" reste essentiel |
+
+#### Bonnes pratiques d'utilisation
+
+1. **Vérifier** : toute configuration générée doit être validée manuellement ou dans un lab
+2. **Contextualiser** : fournir un maximum de contexte (topologie, version IOS, contraintes)
+3. **Anonymiser** : supprimer les mots de passe, IPs publiques et noms de domaine réels avant de soumettre à un outil IA cloud
+4. **Comprendre** : ne pas appliquer aveuglément — l'IA peut expliquer sa logique, demandez-le
+5. **Combiner** : utiliser l'IA en complément de la documentation officielle, pas à la place
+
+### Mise en pratique CLI
+
+```
+! Exemple : un administrateur demande à un outil GenAI
+! "Génère la configuration pour un switch avec VLAN 10 (Users),
+!  VLAN 20 (Servers), une interface de management en VLAN 10
+!  et les ports Gi0/1-12 en access VLAN 10"
+
+! L'IA génère cette configuration :
+Switch(config)# vlan 10
+Switch(config-vlan)# name Users
+Switch(config-vlan)# exit
+Switch(config)# vlan 20
+Switch(config-vlan)# name Servers
+Switch(config-vlan)# exit
+!
+Switch(config)# interface range GigabitEthernet0/1-12
+Switch(config-if-range)# switchport mode access
+Switch(config-if-range)# switchport access vlan 10
+Switch(config-if-range)# exit
+!
+Switch(config)# interface vlan 10
+Switch(config-if)# ip address 10.1.10.2 255.255.255.0
+Switch(config-if)# no shutdown
+
+! VÉRIFICATION HUMAINE NÉCESSAIRE :
+! - L'adresse IP 10.1.10.2 est-elle disponible dans votre réseau ?
+! - Le masque /24 correspond-il à votre plan d'adressage ?
+! - Les ports Gi0/1-12 existent-ils physiquement sur votre switch ?
+! - Faut-il configurer un trunk sur un port uplink ?
+! - Où est la default gateway (ip default-gateway) ?
+```
+
+### Point exam
+
+> **Piège courant** : L'examen ne teste pas votre capacité à utiliser ChatGPT ou un outil spécifique. Il teste votre compréhension des **avantages, limites et bonnes pratiques** de l'IA générative pour le networking. Les questions porteront probablement sur : quand l'IA est utile, quand elle est risquée, et quelle vérification humaine est indispensable.
+>
+> **À retenir** : L'IA générative est un **outil d'assistance**, pas un remplacement de l'expertise réseau. Les deux risques principaux à retenir : les **hallucinations** (informations fausses présentées avec confiance) et la **confidentialité** (ne pas exposer des données sensibles du réseau). Toute configuration générée par IA doit être **validée** avant déploiement.
+
+### Exercice 1.14 — Évaluer l'usage de l'IA
+
+**Contexte** : Un collègue junior vous dit : "J'ai demandé à un outil IA de me générer la configuration OSPF pour notre nouveau routeur et je vais l'appliquer directement en production."
+
+**Consigne** : Listez au moins 4 risques de cette approche et proposez une procédure plus sûre.
+
+**Indice** : <details><summary>Voir l'indice</summary>Pensez aux hallucinations, au contexte réseau que l'IA ne connaît pas, à la confidentialité, et aux tests préalables.</details>
+
+<details>
+<summary>Solution</summary>
+
+**Risques identifiés** :
+1. **Hallucination** : la config peut contenir des commandes inexistantes ou une syntaxe incorrecte pour la version IOS du routeur
+2. **Contexte absent** : l'IA ne connaît pas votre router-id existant, vos réseaux OSPF actuels, vos passive-interfaces, ni les adjacences déjà établies — la config risque de casser des adjacences existantes
+3. **Confidentialité** : si le collègue a collé des informations réseau (adresses publiques, noms de domaine) dans un outil cloud, ces données sont potentiellement exposées
+4. **Pas de test** : appliquer directement en production sans tester dans un lab est risqué, que la config vienne d'une IA ou d'un humain
+5. **Dépendance** : si le collègue ne comprend pas les commandes générées, il ne pourra pas diagnostiquer un problème lié à cette configuration
+
+**Procédure recommandée** :
+1. Fournir un contexte complet à l'IA (topologie, version IOS, contraintes)
+2. Anonymiser les données sensibles avant de les soumettre
+3. **Relire et comprendre** chaque commande générée
+4. Tester dans Packet Tracer ou un lab GNS3/EVE-NG
+5. Appliquer en production pendant une fenêtre de maintenance
+6. Vérifier les adjacences OSPF avec `show ip ospf neighbor` immédiatement après
+
+</details>
+
+### Voir aussi
+
+- Topic 5.11 dans Module 5 (Machine Learning pour la sécurité réseau — autre ajout v1.1)
+- Topic 6.1 dans Module 6 (automatisation réseau — l'IA générative peut générer du code d'automatisation)
+- Topic 6.5 dans Module 6 (REST APIs — l'IA peut aider à écrire des requêtes API)
+
+---
+
+## Labs Module 1
+
+### Lab 1.1 — Câblage et identification des interfaces
+
+**Topologie :**
+```
+                        ┌──────────────┐
+                        │              │
+  [PC1]───Gi0/1───[SW1]───Gi0/24───[R1]
+                   │                   │
+                 Gi0/2              Gi0/1
+                   │                   │
+                 [PC2]          (vers WAN)
+```
+
+**Tableau d'adressage :**
+
+| Équipement | Interface | Adresse IP | Masque | Passerelle |
+|------------|-----------|-----------|--------|------------|
+| R1 | Gi0/0 | 192.168.1.1 | 255.255.255.0 | — |
+| R1 | Gi0/1 | 10.0.0.1 | 255.255.255.252 | — |
+| SW1 | VLAN 1 | 192.168.1.2 | 255.255.255.0 | 192.168.1.1 |
+| PC1 | NIC | 192.168.1.10 | 255.255.255.0 | 192.168.1.1 |
+| PC2 | NIC | 192.168.1.11 | 255.255.255.0 | 192.168.1.1 |
+
+**Objectifs :**
+1. Identifier les types d'interfaces et de câbles utilisés
+2. Configurer l'adressage IPv4 sur le routeur et les PCs
+3. Vérifier la connectivité et diagnostiquer les erreurs d'interface
+
+**Configuration de départ :**
+```cisco
+! Router R1
+hostname R1
+no ip domain-lookup
+!
+! Switch SW1
+hostname SW1
+no ip domain-lookup
+```
+
+**Étapes :**
+
+1. **Identifier les câbles nécessaires**
+   - PC1 <-> SW1 : câble **droit** (straight-through) UTP Cat 5e — connecte un endpoint à un switch
+   - PC2 <-> SW1 : câble **droit** UTP Cat 5e
+   - SW1 <-> R1 : câble **droit** UTP Cat 5e — les interfaces modernes gèrent l'auto-MDIX
+   - Note : les câbles croisés sont rarement nécessaires avec les équipements récents grâce à l'auto-MDIX
+
+2. **Configurer le routeur R1**
+   ```cisco
+   R1(config)# interface GigabitEthernet0/0
+   R1(config-if)# description LAN vers SW1
+   R1(config-if)# ip address 192.168.1.1 255.255.255.0
+   R1(config-if)# no shutdown
+   R1(config-if)# exit
+   R1(config)# interface GigabitEthernet0/1
+   R1(config-if)# description WAN
+   R1(config-if)# ip address 10.0.0.1 255.255.255.252
+   R1(config-if)# no shutdown
+   ```
+
+3. **Configurer le switch SW1**
+   ```cisco
+   SW1(config)# interface vlan 1
+   SW1(config-if)# ip address 192.168.1.2 255.255.255.0
+   SW1(config-if)# no shutdown
+   SW1(config-if)# exit
+   SW1(config)# ip default-gateway 192.168.1.1
+   ```
+
+4. **Configurer les PCs** (dans Packet Tracer : Desktop > IP Configuration)
+   - PC1 : IP 192.168.1.10, masque 255.255.255.0, gateway 192.168.1.1
+   - PC2 : IP 192.168.1.11, masque 255.255.255.0, gateway 192.168.1.1
+
+5. **Vérifier la connectivité**
+   - Commande : `ping 192.168.1.1` depuis PC1
+   - Commande : `ping 192.168.1.11` depuis PC1 (test PC <-> PC)
+   - Vérification interfaces : `show ip interface brief` sur R1 et SW1
+
+6. **Diagnostiquer les interfaces**
+   ```cisco
+   SW1# show interfaces status
+   Port      Name       Status       Vlan       Duplex  Speed Type
+   Gi0/1                connected    1          a-full  a-1000 10/100/1000BaseTX
+   Gi0/2                connected    1          a-full  a-1000 10/100/1000BaseTX
+   Gi0/24               connected    1          a-full  a-1000 10/100/1000BaseTX
+   ```
+   - Vérification : `show interfaces Gi0/1` pour les compteurs d'erreurs
+
+**Vérification finale :**
+```cisco
+R1# show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0     192.168.1.1     YES manual up                    up
+GigabitEthernet0/1     10.0.0.1        YES manual up                    up
+
+SW1# show mac address-table
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+   1    0001.4275.a3e1    DYNAMIC     Gi0/1
+   1    0050.7966.6800    DYNAMIC     Gi0/2
+   1    c801.07f1.0000    DYNAMIC     Gi0/24
+```
+
+**Questions de validation :**
+1. Pourquoi le switch SW1 a-t-il besoin d'une `ip default-gateway` alors que le routeur n'en a pas ?
+2. Que se passerait-il si vous configuriez PC1 avec le masque 255.255.0.0 au lieu de 255.255.255.0 ?
+
+---
+
+### Lab 1.2 — Adressage IPv4/IPv6 et sous-réseaux
+
+**Topologie :**
+```
+  [PC-A]───[SW1]───Gi0/0──[R1]──Gi0/1──[R2]──Gi0/0──[SW2]───[PC-B]
+                                          │
+                                        Gi0/1
+                                          │
+                                   [SW3]───[PC-C]
+```
+
+**Tableau d'adressage :**
+
+| Équipement | Interface | IPv4 | Masque | IPv6 |
+|------------|-----------|------|--------|------|
+| R1 | Gi0/0 | 10.10.1.1 | 255.255.255.0 | 2001:DB8:A:1::1/64 |
+| R1 | Gi0/1 | 10.10.0.1 | 255.255.255.252 | 2001:DB8:A:FF::1/64 |
+| R2 | Gi0/0/0 | 10.10.0.2 | 255.255.255.252 | 2001:DB8:A:FF::2/64 |
+| R2 | Gi0/0 | 10.10.2.1 | 255.255.255.0 | 2001:DB8:A:2::1/64 |
+| R2 | Gi0/1 | 10.10.3.1 | 255.255.255.0 | 2001:DB8:A:3::1/64 |
+| PC-A | NIC | 10.10.1.10 | 255.255.255.0 | 2001:DB8:A:1::10/64 |
+| PC-B | NIC | 10.10.2.10 | 255.255.255.0 | 2001:DB8:A:2::10/64 |
+| PC-C | NIC | 10.10.3.10 | 255.255.255.0 | 2001:DB8:A:3::10/64 |
+
+**Objectifs :**
+1. Calculer les sous-réseaux appropriés pour chaque segment
+2. Configurer le dual-stack IPv4 + IPv6 sur les routeurs
+3. Vérifier la connectivité de bout en bout
+
+**Configuration de départ :**
+```cisco
+! R1
+hostname R1
+no ip domain-lookup
+!
+! R2
+hostname R2
+no ip domain-lookup
+```
+
+**Étapes :**
+
+1. **Configurer le dual-stack sur R1**
+   ```cisco
+   R1(config)# ipv6 unicast-routing
+   !
+   R1(config)# interface GigabitEthernet0/0
+   R1(config-if)# description LAN-A
+   R1(config-if)# ip address 10.10.1.1 255.255.255.0
+   R1(config-if)# ipv6 address 2001:DB8:A:1::1/64
+   R1(config-if)# no shutdown
+   R1(config-if)# exit
+   !
+   R1(config)# interface GigabitEthernet0/1
+   R1(config-if)# description Lien vers R2
+   R1(config-if)# ip address 10.10.0.1 255.255.255.252
+   R1(config-if)# ipv6 address 2001:DB8:A:FF::1/64
+   R1(config-if)# no shutdown
+   ```
+
+2. **Configurer le dual-stack sur R2**
+   ```cisco
+   R2(config)# ipv6 unicast-routing
+   !
+   R2(config)# interface GigabitEthernet0/0/0
+   R2(config-if)# description Lien vers R1
+   R2(config-if)# ip address 10.10.0.2 255.255.255.252
+   R2(config-if)# ipv6 address 2001:DB8:A:FF::2/64
+   R2(config-if)# no shutdown
+   R2(config-if)# exit
+   !
+   R2(config)# interface GigabitEthernet0/0
+   R2(config-if)# description LAN-B
+   R2(config-if)# ip address 10.10.2.1 255.255.255.0
+   R2(config-if)# ipv6 address 2001:DB8:A:2::1/64
+   R2(config-if)# no shutdown
+   R2(config-if)# exit
+   !
+   R2(config)# interface GigabitEthernet0/1
+   R2(config-if)# description LAN-C
+   R2(config-if)# ip address 10.10.3.1 255.255.255.0
+   R2(config-if)# ipv6 address 2001:DB8:A:3::1/64
+   R2(config-if)# no shutdown
+   ```
+
+3. **Configurer les routes statiques** (pour la connectivité inter-réseaux)
+   ```cisco
+   ! R1 — routes vers les LANs de R2
+   R1(config)# ip route 10.10.2.0 255.255.255.0 10.10.0.2
+   R1(config)# ip route 10.10.3.0 255.255.255.0 10.10.0.2
+   R1(config)# ipv6 route 2001:DB8:A:2::/64 2001:DB8:A:FF::2
+   R1(config)# ipv6 route 2001:DB8:A:3::/64 2001:DB8:A:FF::2
+
+   ! R2 — route vers le LAN de R1
+   R2(config)# ip route 10.10.1.0 255.255.255.0 10.10.0.1
+   R2(config)# ipv6 route 2001:DB8:A:1::/64 2001:DB8:A:FF::1
+   ```
+
+4. **Configurer les PCs** avec les adresses du tableau (IPv4 + IPv6 + gateway)
+
+5. **Vérifier la connectivité**
+   ```cisco
+   R1# ping 10.10.0.2
+   !!!!!
+   R1# ping 2001:DB8:A:FF::2
+   !!!!!
+   ```
+   - Depuis PC-A : ping vers PC-B (10.10.2.10) et PC-C (10.10.3.10)
+   - Depuis PC-A : ping IPv6 vers PC-B (2001:DB8:A:2::10)
+
+**Vérification finale :**
+```cisco
+R1# show ip route
+     10.0.0.0/8 is variably subnetted, 5 subnets, 2 masks
+C       10.10.0.0/30 is directly connected, GigabitEthernet0/1
+L       10.10.0.1/32 is directly connected, GigabitEthernet0/1
+C       10.10.1.0/24 is directly connected, GigabitEthernet0/0
+L       10.10.1.1/32 is directly connected, GigabitEthernet0/0
+S       10.10.2.0/24 [1/0] via 10.10.0.2
+S       10.10.3.0/24 [1/0] via 10.10.0.2
+
+R2# show ipv6 interface brief
+GigabitEthernet0/0             [up/up]
+    FE80::1
+    2001:DB8:A:2::1
+GigabitEthernet0/0/0           [up/up]
+    FE80::2
+    2001:DB8:A:FF::2
+GigabitEthernet0/1             [up/up]
+    FE80::3
+    2001:DB8:A:3::1
+```
+
+**Questions de validation :**
+1. Pourquoi le lien R1-R2 utilise un /30 en IPv4 mais un /64 en IPv6 ?
+2. Que se passerait-il si vous oubliez `ipv6 unicast-routing` sur R2 ?
+
+---
+
+## Quiz Module 1 — 15 questions
+
+**Q1.** Quel composant réseau opère principalement à la couche 3 et interconnecte des réseaux différents ? _(Topic 1.1)_
+
+- A) Switch Layer 2
+- B) Hub
+- C) Routeur
+- D) Point d'accès Wi-Fi
+
+<details>
+<summary>Réponse</summary>
+
+**C** — Le routeur opère à la couche 3 (réseau) et prend ses décisions de transfert basées sur les adresses IP. Le switch L2 opère en couche 2 (MAC), le hub en couche 1 (physique), et l'AP fait un bridge entre le wireless et le filaire (couches 1-2).
+
+</details>
+
+---
+
+**Q2.** Dans une architecture spine-leaf, combien de sauts séparent deux serveurs connectés à des leafs différents ? _(Topic 1.2)_
+
+- A) 1
+- B) 2
+- C) 3
+- D) Variable selon la topologie
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Dans une topologie spine-leaf, le chemin est toujours leaf → spine → leaf, soit exactement **2 sauts**. C'est l'un des avantages principaux : la latence est prévisible et uniforme.
+
+</details>
+
+---
+
+**Q3.** Quelle est la distance maximale d'un câble UTP Cat 6a pour une liaison 10 Gbps ? _(Topic 1.3)_
+
+- A) 55 mètres
+- B) 100 mètres
+- C) 300 mètres
+- D) 550 mètres
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Tous les câbles UTP, quelle que soit leur catégorie (5e, 6, 6a), sont limités à **100 mètres**. La catégorie détermine le débit supporté sur cette distance, pas la distance elle-même. Cat 6 standard ne supporte le 10G que sur 55 m, mais Cat 6a le supporte sur la totalité des 100 m.
+
+</details>
+
+---
+
+**Q4.** Un technicien observe des late collisions sur une interface en half-duplex. Quelle est la cause la plus probable ? _(Topic 1.4)_
+
+- A) Câble trop court
+- B) Duplex mismatch
+- C) Vitesse trop élevée
+- D) VLAN mal configuré
+
+<details>
+<summary>Réponse</summary>
+
+**B** — Les **late collisions** (collisions détectées après les 64 premiers octets) sont le symptôme classique d'un **duplex mismatch**. Le côté en half-duplex détecte des collisions que le côté en full-duplex ignore complètement. Un câble trop court ne cause pas de late collisions. La vitesse et les VLANs ne sont pas liés aux collisions.
+
+</details>
+
+---
+
+**Q5.** Quel protocole de transport utilise un en-tête de seulement 8 octets ? _(Topic 1.5)_
+
+- A) TCP
+- B) UDP
+- C) ICMP
+- D) IP
+
+<details>
+<summary>Réponse</summary>
+
+**B** — L'en-tête UDP fait **8 octets** (source port, destination port, length, checksum). L'en-tête TCP fait 20 à 60 octets. ICMP et IP ne sont pas des protocoles de couche transport au sens strict (IP = couche 3, ICMP est encapsulé dans IP).
+
+</details>
+
+---
+
+**Q6.** Un réseau 172.16.100.0/22 fournit combien d'adresses hôtes utilisables ? _(Topic 1.6)_
+
+- A) 254
+- B) 510
+- C) 1 022
+- D) 2 046
+
+<details>
+<summary>Réponse</summary>
+
+**C** — Un masque /22 laisse 10 bits pour les hôtes (32 - 22 = 10). 2^10 = 1 024 adresses, moins 2 (réseau + broadcast) = **1 022 hôtes utilisables**. Le piège serait de penser que /22 couvre un seul sous-réseau de classe C (/24), mais en réalité il couvre 4 x 256 = 1 024 adresses.
+
+</details>
+
+---
+
+**Q7.** Laquelle de ces adresses est une adresse IPv4 privée selon la RFC 1918 ? _(Topic 1.7)_
+
+- A) 172.32.1.1
+- B) 192.169.1.1
+- C) 10.255.0.1
+- D) 169.254.1.1
+
+<details>
+<summary>Réponse</summary>
+
+**C** — **10.255.0.1** est dans la plage 10.0.0.0/8 (RFC 1918). 172.32.1.1 est hors plage (la plage privée s'arrête à 172.31.x.x). 192.169.1.1 est hors plage (la plage privée est 192.168.x.x). 169.254.1.1 est une adresse APIPA, pas RFC 1918.
+
+</details>
+
+---
+
+**Q8.** Quelle commande est indispensable sur un routeur Cisco pour activer le routage IPv6 ? _(Topic 1.8)_
+
+- A) `ipv6 enable`
+- B) `ipv6 unicast-routing`
+- C) `ipv6 route ::/0`
+- D) `ipv6 address autoconfig`
+
+<details>
+<summary>Réponse</summary>
+
+**B** — La commande `ipv6 unicast-routing` est requise en mode de configuration globale pour que le routeur accepte de router des paquets IPv6. Sans elle, le routeur ne fera que du forwarding local (les interfaces auront des adresses IPv6 mais le routeur ne routera pas entre elles). `ipv6 enable` active IPv6 sur une interface mais n'active pas le routage.
+
+</details>
+
+---
+
+**Q9.** Quel préfixe identifie une adresse IPv6 link-local ? _(Topic 1.9)_
+
+- A) 2001::/16
+- B) FC00::/7
+- C) FE80::/10
+- D) FF02::/16
+
+<details>
+<summary>Réponse</summary>
+
+**C** — **FE80::/10** est le préfixe des adresses link-local. 2001::/16 fait partie des GUA (Global Unicast). FC00::/7 (en pratique FD00::/8) identifie les ULA (Unique Local). FF02::/16 est du multicast link-local.
+
+</details>
+
+---
+
+**Q10.** Un PC Windows affiche l'adresse 169.254.45.200. Quel est le problème le plus probable ? _(Topic 1.10)_
+
+- A) Le serveur DNS est hors service
+- B) Le câble réseau est débranché
+- C) Le serveur DHCP est injoignable
+- D) L'adresse IP est en conflit
+
+<details>
+<summary>Réponse</summary>
+
+**C** — L'adresse 169.254.x.x (APIPA) indique que le PC n'a pas pu obtenir d'adresse du serveur **DHCP**. Le PC attribue automatiquement une adresse APIPA en dernier recours. Le câble pourrait aussi être la cause (B), mais la question demande la cause la plus probable et l'adresse APIPA pointe spécifiquement vers un problème DHCP. Un problème DNS n'affecte pas l'obtention d'adresse IP.
+
+</details>
+
+---
+
+**Q11.** En 2,4 GHz, combien de canaux Wi-Fi sont non-overlapping ? _(Topic 1.11)_
+
+- A) 3
+- B) 11
+- C) 13
+- D) 14
+
+<details>
+<summary>Réponse</summary>
+
+**A** — Seulement **3 canaux** (1, 6, 11) sont non-overlapping en 2,4 GHz. Bien qu'il y ait 11 canaux disponibles en Amérique (13 en Europe, 14 au Japon), chaque canal fait 22 MHz de large et ils sont espacés de seulement 5 MHz. Seuls les canaux 1, 6 et 11 ne se chevauchent pas.
+
+</details>
+
+---
+
+**Q12.** Quel type d'hyperviseur s'installe directement sur le matériel physique sans OS intermédiaire ? _(Topic 1.12)_
+
+- A) Type 1 (bare-metal)
+- B) Type 2 (hosted)
+- C) Container engine
+- D) VRF
+
+<details>
+<summary>Réponse</summary>
+
+**A** — L'hyperviseur **Type 1** (bare-metal) s'installe directement sur le hardware (exemples : VMware ESXi, Microsoft Hyper-V Server, KVM). Le Type 2 nécessite un OS hôte (exemples : VirtualBox, VMware Workstation). Un container engine (Docker) n'est pas un hyperviseur. Un VRF est de la virtualisation réseau, pas serveur.
+
+</details>
+
+---
+
+**Q13.** Quel est le timer d'aging par défaut de la table MAC sur un switch Cisco ? _(Topic 1.13)_
+
+- A) 60 secondes
+- B) 180 secondes
+- C) 300 secondes
+- D) 600 secondes
+
+<details>
+<summary>Réponse</summary>
+
+**C** — Le timer d'aging par défaut est de **300 secondes** (5 minutes). Si une adresse MAC n'est pas vue en source pendant 300 secondes, elle est supprimée de la table MAC. Ce timer est modifiable avec `mac address-table aging-time`.
+
+</details>
+
+---
+
+**Q14.** Un switch reçoit une trame avec une adresse MAC destination inconnue. Que fait-il ? _(Topic 1.13)_
+
+- A) Il supprime la trame
+- B) Il envoie la trame à la passerelle par défaut
+- C) Il flood la trame sur tous les ports du même VLAN sauf le port source
+- D) Il flood la trame sur tous les ports de tous les VLANs
+
+<details>
+<summary>Réponse</summary>
+
+**C** — Quand le switch ne connaît pas la MAC destination (unknown unicast), il **flood** la trame sur **tous les ports du même VLAN**, sauf le port d'entrée. Le flooding est toujours limité au VLAN. Il ne supprime pas la trame et ne l'envoie pas à la gateway (ce n'est pas un routeur).
+
+</details>
+
+---
+
+**Q15.** Quel est le principal risque d'appliquer directement une configuration réseau générée par un outil d'IA générative ? _(Topic 1.14)_
+
+- A) La configuration sera trop lente à générer
+- B) L'outil ne supporte pas la syntaxe Cisco
+- C) L'IA peut produire des configurations incorrectes (hallucinations) sans contexte de votre réseau
+- D) L'IA ne peut pas générer de configurations réseau
+
+<details>
+<summary>Réponse</summary>
+
+**C** — Le principal risque est l'**hallucination** : l'IA peut générer des configurations qui semblent correctes mais contiennent des erreurs (commandes inexistantes, paramètres inadaptés à votre topologie). L'IA ne connaît pas votre réseau spécifique. Elle peut très bien générer des configs Cisco (D est faux), et la vitesse de génération n'est pas un problème (A est non pertinent). La plupart des outils GenAI supportent bien la syntaxe Cisco (B est incorrect).
+
+</details>
+
+---
+
+## Récapitulatif Module 1
+
+| Topic | Concept clé | Commande(s) essentielles |
+|-------|------------|--------------------------|
+| 1.1 | Routeur (L3), Switch L2/L3, NGFW, AP, WLC, DNA Center, PoE | `show cdp neighbors`, `show power inline` |
+| 1.2 | Two-tier, three-tier, spine-leaf, WAN, SOHO, cloud | `show cdp neighbors detail` |
+| 1.3 | UTP (100 m max), MMF (aqua), SMF (jaune, longue distance) | `show interfaces transceiver` |
+| 1.4 | Duplex mismatch → late collisions, CRC = câble ou mismatch | `show interfaces`, `show interfaces status` |
+| 1.5 | TCP = fiable/connexion, UDP = rapide/sans connexion | `show tcp brief`, `show ip traffic` |
+| 1.6 | Subnetting : 2^n - 2 hôtes, VLSM, notation CIDR | `show ip interface brief`, `ip address` |
+| 1.7 | RFC 1918 : 10/8, 172.16/12, 192.168/16. APIPA != privé | `show ip interface brief` |
+| 1.8 | IPv6 = 128 bits, /64 standard, `ipv6 unicast-routing` obligatoire | `show ipv6 interface brief` |
+| 1.9 | GUA (2xxx), LLA (FE80), ULA (FDxx), multicast (FFxx), EUI-64 | `show ipv6 interface` |
+| 1.10 | Windows: `ipconfig /all`, Linux: `ip addr`, macOS: `ifconfig` | `ipconfig`, `ip addr`, `ifconfig` |
+| 1.11 | 3 canaux non-overlapping (1,6,11), WPA2=AES, WPA3=SAE | `show ap summary`, `show ap channel` |
+| 1.12 | VM (hyperviseur), container (Docker), VRF (routage virtuel) | `show ip vrf`, `show ip route vrf` |
+| 1.13 | MAC learning (source), forwarding (destination), aging 300s | `show mac address-table` |
+| 1.14 | GenAI = assistant, risques : hallucinations, confidentialité | — (pas de commande CLI spécifique) |
+
+**Check-list avant de passer au Module 2 :**
+- [ ] Je sais expliquer le rôle de chaque composant réseau (routeur, switch L2/L3, NGFW, AP, WLC, DNA Center)
+- [ ] Je sais décrire et comparer les topologies (2-tier, 3-tier, spine-leaf, WAN, SOHO)
+- [ ] Je sais choisir le bon câble selon la distance et le débit (UTP, MMF, SMF)
+- [ ] Je sais lire un `show interfaces` et identifier les erreurs (CRC, late collisions, duplex mismatch)
+- [ ] Je sais comparer TCP et UDP et associer les protocoles applicatifs au bon transport
+- [ ] Je sais calculer des sous-réseaux IPv4 (adresse réseau, broadcast, hôtes, VLSM)
+- [ ] Je connais les trois plages RFC 1918 et leurs limites exactes
+- [ ] Je sais configurer et vérifier IPv6 (adresses, `ipv6 unicast-routing`, types d'adresses)
+- [ ] Je sais vérifier les paramètres IP sur Windows, Linux et macOS
+- [ ] Je sais décrire les principes wireless (canaux, SSID, RF, chiffrement)
+- [ ] Je sais expliquer la virtualisation (VM vs container vs VRF)
+- [ ] Je sais décrire le fonctionnement du switch (MAC learning, flooding, aging)
+- [ ] Je sais décrire les usages et limites de l'IA générative pour le networking
+- [ ] J'ai complété les 14 exercices
+- [ ] J'ai réalisé les 2 labs (Packet Tracer)
+- [ ] J'ai obtenu >70% au quiz (11/15 minimum)

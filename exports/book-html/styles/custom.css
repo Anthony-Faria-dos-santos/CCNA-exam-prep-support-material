@@ -1,0 +1,64 @@
+/* Fallback CSS — used if SCSS compilation fails */
+
+:root {
+  --navy: #1a2332;
+  --cisco-blue: #049fd9;
+  --light-gray: #f4f6f8;
+  --medium-gray: #e2e6ea;
+  --accent: #ff6b35;
+  --lab-green: #28a745;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #2d3748;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+h1 {
+  border-bottom: 3px solid var(--cisco-blue);
+  padding-bottom: 0.4rem;
+}
+
+/* Callouts */
+.callout-tip { border-left-color: var(--cisco-blue) !important; }
+.callout-warning { border-left-color: var(--accent) !important; }
+.callout-note { border-left-color: #6c757d !important; }
+.callout-important { border-left-color: var(--lab-green) !important; }
+
+/* Code blocks */
+div.sourceCode {
+  background-color: #1e1e2e;
+  border-left: 4px solid var(--cisco-blue);
+  border-radius: 6px;
+}
+
+div.sourceCode pre {
+  background-color: #1e1e2e;
+  color: #cdd6f4;
+  padding: 1rem 1.2rem;
+  font-size: 0.88rem;
+}
+
+code:not(.sourceCode) {
+  background-color: var(--light-gray);
+  color: var(--navy);
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+}
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 1.2rem 0; }
+thead th {
+  background-color: var(--navy);
+  color: #fff;
+  padding: 0.65rem 0.8rem;
+  font-weight: 600;
+}
+tbody tr { border-bottom: 1px solid var(--medium-gray); }
+tbody tr:nth-child(even) { background-color: var(--light-gray); }
+tbody td { padding: 0.55rem 0.8rem; }
